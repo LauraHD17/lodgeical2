@@ -1,33 +1,86 @@
 // src/App.jsx
-// Root application component.
-// Full routing, providers, and lazy-loaded pages are wired in Phase 4.
-// For now: minimal shell to verify design tokens and base config work.
+// Full routing setup. All page components are lazy-loaded.
+// Admin routes wrapped in RouteGuard + AdminLayout.
 
-function App() {
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+import { AuthProvider } from '@/lib/auth/AuthContext'
+import { PropertyProvider } from '@/lib/property/PropertyContext'
+import { ToastProvider } from '@/components/ui/ToastProvider'
+import { RouteGuard } from '@/components/auth/RouteGuard'
+import { AdminLayout } from '@/components/layout/AdminLayout'
+import { PageLoader } from '@/components/shared/PageLoader'
+
+// Admin pages (lazy-loaded)
+const Dashboard       = lazy(() => import('@/pages/admin/Dashboard'))
+const Reservations    = lazy(() => import('@/pages/admin/Reservations'))
+const Rooms           = lazy(() => import('@/pages/admin/Rooms'))
+const Guests          = lazy(() => import('@/pages/admin/Guests'))
+const Rates           = lazy(() => import('@/pages/admin/Rates'))
+const Payments        = lazy(() => import('@/pages/admin/Payments'))
+const Messaging       = lazy(() => import('@/pages/admin/Messaging'))
+const Documents       = lazy(() => import('@/pages/admin/Documents'))
+const Reports         = lazy(() => import('@/pages/admin/Reports'))
+const Settings        = lazy(() => import('@/pages/admin/Settings'))
+const Import          = lazy(() => import('@/pages/admin/Import'))
+
+// Public pages (lazy-loaded)
+const Login               = lazy(() => import('@/pages/public/Login'))
+const Widget              = lazy(() => import('@/pages/public/Widget'))
+const GuestPortal         = lazy(() => import('@/pages/public/GuestPortal'))
+const BookingConfirmation = lazy(() => import('@/pages/public/BookingConfirmation'))
+const Invoice             = lazy(() => import('@/pages/public/Invoice'))
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 1000 * 60 * 2, retry: 1 },
+  },
+})
+
+function AdminPage({ permission, children }) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto p-8">
-        <h1 className="font-heading text-text-primary mb-2">Lodge-ical</h1>
-        <p className="font-body text-text-secondary text-[15px]">
-          Property management platform — build in progress.
-        </p>
-        <div className="mt-6 p-6 bg-surface border border-border rounded-[var(--radius-card)]">
-          <h4 className="font-body text-text-primary uppercase tracking-[0.06em] text-[13px] font-semibold mb-3">
-            Design Token Verification
-          </h4>
-          <p className="font-mono text-[14px] text-text-primary">
-            $1,234.56 — IBM Plex Mono (prices, dates, IDs)
-          </p>
-          <div className="mt-3 flex gap-2 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-success-bg text-success text-[12px] font-semibold">confirmed</span>
-            <span className="px-3 py-1 rounded-full bg-warning-bg text-warning text-[12px] font-semibold">pending</span>
-            <span className="px-3 py-1 rounded-full bg-danger-bg text-danger text-[12px] font-semibold">cancelled</span>
-            <span className="px-3 py-1 rounded-full bg-info-bg text-info text-[12px] font-semibold">info</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <RouteGuard permission={permission}>
+      <AdminLayout>{children}</AdminLayout>
+    </RouteGuard>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <PropertyProvider>
+            <ToastProvider>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  {/* Admin routes */}
+                  <Route path="/" element={<AdminPage permission="view_dashboard"><Dashboard /></AdminPage>} />
+                  <Route path="/reservations" element={<AdminPage permission="view_reservations"><Reservations /></AdminPage>} />
+                  <Route path="/rooms" element={<AdminPage permission="manage_rooms"><Rooms /></AdminPage>} />
+                  <Route path="/guests" element={<AdminPage permission="manage_guests"><Guests /></AdminPage>} />
+                  <Route path="/rates" element={<AdminPage permission="manage_rooms"><Rates /></AdminPage>} />
+                  <Route path="/payments" element={<AdminPage permission="manage_payments"><Payments /></AdminPage>} />
+                  <Route path="/messaging" element={<AdminPage permission="manage_messaging"><Messaging /></AdminPage>} />
+                  <Route path="/documents" element={<AdminPage permission="manage_documents"><Documents /></AdminPage>} />
+                  <Route path="/reports" element={<AdminPage permission="view_reports"><Reports /></AdminPage>} />
+                  <Route path="/settings" element={<AdminPage permission="manage_settings"><Settings /></AdminPage>} />
+                  <Route path="/import" element={<AdminPage permission="manage_reservations"><Import /></AdminPage>} />
+
+                  {/* Public routes */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/widget" element={<Widget />} />
+                  <Route path="/guest-portal" element={<GuestPortal />} />
+                  <Route path="/booking-confirmation" element={<BookingConfirmation />} />
+                  <Route path="/invoice/:id" element={<Invoice />} />
+                </Routes>
+              </Suspense>
+            </ToastProvider>
+          </PropertyProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  )
+}
