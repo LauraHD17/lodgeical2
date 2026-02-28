@@ -1,0 +1,49 @@
+/* Lodge-ical Design Tokens — CSS Custom Properties */
+/* This file is the single source of truth for all design values. */
+
+:root {
+  /* Surface colors */
+  --color-background: #E8E8E8;
+  --color-surface: #F4F4F4;
+  --color-surface-raised: #FFFFFF;
+  --color-border: #D4D4D4;
+
+  /* Text colors */
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+
+  /* Semantic colors */
+  --color-success: #15803D;
+  --color-success-bg: #DCFCE7;
+  --color-warning: #B45309;
+  --color-warning-bg: #FEF3C7;
+  --color-danger: #BE123C;
+  --color-danger-bg: #FFE4E6;
+  --color-info: #1D4ED8;
+  --color-info-bg: #DBEAFE;
+
+  /* Table */
+  --color-table-alt: #F8FAFC;
+
+  /* Typography */
+  --font-heading: 'Questrial', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  /* Font sizes */
+  --text-h1: 32px;
+  --text-h2: 24px;
+  --text-h3: 18px;
+  --text-h4: 13px;
+  --text-body: 15px;
+  --text-caption: 13px;
+  --text-mono: 14px;
+  --text-mono-sm: 13px;
+
+  /* Spacing */
+  --radius-card: 8px;
+  --radius-modal: 12px;
+  --radius-chip: 999px;
+  --radius-input: 6px;
+}

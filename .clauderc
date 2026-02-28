@@ -1,0 +1,57 @@
+# Lodge-ical AI Context File
+# This file provides mandatory context to Claude Code for every session.
+# These rules are enforced by ESLint config and the locked Tailwind palette.
+
+project: Lodge-ical
+description: Property management platform for small inns (< 15 rooms)
+
+## Design System Rules (MANDATORY)
+
+### Colors — ONLY these tokens exist. No other colors.
+background: #E8E8E8     # All page/app surface backgrounds
+surface: #F4F4F4        # Cards, panels, sidebar
+surface-raised: #FFFFFF # Modals, dropdowns, tooltips
+border: #D4D4D4         # All borders and dividers
+text-primary: #1A1A1A   # All primary readable text
+text-secondary: #555555 # Labels, captions, helper text
+text-muted: #888888     # Placeholders, disabled text
+success: #15803D        # Text only — confirmed, paid, active
+success-bg: #DCFCE7     # Success chip background
+warning: #B45309        # Text only — pending, partial, attention
+warning-bg: #FEF3C7     # Warning chip background
+danger: #BE123C         # Text only — error, cancelled, overdue
+danger-bg: #FFE4E6      # Danger chip background
+info: #1D4ED8           # Links, focus rings, informational
+info-bg: #DBEAFE        # Info callout background
+
+### Typography Rules
+- h1: Questrial, 32px, weight 400. NEVER bold — Questrial has no bold.
+- h2: Questrial, 24px, weight 400.
+- h3: DM Sans, 18px, weight 600.
+- h4: DM Sans, 13px, weight 600, letter-spacing 0.06em, ALL CAPS.
+- body: DM Sans, 15px, weight 400, line-height 1.65.
+- caption: DM Sans, 13px, weight 400, color text-secondary.
+- ALL numeric data (prices, dates, IDs, counts): IBM Plex Mono, 14px. Always.
+
+### Component Rules
+- Buttons: min 44px height. Primary has NO border-radius (sharp corners).
+- Inputs: 44px height, 1.5px solid border, 6px border-radius.
+- Focus ring: 2px offset, info color.
+- Never use raw hex values in component code — always use Tailwind design token classes.
+- Never use floating labels. Label always above input, external.
+
+### Architecture Rules
+- AuthContext calls supabase.auth.getUser() once. RouteGuard never calls Supabase directly.
+- PropertyContext reads from AuthContext only.
+- usePaymentSummary calls the Edge Function. Never calculate payments client-side.
+- All routes defined in src/config/routes.js only.
+- All query keys defined in src/config/queryKeys.js only.
+- All dates: ISO strings (YYYY-MM-DD) in state and API calls. Never Date objects.
+- All monetary values: integer cents in state and API. Display with IBM Plex Mono.
+
+### Forbidden
+- No hardcoded hex colors in any component file.
+- No payment math in frontend code.
+- No class components. Function components + hooks only.
+- No packages not in the approved stack without explicit approval.
+- No VITE_ env vars containing secret keys.

@@ -1,0 +1,71 @@
+/* Lodge-ical Global Styles — Font imports and body resets only */
+
+/* Google Fonts — self-hosted via Google CDN */
+@import url('https://fonts.googleapis.com/css2?family=Questrial&family=DM+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap');
+
+@import './design-tokens.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Body reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--color-text-primary);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--color-background);
+}
+
+/* Typography resets */
+h1 {
+  font-family: var(--font-heading);
+  font-size: var(--text-h1);
+  font-weight: 400;
+}
+
+h2 {
+  font-family: var(--font-heading);
+  font-size: var(--text-h2);
+  font-weight: 400;
+}
+
+h3 {
+  font-family: var(--font-body);
+  font-size: var(--text-h3);
+  font-weight: 600;
+}
+
+h4 {
+  font-family: var(--font-body);
+  font-size: var(--text-h4);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Numeric / mono data */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-weight: 400;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
