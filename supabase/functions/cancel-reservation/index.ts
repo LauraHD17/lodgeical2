@@ -1,0 +1,161 @@
+// cancel-reservation Edge Function
+// Applies cancellation policy, calculates refund, updates status.
+
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
+import { requireAuth } from '../_shared/auth.ts'
+import { rateLimit } from '../_shared/rateLimit.ts'
+import { getStripe } from '../_shared/stripe.ts'
+
+const CORS_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type',
+}
+
+const inputSchema = z.object({
+  reservation_id: z.string().uuid(),
+  preview_only: z.boolean().default(false), // if true, just return refund amount
+})
+
+export function calculateRefundCents(
+  policy: string,
+  totalDueCents: number,
+  netPaidCents: number,
+  checkInDate: string,
+  today: string = new Date().toISOString().slice(0, 10)
+): number {
+  const daysUntilCheckIn = Math.ceil(
+    (new Date(checkInDate).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  if (policy === 'flexible') {
+    // Full refund if cancelled > 1 day before check-in
+    return daysUntilCheckIn >= 1 ? netPaidCents : 0
+  }
+
+  if (policy === 'moderate') {
+    // Full refund if cancelled > 5 days before; 50% if 1-5 days; none on day-of
+    if (daysUntilCheckIn >= 5) return netPaidCents
+    if (daysUntilCheckIn >= 1) return Math.floor(netPaidCents / 2)
+    return 0
+  }
+
+  if (policy === 'strict') {
+    // Full refund only if cancelled > 14 days before; no refund otherwise
+    return daysUntilCheckIn >= 14 ? netPaidCents : 0
+  }
+
+  return 0
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
+
+  const rateLimitError = rateLimit(req)
+  if (rateLimitError) return rateLimitError
+
+  // Support both admin auth and guest portal (guest portal sets a special header)
+  const isGuestRequest = req.headers.get('x-guest-cancel') === 'true'
+  let propertyId: string | null = null
+
+  if (!isGuestRequest) {
+    const authResult = await requireAuth(req)
+    if (authResult.error) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS_HEADERS })
+    }
+    propertyId = authResult.propertyId
+  }
+
+  let body: unknown
+  try { body = await req.json() } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: CORS_HEADERS })
+  }
+  const parsed = inputSchema.safeParse(body)
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: 'Invalid input' }), { status: 400, headers: CORS_HEADERS })
+  }
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+  // Fetch reservation
+  const resQuery = supabase
+    .from('reservations')
+    .select('*, guests(email, first_name, last_name)')
+    .eq('id', parsed.data.reservation_id)
+
+  if (propertyId) resQuery.eq('property_id', propertyId)
+
+  const { data: reservation, error: resError } = await resQuery.single()
+  if (resError || !reservation) {
+    return new Response(JSON.stringify({ error: 'Reservation not found' }), { status: 404, headers: CORS_HEADERS })
+  }
+
+  if (reservation.status === 'cancelled') {
+    return new Response(JSON.stringify({ error: 'Reservation is already cancelled' }), { status: 400, headers: CORS_HEADERS })
+  }
+
+  // Fetch settings for cancellation policy
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('cancellation_policy')
+    .eq('property_id', reservation.property_id)
+    .single()
+
+  const policy = settings?.cancellation_policy ?? 'moderate'
+
+  // Calculate net paid (succeeded charges minus refunds)
+  const { data: payments } = await supabase
+    .from('payments')
+    .select('type, status, amount_cents, stripe_payment_intent_id')
+    .eq('reservation_id', parsed.data.reservation_id)
+
+  const netPaidCents = (payments ?? []).reduce((sum, p) => {
+    if (p.status !== 'succeeded') return sum
+    return p.type === 'charge' ? sum + p.amount_cents : sum - p.amount_cents
+  }, 0)
+
+  const refundCents = calculateRefundCents(policy, reservation.total_due_cents, netPaidCents, reservation.check_in)
+
+  // If preview only, return the refund amount without cancelling
+  if (parsed.data.preview_only) {
+    return new Response(JSON.stringify({ refund_cents: refundCents, policy }), { headers: CORS_HEADERS })
+  }
+
+  // Process refund via Stripe if applicable
+  if (refundCents > 0) {
+    const stripePayment = (payments ?? []).find(p => p.type === 'charge' && p.status === 'succeeded' && p.stripe_payment_intent_id)
+    if (stripePayment?.stripe_payment_intent_id) {
+      try {
+        const stripe = getStripe()
+        await stripe.refunds.create({
+          payment_intent: stripePayment.stripe_payment_intent_id,
+          amount: refundCents,
+        })
+        // Create refund record
+        await supabase.from('payments').insert({
+          reservation_id: parsed.data.reservation_id,
+          property_id: reservation.property_id,
+          type: 'refund',
+          amount_cents: refundCents,
+          status: 'pending', // webhook will mark as succeeded
+          method: 'stripe',
+        })
+      } catch (e) {
+        console.error('[cancel-reservation] refund error:', e)
+      }
+    }
+  }
+
+  // Cancel the reservation
+  await supabase
+    .from('reservations')
+    .update({ status: 'cancelled' })
+    .eq('id', parsed.data.reservation_id)
+
+  return new Response(
+    JSON.stringify({ success: true, refund_cents: refundCents, policy }),
+    { headers: CORS_HEADERS }
+  )
+})
