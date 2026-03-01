@@ -133,9 +133,9 @@ serve(async (req) => {
     const roomId = roomByName.get(row.room_name.toLowerCase().trim())
     if (!roomId) {
       errors.push({
-        row,
+        row: rowNum,
         error: `Room "${row.room_name}" not found in this property`,
-      } as unknown as RowError)
+      })
       continue
     }
 
