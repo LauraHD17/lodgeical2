@@ -1,64 +1,8 @@
 // tests/unit/csvImport.test.js
 // Unit tests for the CSV parsing logic used by the Import page.
-// Mirrors the RFC 4180 parser implementation from Import.jsx.
 
 import { describe, it, expect } from 'vitest'
-
-// ---------------------------------------------------------------------------
-// RFC 4180 CSV parser — mirrors Import.jsx implementation
-// ---------------------------------------------------------------------------
-
-function parseRfc4180(text) {
-  const records = []
-  let row = []
-  let i = 0
-  const n = text.length
-
-  while (i < n) {
-    if (text[i] === '"') {
-      i++
-      let field = ''
-      while (i < n) {
-        if (text[i] === '"') {
-          if (text[i + 1] === '"') { field += '"'; i += 2 }
-          else { i++; break }
-        } else { field += text[i++] }
-      }
-      row.push(field)
-      if (text[i] === ',') i++
-      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
-      else if (text[i] === '\n') { records.push(row); row = []; i++ }
-    } else {
-      let field = ''
-      while (i < n && text[i] !== ',' && text[i] !== '\r' && text[i] !== '\n') {
-        field += text[i++]
-      }
-      row.push(field.trim())
-      if (text[i] === ',') i++
-      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
-      else if (text[i] === '\n') { records.push(row); row = []; i++ }
-      else if (i >= n && row.length > 0) { records.push(row); row = [] }
-    }
-  }
-
-  if (row.length > 0) records.push(row)
-  return records
-}
-
-function parseCsvToRows(text) {
-  if (!text?.trim()) return { headers: [], rows: [] }
-  const records = parseRfc4180(text)
-  if (records.length < 2) return { headers: [], rows: [] }
-  const headers = records[0].map(h => h.trim())
-  const rows = records.slice(1)
-    .filter(cells => cells.some(c => c !== ''))
-    .map(cells => {
-      const obj = {}
-      headers.forEach((h, i) => { obj[h] = cells[i] ?? '' })
-      return obj
-    })
-  return { headers, rows }
-}
+import { parseCsvToRows } from '../../src/lib/csv/parseRfc4180.js'
 
 // ---------------------------------------------------------------------------
 // Tests — basic parsing

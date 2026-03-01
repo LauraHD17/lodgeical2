@@ -90,15 +90,18 @@ serve(async (req) => {
     })
   }
 
-  // 3. Load all rooms for this property (to map room_name → room_id)
-  const { data: propertyRooms } = await supabase
-    .from('rooms')
-    .select('id, name')
-    .eq('property_id', propertyId)
+  // 3. Load rooms + existing confirmation numbers in parallel (both independent of row data)
+  const [{ data: propertyRooms }, { data: existingReservations }] = await Promise.all([
+    supabase.from('rooms').select('id, name').eq('property_id', propertyId),
+    supabase.from('reservations').select('confirmation_number').eq('property_id', propertyId),
+  ])
 
   const roomByName = new Map<string, string>(
     (propertyRooms ?? []).map(r => [r.name.toLowerCase().trim(), r.id])
   )
+
+  // Pre-load into a Set for O(1) duplicate checks — avoids N+1 per-row SELECT
+  const existingConfNums = new Set((existingReservations ?? []).map(r => r.confirmation_number))
 
   // 4. Process each row
   let imported = 0
@@ -119,15 +122,8 @@ serve(async (req) => {
     }
     const row: CsvRow = parsed.data
 
-    // Check for duplicate confirmation_number
-    const { data: dup } = await supabase
-      .from('reservations')
-      .select('id')
-      .eq('property_id', propertyId)
-      .eq('confirmation_number', row.confirmation_number)
-      .single()
-
-    if (dup) { skipped++; continue }
+    // Check for duplicate confirmation_number (O(1) — pre-loaded above)
+    if (existingConfNums.has(row.confirmation_number)) { skipped++; continue }
 
     // Resolve room
     const roomId = roomByName.get(row.room_name.toLowerCase().trim())

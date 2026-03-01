@@ -9,6 +9,7 @@
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { icsEscape, toIcsDate, toIcsDateTime } from '../_shared/ical.ts'
 
 const ICAL_CONTENT_TYPE = 'text/calendar; charset=utf-8'
 
@@ -134,33 +135,3 @@ function buildIcs(
   return lines
 }
 
-/** Convert 'YYYY-MM-DD' to 'YYYYMMDD' for iCal DATE values */
-function toIcsDate(dateStr: string): string | null {
-  if (!dateStr || !/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return null
-  return dateStr.slice(0, 10).replace(/-/g, '')
-}
-
-/** Convert ISO timestamp to 'YYYYMMDDTHHmmssZ' for iCal DATETIME values */
-function toIcsDateTime(iso: string): string {
-  try {
-    const d = new Date(iso)
-    return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
-  } catch {
-    return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
-  }
-}
-
-/**
- * Escape special characters per RFC 5545 §3.3.11.
- * CR (\r) is stripped first to prevent iCal property injection — a lone \r
- * is treated as a line terminator by many parsers, allowing user-supplied
- * strings (guest names, notes) to inject arbitrary iCal properties.
- */
-function icsEscape(str: string): string {
-  return str
-    .replace(/\r/g, '')     // strip CR to prevent property injection
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g,  '\\;')
-    .replace(/,/g,  '\\,')
-    .replace(/\n/g, '\\n')
-}
