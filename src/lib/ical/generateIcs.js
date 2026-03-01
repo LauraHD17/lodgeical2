@@ -5,11 +5,16 @@
 
 /**
  * Escape special characters per RFC 5545 §3.3.11.
+ * CR (\r) is stripped before any other processing to prevent iCal property
+ * injection — a lone \r is interpreted as a line terminator by many parsers,
+ * which would let user-supplied text (e.g. guest names or notes) inject
+ * arbitrary iCal properties into the exported feed.
  * @param {string} str
  * @returns {string}
  */
 export function icsEscape(str) {
   return String(str ?? '')
+    .replace(/\r/g, '')     // strip CR first to prevent property injection
     .replace(/\\/g, '\\\\')
     .replace(/;/g,  '\\;')
     .replace(/,/g,  '\\,')

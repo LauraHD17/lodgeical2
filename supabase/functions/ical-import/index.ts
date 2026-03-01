@@ -23,6 +23,32 @@ const CORS_HEADERS = {
 // Internal "blocked date" guest — created once per property on first sync.
 const BLOCKED_GUEST_EMAIL = 'blocked@lodge-ical.internal'
 
+/**
+ * Validate that a user-supplied URL is safe to fetch.
+ * - Must be HTTPS (prevents plain-text interception)
+ * - Must not target private/link-local/loopback IP ranges (prevents SSRF)
+ */
+function isSafeExternalUrl(raw: string): boolean {
+  let parsed: URL
+  try { parsed = new URL(raw) } catch { return false }
+  if (parsed.protocol !== 'https:') return false
+
+  const h = parsed.hostname.toLowerCase()
+  // Loopback and common internal hostnames
+  if (h === 'localhost' || h === '0.0.0.0') return false
+  // IPv4 private / reserved ranges
+  if (/^127\./.test(h)) return false              // 127.0.0.0/8
+  if (/^10\./.test(h)) return false               // 10.0.0.0/8
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false  // 172.16-31.x.x
+  if (/^192\.168\./.test(h)) return false          // 192.168.0.0/16
+  if (/^169\.254\./.test(h)) return false          // 169.254.0.0/16 link-local
+  // IPv6 loopback and ULA
+  if (h === '::1' || h === '[::1]') return false
+  if (/^\[?fe80:/i.test(h)) return false           // link-local
+  if (/^\[?fc00:/i.test(h) || /^\[?fd/i.test(h)) return false  // ULA
+  return true
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
@@ -77,6 +103,14 @@ serve(async (req) => {
   let targetUrl: string
 
   if (feed_url) {
+    // Validate URL before saving or fetching (SSRF prevention)
+    if (!isSafeExternalUrl(feed_url)) {
+      return new Response(
+        JSON.stringify({ error: 'feed_url must be an HTTPS URL pointing to a public host' }),
+        { status: 400, headers: CORS_HEADERS },
+      )
+    }
+
     // Save (upsert) the feed record then sync
     await supabase
       .from('room_external_feeds')
@@ -186,7 +220,11 @@ serve(async (req) => {
     })
 
     if (insertErr) {
-      // Conflict (duplicate confirmation_number race) — skip silently
+      // 23505 = unique_violation (duplicate confirmation_number race) — skip
+      // Any other error code is unexpected and should be logged for debugging.
+      if (insertErr.code !== '23505') {
+        console.error('[ical-import] Unexpected insert error:', insertErr.code, insertErr.message)
+      }
       skipped++
     } else {
       synced++
@@ -275,13 +313,27 @@ function parseDate(val: string | undefined): string | null {
   return `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}`
 }
 
-/** Produce a stable, short confirmation number from an iCal event */
+/**
+ * Produce a stable, collision-resistant confirmation number from an iCal event.
+ * Uses FNV-1a 32-bit hash of the full UID so two events that share a common
+ * prefix (e.g. "airbnb-123456@airbnb.com" vs "airbnb-1234567@airbnb.com") still
+ * produce distinct keys.
+ */
 function deriveConfirmationNumber(event: IcsEvent, roomId: string): string {
   if (event.uid) {
-    // Use the first 20 chars of the UID (guaranteed unique per source)
-    return `EXT-${event.uid.slice(0, 20).replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`
+    return `EXT-${fnv1a32(event.uid)}`
   }
-  // Fallback: date range + room prefix
-  const room = roomId.slice(0, 6).toUpperCase()
-  return `EXT-${room}-${event.dtstart?.replace(/-/g, '')}-${event.dtend?.replace(/-/g, '')}`
+  // Fallback: hash of room + date range (still collision-resistant)
+  const fallbackKey = `${roomId}|${event.dtstart}|${event.dtend}`
+  return `EXT-${fnv1a32(fallbackKey)}`
+}
+
+/** FNV-1a 32-bit hash — fast, non-cryptographic, collision-resistant for string keys */
+function fnv1a32(str: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0  // unsigned 32-bit
+  }
+  return h.toString(16).padStart(8, '0').toUpperCase()
 }

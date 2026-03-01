@@ -14,6 +14,15 @@ import { parseIcs, parseDate } from '../../src/lib/ical/parseIcs.js'
 // icsEscape
 // ---------------------------------------------------------------------------
 describe('icsEscape', () => {
+  it('strips carriage return to prevent iCal property injection', () => {
+    // A lone \r is treated as a line terminator by many iCal parsers;
+    // allowing it through would let a guest name like "Alice\rDTSTART:20200101"
+    // inject arbitrary properties into the feed.
+    expect(icsEscape('Alice\rSmith')).toBe('AliceSmith')
+    expect(icsEscape('note\rDTSTART:20200101')).toBe('noteDTSTART:20200101')
+    expect(icsEscape('\r')).toBe('')
+  })
+
   it('escapes backslash', () => {
     expect(icsEscape('a\\b')).toBe('a\\\\b')
   })

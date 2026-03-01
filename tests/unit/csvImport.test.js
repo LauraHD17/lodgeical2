@@ -1,29 +1,67 @@
 // tests/unit/csvImport.test.js
 // Unit tests for the CSV parsing logic used by the Import page.
-// Tests the parseCsvToRows function extracted as a pure utility
-// (mirrors the inline function in Import.jsx).
+// Mirrors the RFC 4180 parser implementation from Import.jsx.
 
 import { describe, it, expect } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Pure CSV parser utility (mirrors Import.jsx implementation)
+// RFC 4180 CSV parser — mirrors Import.jsx implementation
 // ---------------------------------------------------------------------------
 
+function parseRfc4180(text) {
+  const records = []
+  let row = []
+  let i = 0
+  const n = text.length
+
+  while (i < n) {
+    if (text[i] === '"') {
+      i++
+      let field = ''
+      while (i < n) {
+        if (text[i] === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2 }
+          else { i++; break }
+        } else { field += text[i++] }
+      }
+      row.push(field)
+      if (text[i] === ',') i++
+      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
+      else if (text[i] === '\n') { records.push(row); row = []; i++ }
+    } else {
+      let field = ''
+      while (i < n && text[i] !== ',' && text[i] !== '\r' && text[i] !== '\n') {
+        field += text[i++]
+      }
+      row.push(field.trim())
+      if (text[i] === ',') i++
+      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
+      else if (text[i] === '\n') { records.push(row); row = []; i++ }
+      else if (i >= n && row.length > 0) { records.push(row); row = [] }
+    }
+  }
+
+  if (row.length > 0) records.push(row)
+  return records
+}
+
 function parseCsvToRows(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  if (lines.length < 2) return { headers: [], rows: [] }
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-  const rows = lines.slice(1).map(line => {
-    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-    const obj = {}
-    headers.forEach((h, i) => { obj[h] = cells[i] ?? '' })
-    return obj
-  })
+  if (!text?.trim()) return { headers: [], rows: [] }
+  const records = parseRfc4180(text)
+  if (records.length < 2) return { headers: [], rows: [] }
+  const headers = records[0].map(h => h.trim())
+  const rows = records.slice(1)
+    .filter(cells => cells.some(c => c !== ''))
+    .map(cells => {
+      const obj = {}
+      headers.forEach((h, i) => { obj[h] = cells[i] ?? '' })
+      return obj
+    })
   return { headers, rows }
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests — basic parsing
 // ---------------------------------------------------------------------------
 
 const SAMPLE_CSV = [
@@ -79,13 +117,18 @@ describe('parseCsvToRows', () => {
     expect(rows).toEqual([])
   })
 
+  it('returns empty headers and rows for null/undefined', () => {
+    expect(parseCsvToRows(null)).toEqual({ headers: [], rows: [] })
+    expect(parseCsvToRows(undefined)).toEqual({ headers: [], rows: [] })
+  })
+
   it('trims whitespace from headers', () => {
-    const csv = ' name , email \nAlice, alice@example.com'
+    const csv = ' name , email \nAlice,alice@example.com'
     const { headers } = parseCsvToRows(csv)
     expect(headers).toEqual(['name', 'email'])
   })
 
-  it('trims whitespace from cell values', () => {
+  it('trims whitespace from unquoted cell values', () => {
     const csv = 'name,email\n Alice , alice@example.com '
     const { rows } = parseCsvToRows(csv)
     expect(rows[0].name).toBe('Alice')
@@ -116,6 +159,61 @@ describe('parseCsvToRows', () => {
     const { rows } = parseCsvToRows(csv)
     expect(rows).toHaveLength(1)
     expect(rows[0]).toEqual({ a: '1', b: '2', c: '3' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// RFC 4180 quoted-field handling
+// ---------------------------------------------------------------------------
+
+describe('parseCsvToRows — RFC 4180 quoted fields', () => {
+  it('preserves comma inside a quoted field', () => {
+    const csv = 'name,notes\nAlice,"Loves hiking, camping"'
+    const { rows } = parseCsvToRows(csv)
+    expect(rows[0].notes).toBe('Loves hiking, camping')
+  })
+
+  it('handles multiple commas inside a quoted field', () => {
+    const csv = 'id,text\n1,"one, two, three"'
+    const { rows } = parseCsvToRows(csv)
+    expect(rows[0].text).toBe('one, two, three')
+  })
+
+  it('handles escaped double-quote inside a quoted field (RFC 4180 §2.7)', () => {
+    const csv = 'name,quote\nAlice,"She said ""hello"""'
+    const { rows } = parseCsvToRows(csv)
+    expect(rows[0].quote).toBe('She said "hello"')
+  })
+
+  it('parses a row where all fields are quoted', () => {
+    const csv = '"a","b","c"\n"1","2","3"'
+    const { rows } = parseCsvToRows(csv)
+    expect(rows[0]).toEqual({ a: '1', b: '2', c: '3' })
+  })
+
+  it('correctly handles notes field containing a comma (realistic import row)', () => {
+    const csv = [
+      'confirmation_number,check_in,check_out,num_guests,guest_first_name,guest_last_name,guest_email,guest_phone,room_name,total_due_cents,status,notes',
+      'RES-001,2026-06-01,2026-06-05,2,John,Doe,john@example.com,+1 555 0100,Cabin A,59600,confirmed,"Late check-in, please leave key"',
+    ].join('\n')
+    const { rows } = parseCsvToRows(csv)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].notes).toBe('Late check-in, please leave key')
+    expect(rows[0].confirmation_number).toBe('RES-001')
+  })
+
+  it('naive split would break comma-in-notes but RFC 4180 does not', () => {
+    // This test documents the bug that was fixed: with split(','), the comma
+    // inside the quoted notes field would cause the columns to shift, producing
+    // 13 cells instead of 12 and the wrong values.
+    const csv = [
+      'a,b,c',
+      '1,2,"three, point five"',
+    ].join('\n')
+    const { rows } = parseCsvToRows(csv)
+    expect(rows[0].a).toBe('1')
+    expect(rows[0].b).toBe('2')
+    expect(rows[0].c).toBe('three, point five')
   })
 })
 

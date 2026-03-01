@@ -150,9 +150,15 @@ function toIcsDateTime(iso: string): string {
   }
 }
 
-/** Escape special characters per RFC 5545 §3.3.11 */
+/**
+ * Escape special characters per RFC 5545 §3.3.11.
+ * CR (\r) is stripped first to prevent iCal property injection — a lone \r
+ * is treated as a line terminator by many parsers, allowing user-supplied
+ * strings (guest names, notes) to inject arbitrary iCal properties.
+ */
 function icsEscape(str: string): string {
   return str
+    .replace(/\r/g, '')     // strip CR to prevent property injection
     .replace(/\\/g, '\\\\')
     .replace(/;/g,  '\\;')
     .replace(/,/g,  '\\,')

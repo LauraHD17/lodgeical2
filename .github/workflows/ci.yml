@@ -60,11 +60,13 @@ jobs:
     needs: test
 
     env:
-      # These can be left empty — the smoke tests only check public routes
-      # and auth redirects which work even without a live Supabase project.
-      VITE_SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL || '' }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || '' }}
-      VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY || '' }}
+      # Smoke tests only check routing / rendering — no real Supabase calls.
+      # These stub values satisfy the truthy check in supabaseClient.js so the
+      # app boots; any actual API calls will fail fast (DNS NXDOMAIN) and
+      # the auth context will resolve to unauthenticated, which is what we test.
+      VITE_SUPABASE_URL:           ${{ secrets.VITE_SUPABASE_URL || 'https://e2e-stub.supabase.co' }}
+      VITE_SUPABASE_ANON_KEY:      ${{ secrets.VITE_SUPABASE_ANON_KEY || 'e2e-stub-anon-key-not-real' }}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_stub' }}
 
     steps:
       - name: Checkout

@@ -51,18 +51,78 @@ function downloadTemplate() {
   URL.revokeObjectURL(url)
 }
 
-/** Parse a CSV text into an array of row objects keyed by header. */
+/**
+ * Parse a CSV text into headers + row objects, per RFC 4180.
+ * Handles quoted fields that contain commas, escaped quotes (""), and
+ * CRLF/LF line endings.
+ */
 function parseCsvToRows(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  if (lines.length < 2) return { headers: [], rows: [] }
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-  const rows = lines.slice(1).map(line => {
-    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-    const obj = {}
-    headers.forEach((h, i) => { obj[h] = cells[i] ?? '' })
-    return obj
-  })
+  if (!text?.trim()) return { headers: [], rows: [] }
+
+  const records = parseRfc4180(text)
+  if (records.length < 2) return { headers: [], rows: [] }
+
+  const headers = records[0].map(h => h.trim())
+  const rows = records.slice(1)
+    .filter(cells => cells.some(c => c !== ''))  // skip blank lines
+    .map(cells => {
+      const obj = {}
+      headers.forEach((h, i) => { obj[h] = cells[i] ?? '' })
+      return obj
+    })
+
   return { headers, rows }
+}
+
+/**
+ * RFC 4180 CSV parser. Returns a 2-D array of string cells.
+ * Handles: quoted fields, escaped double-quotes (""), CRLF and LF.
+ */
+function parseRfc4180(text) {
+  const records = []
+  let row = []
+  let i = 0
+  const n = text.length
+
+  while (i < n) {
+    // Quoted field
+    if (text[i] === '"') {
+      i++ // skip opening quote
+      let field = ''
+      while (i < n) {
+        if (text[i] === '"') {
+          if (text[i + 1] === '"') {
+            field += '"'  // escaped quote
+            i += 2
+          } else {
+            i++  // closing quote
+            break
+          }
+        } else {
+          field += text[i++]
+        }
+      }
+      row.push(field)
+      // Skip delimiter or line ending after closing quote
+      if (text[i] === ',') i++
+      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
+      else if (text[i] === '\n') { records.push(row); row = []; i++ }
+    } else {
+      // Unquoted field — read until comma or line ending
+      let field = ''
+      while (i < n && text[i] !== ',' && text[i] !== '\r' && text[i] !== '\n') {
+        field += text[i++]
+      }
+      row.push(field.trim())
+      if (text[i] === ',') i++
+      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
+      else if (text[i] === '\n') { records.push(row); row = []; i++ }
+      else if (i >= n && row.length > 0) { records.push(row); row = [] }
+    }
+  }
+
+  if (row.length > 0) records.push(row)
+  return records
 }
 
 export default function Import() {
@@ -114,14 +174,18 @@ export default function Import() {
     setResult(null)
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY
       const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        addToast({ message: 'Your session has expired. Please log in again.', variant: 'error' })
+        setImporting(false)
+        return
+      }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/import-csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token ?? anonKey}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ rows: preview.allRows }),
       })

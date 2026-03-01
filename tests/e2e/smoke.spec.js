@@ -2,10 +2,31 @@
 // Smoke tests — verify that public routes render without crashing
 // and that admin routes redirect unauthenticated users to /login.
 //
-// These tests do NOT require a live Supabase connection because they only
-// check static shell rendering and redirect behaviour.
+// No live Supabase connection is required. All Supabase HTTP calls are
+// intercepted and return an empty/unauthenticated response immediately so
+// the auth guard resolves without waiting for a real network round-trip.
 
 import { test, expect } from '@playwright/test'
+
+// ---------------------------------------------------------------------------
+// Intercept Supabase auth/REST calls for every test so the auth context
+// resolves to "no session" instantly rather than timing out on DNS.
+// ---------------------------------------------------------------------------
+
+test.beforeEach(async ({ page }) => {
+  // Auth endpoint — return 401 so supabase-js treats session as absent
+  await page.route('**/auth/v1/**', route =>
+    route.fulfill({ status: 401, contentType: 'application/json', body: '{}' })
+  )
+  // REST endpoint — return empty list for any data queries
+  await page.route('**/rest/v1/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  )
+  // Edge functions — return empty success
+  await page.route('**/functions/v1/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+  )
+})
 
 // ---------------------------------------------------------------------------
 // Public routes — accessible without login
@@ -15,15 +36,12 @@ test.describe('Public routes', () => {
   test('Login page renders the sign-in form', async ({ page }) => {
     await page.goto('/login')
     await expect(page).toHaveTitle(/Lodge/i)
-    // The login page should show an email field
     await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10_000 })
   })
 
   test('Widget page renders without crashing', async ({ page }) => {
     await page.goto('/widget')
-    // The page must not show a blank white screen — expect at least one element
     await expect(page.locator('body')).not.toBeEmpty()
-    // No unhandled JS error banner
     await expect(page.locator('[data-testid="error-boundary"]')).toHaveCount(0)
   })
 
@@ -40,7 +58,6 @@ test.describe('Public routes', () => {
 test.describe('Auth guard', () => {
   test('visiting / redirects unauthenticated user to /login', async ({ page }) => {
     await page.goto('/')
-    // Wait for navigation — must end up at /login
     await page.waitForURL(/\/login/, { timeout: 10_000 })
     await expect(page.url()).toContain('/login')
   })
@@ -65,8 +82,6 @@ test.describe('Auth guard', () => {
 test.describe('Unknown routes', () => {
   test('unknown route redirects or shows login', async ({ page }) => {
     await page.goto('/this-route-does-not-exist')
-    // Either ends up at login (auth guard catches it) or shows a 404 page —
-    // the important thing is no unhandled crash.
     await expect(page.locator('body')).not.toBeEmpty()
   })
 })

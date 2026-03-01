@@ -575,13 +575,9 @@ function ChannelSyncTab() {
     setSyncing(feed.room_id)
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY
       const { data: { session } } = await supabase.auth.getSession()
-
-      const { data: { session } } = await supabase.auth.getSession()
-
       if (!session) {
-        addToast({ message: 'You must be logged in to sync feeds.', variant: 'error' })
+        addToast({ message: 'Your session has expired. Please log in again.', variant: 'error' })
         setSyncing(null)
         return
       }
@@ -594,6 +590,8 @@ function ChannelSyncTab() {
         },
         body: JSON.stringify({ room_id: feed.room_id }),
       })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Sync failed')
       addToast({
         message: `Synced: ${json.synced} new block(s), ${json.skipped} skipped`,
         variant: 'success',
