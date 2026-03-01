@@ -252,6 +252,7 @@ export default function Guests() {
           columns={COLUMNS}
           data={guests}
           loading={isLoading}
+          onRowClick={(row) => setSelectedGuest(row)}
           emptyState={
             <p className="font-body text-[15px] text-text-muted py-8">
               {debouncedSearch ? `No guests matching "${debouncedSearch}"` : 'No guests yet'}
@@ -259,14 +260,6 @@ export default function Guests() {
           }
         />
       </div>
-
-      {/* Clickable rows — overlay since DataTable doesn't natively support row clicks */}
-      {/* We render a visually hidden row overlay approach via separate solution */}
-      {guests.length > 0 && !isLoading && (
-        <div className="text-[13px] text-text-muted font-body">
-          Click a guest row to view details. ({guests.length} guest{guests.length !== 1 ? 's' : ''} found)
-        </div>
-      )}
 
       {/* Guest Drawer */}
       {selectedGuest && (

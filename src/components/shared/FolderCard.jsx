@@ -1,24 +1,27 @@
 import { cn } from '@/lib/utils'
 
-// Color map — only approved design tokens
-const colorMap = {
-  primary: '#1A1A1A',
-  info: '#1D4ED8',
-  success: '#15803D',
-  warning: '#B45309',
-  danger: '#BE123C',
+// Maps color tokens to Tailwind background utility classes.
+// Values must be static strings so Tailwind JIT can detect them.
+const tabClassMap = {
+  primary: 'bg-text-primary',
+  info:    'bg-info',
+  success: 'bg-success',
+  warning: 'bg-warning',
+  danger:  'bg-danger',
 }
 
 export function FolderCard({ color = 'primary', tabLabel, children, className }) {
-  const bgColor = colorMap[color] ?? colorMap.primary
+  const tabClass = tabClassMap[color] ?? tabClassMap.primary
 
   return (
     <div className={cn('inline-block w-full', className)}>
       {/* Top tab — flush left, rounded top corners only */}
       <div
-        className="inline-block px-4 py-2 text-[13px] font-body font-semibold text-white
-                   rounded-tl-[8px] rounded-tr-[8px]"
-        style={{ backgroundColor: bgColor }}
+        className={cn(
+          tabClass,
+          'inline-block px-4 py-2 text-[13px] font-body font-semibold text-white',
+          'rounded-tl-[8px] rounded-tr-[8px]'
+        )}
       >
         {tabLabel}
       </div>

@@ -87,7 +87,8 @@ function Step1Dates({ checkIn, checkOut, onSelect, bookedRanges = [], minStay = 
           start: typeof range.start === 'string' ? parseISO(range.start) : range.start,
           end: typeof range.end === 'string' ? parseISO(range.end) : range.end,
         })
-      } catch {
+      } catch (err) {
+        console.warn('[isBooked] invalid date range skipped:', range, err)
         return false
       }
     })

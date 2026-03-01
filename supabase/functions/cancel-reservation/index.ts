@@ -16,7 +16,11 @@ const CORS_HEADERS = {
 
 const inputSchema = z.object({
   reservation_id: z.string().uuid(),
-  preview_only: z.boolean().default(false), // if true, just return refund amount
+  preview_only: z.boolean().default(false),
+  // Required when the request is unauthenticated (guest self-service)
+  email: z.string().email().optional(),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
 })
 
 export function calculateRefundCents(
@@ -56,8 +60,11 @@ serve(async (req) => {
   const rateLimitError = rateLimit(req)
   if (rateLimitError) return rateLimitError
 
-  // Support both admin auth and guest portal (guest portal sets a special header)
-  const isGuestRequest = req.headers.get('x-guest-cancel') === 'true'
+  // A request is a guest (unauthenticated) request if it carries no Authorization header.
+  // Admin requests must supply a valid JWT; guest requests must supply identity fields in
+  // the body so we can verify them against the reservation record.
+  const hasAuthHeader = !!req.headers.get('authorization')
+  const isGuestRequest = !hasAuthHeader
   let propertyId: string | null = null
 
   if (!isGuestRequest) {
@@ -77,9 +84,21 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Invalid input' }), { status: 400, headers: CORS_HEADERS })
   }
 
+  // Guest requests must supply all three identity fields up-front so we can verify
+  // them before touching any data.
+  if (isGuestRequest) {
+    const { email, first_name, last_name } = parsed.data
+    if (!email || !first_name || !last_name) {
+      return new Response(
+        JSON.stringify({ error: 'email, first_name, and last_name are required to cancel a reservation' }),
+        { status: 401, headers: CORS_HEADERS }
+      )
+    }
+  }
+
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // Fetch reservation
+  // Fetch reservation — admin requests are additionally scoped to their property
   const resQuery = supabase
     .from('reservations')
     .select('*, guests(email, first_name, last_name)')
@@ -90,6 +109,22 @@ serve(async (req) => {
   const { data: reservation, error: resError } = await resQuery.single()
   if (resError || !reservation) {
     return new Response(JSON.stringify({ error: 'Reservation not found' }), { status: 404, headers: CORS_HEADERS })
+  }
+
+  // Verify guest identity for unauthenticated requests
+  if (isGuestRequest) {
+    const { email, first_name, last_name } = parsed.data as Required<typeof parsed.data>
+    const guest = reservation.guests
+    const emailMatch = guest?.email?.toLowerCase() === email.toLowerCase()
+    const firstMatch = guest?.first_name?.toLowerCase() === first_name.toLowerCase()
+    const lastMatch = guest?.last_name?.toLowerCase() === last_name.toLowerCase()
+
+    if (!emailMatch || !firstMatch || !lastMatch) {
+      return new Response(
+        JSON.stringify({ error: 'Identity verification failed' }),
+        { status: 403, headers: CORS_HEADERS }
+      )
+    }
   }
 
   if (reservation.status === 'cancelled') {

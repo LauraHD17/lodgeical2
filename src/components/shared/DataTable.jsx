@@ -21,6 +21,7 @@ export function DataTable({
   onSort,
   sortKey,
   sortDir,
+  onRowClick,
 }) {
   function handleSort(col) {
     if (!col.sortable || !onSort) return
@@ -85,9 +86,14 @@ export function DataTable({
             data.map((row, rowIndex) => (
               <tr
                 key={row.id ?? rowIndex}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onRowClick(row) } : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? 'button' : undefined}
                 className={cn(
                   'transition-colors duration-150 hover:bg-info-bg',
-                  rowIndex % 2 === 0 ? 'bg-white' : 'bg-tableAlt'
+                  rowIndex % 2 === 0 ? 'bg-white' : 'bg-tableAlt',
+                  onRowClick && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-info'
                 )}
               >
                 {columns.map((col) => (
