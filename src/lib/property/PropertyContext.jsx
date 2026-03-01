@@ -3,7 +3,7 @@
 export { useProperty } from './useProperty'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '../auth/useAuth'
 import { PropertyContext } from './propertyContext'
 import { getRolePermissions } from '../auth/permissions'

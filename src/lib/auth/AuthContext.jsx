@@ -5,7 +5,7 @@
 export { useAuth } from './useAuth'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../supabaseClient'
+import { supabase } from '@/lib/supabaseClient'
 import { AuthContext } from './authContext'
 
 export function AuthProvider({ children }) {
