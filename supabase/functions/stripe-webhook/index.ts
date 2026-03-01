@@ -85,18 +85,21 @@ serve(async (req) => {
     const charge = event.data.object as { id: string; amount_refunded: number; payment_intent?: string }
 
     if (charge.payment_intent) {
-      await supabase
+      // Resolve the reservation_id first — cannot pass a query builder to .eq()
+      const { data: chargeRow } = await supabase
         .from('payments')
-        .update({ status: 'succeeded' })
-        .eq('reservation_id',
-          supabase
-            .from('payments')
-            .select('reservation_id')
-            .eq('stripe_payment_intent_id', charge.payment_intent)
-            .limit(1)
-        )
-        .eq('type', 'refund')
-        .eq('status', 'pending')
+        .select('reservation_id')
+        .eq('stripe_payment_intent_id', charge.payment_intent)
+        .single()
+
+      if (chargeRow?.reservation_id) {
+        await supabase
+          .from('payments')
+          .update({ status: 'succeeded' })
+          .eq('reservation_id', chargeRow.reservation_id)
+          .eq('type', 'refund')
+          .eq('status', 'pending')
+      }
     }
   }
 
