@@ -17,13 +17,12 @@ export function PropertyProvider({ children }) {
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
-      // Use a microtask to avoid calling setState synchronously inside the effect body
-      const id = setTimeout(() => setState({ propertyId: null, property: null, settings: null, role: null, permissions: [], isLoading: false, error: null }), 0)
-      return () => clearTimeout(id)
+      setState({ propertyId: null, property: null, settings: null, role: null, permissions: [], isLoading: false, error: null })
+      return
     }
 
     let mounted = true
-    setTimeout(() => { if (mounted) setState(prev => ({ ...prev, isLoading: true, error: null })) }, 0)
+    setState(prev => ({ ...prev, isLoading: true, error: null }))
 
     async function loadProperty() {
       try {
