@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import * as Switch from '@radix-ui/react-switch'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, ArrowsClockwise, Link, CalendarPlus } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -540,8 +540,6 @@ function ChannelSyncTab() {
   const [newLabel, setNewLabel] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [syncing, setSyncing] = useState(null) // room_id being synced
-
-  const roomOptions = rooms.map(r => ({ value: r.id, label: r.name }))
 
   // Rooms that don't already have a feed configured
   const feedRoomIds = new Set(feeds.map(f => f.room_id))
