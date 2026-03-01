@@ -40,6 +40,7 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   // Fetch reservation by confirmation number
+  // check_in_time / check_out_time live on the settings table, not properties
   const { data: reservation, error: resError } = await supabase
     .from('reservations')
     .select(`
@@ -47,7 +48,7 @@ serve(async (req) => {
       status, origin, total_due_cents, notes, created_at,
       room_ids, property_id,
       guests!inner(id, first_name, last_name, email, phone),
-      properties(name, check_in_time, check_out_time, timezone, location)
+      properties(name, timezone, location)
     `)
     .eq('confirmation_number', parsed.data.confirmation_number)
     .single()
@@ -66,6 +67,24 @@ serve(async (req) => {
     return GENERIC_NOT_FOUND
   }
 
+  // Fetch check_in_time / check_out_time / min_stay_nights from settings (not properties)
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('check_in_time, check_out_time, min_stay_nights')
+    .eq('property_id', reservation.property_id)
+    .single()
+
+  // Merge settings into the properties object to preserve the API shape the frontend expects
+  const reservationWithTimes = {
+    ...reservation,
+    properties: {
+      ...(reservation.properties as Record<string, unknown> ?? {}),
+      check_in_time: settings?.check_in_time ?? null,
+      check_out_time: settings?.check_out_time ?? null,
+      min_stay_nights: settings?.min_stay_nights ?? null,
+    },
+  }
+
   // Fetch rooms for display
   const { data: rooms } = await supabase
     .from('rooms')
@@ -81,7 +100,7 @@ serve(async (req) => {
   const paymentSummary = calculatePaymentSummary(reservation.total_due_cents, payments ?? [])
 
   return new Response(
-    JSON.stringify({ reservation, rooms: rooms ?? [], paymentSummary }),
+    JSON.stringify({ reservation: reservationWithTimes, rooms: rooms ?? [], paymentSummary }),
     { headers: CORS_HEADERS }
   )
 })

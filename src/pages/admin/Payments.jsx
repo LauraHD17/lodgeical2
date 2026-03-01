@@ -1,6 +1,7 @@
 // src/pages/admin/Payments.jsx
 // Payments management page.
-// NEVER calculates totals — only displays from usePaymentSummary per reservation.
+// NEVER calculates per-reservation payment balances locally — those always come from usePaymentSummary.
+// Page-level aggregate totals (collected, refunded, pending) summarize the raw payments list for display only.
 
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'

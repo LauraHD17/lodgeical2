@@ -190,7 +190,6 @@ serve(async (req) => {
       total_due_cents: totalDueCents,
       confirmation_number: confirmationNumber,
       notes: input.notes ?? null,
-      created_by: user.id,
     })
     .select()
     .single()
