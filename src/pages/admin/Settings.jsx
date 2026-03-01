@@ -578,16 +578,22 @@ function ChannelSyncTab() {
       const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY
       const { data: { session } } = await supabase.auth.getSession()
 
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        addToast({ message: 'You must be logged in to sync feeds.', variant: 'error' })
+        setSyncing(null)
+        return
+      }
+
       const res = await fetch(`${supabaseUrl}/functions/v1/ical-import`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token ?? anonKey}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ room_id: feed.room_id }),
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Sync failed')
       addToast({
         message: `Synced: ${json.synced} new block(s), ${json.skipped} skipped`,
         variant: 'success',
