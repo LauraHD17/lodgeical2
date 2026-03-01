@@ -27,10 +27,15 @@ async function enableMocking() {
   })
 }
 
-enableMocking().then(() => {
-  createRoot(document.getElementById('root')).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
-})
+enableMocking()
+  .catch((err) => {
+    // MSW init failure must not silently swallow the app — log and continue.
+    console.error('[MSW] Failed to start mock service worker:', err)
+  })
+  .then(() => {
+    createRoot(document.getElementById('root')).render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+  })
