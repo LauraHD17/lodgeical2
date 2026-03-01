@@ -1,0 +1,587 @@
+// src/components/reservations/ReservationModal.jsx
+// Multi-step modal for creating / editing reservations.
+// Steps: 1=Dates, 2=Rooms, 3=Guest, 4=Review
+
+import { useState, useEffect } from 'react'
+import { DayPicker } from 'react-day-picker'
+import 'react-day-picker/style.css'
+import { format, differenceInCalendarDays, isWithinInterval, parseISO } from 'date-fns'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { CheckCircle, ArrowLeft, ArrowRight } from '@phosphor-icons/react'
+
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { FolderCard } from '@/components/shared/FolderCard'
+import { ConflictBanner } from './ConflictBanner'
+import { useRooms } from '@/hooks/useRooms'
+import { useGuestByEmail } from '@/hooks/useGuests'
+import { useCreateReservation, useUpdateReservation } from '@/hooks/useReservations'
+import { useToast } from '@/components/ui/useToast'
+import { cn } from '@/lib/utils'
+
+const STEPS = ['Dates', 'Rooms', 'Guest', 'Review']
+
+const guestSchema = z.object({
+  email: z.string().email('Valid email required'),
+  first_name: z.string().min(1, 'First name required'),
+  last_name: z.string().min(1, 'Last name required'),
+  phone: z.string().optional(),
+  num_guests: z.coerce.number().min(1, 'At least 1 guest'),
+  notes: z.string().optional(),
+})
+
+function StepIndicator({ currentStep }) {
+  return (
+    <div className="flex items-center gap-0 mb-8">
+      {STEPS.map((label, idx) => {
+        const stepNum = idx + 1
+        const isDone = stepNum < currentStep
+        const isActive = stepNum === currentStep
+        return (
+          <div key={label} className="flex items-center">
+            <div className="flex flex-col items-center">
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold font-body transition-colors',
+                  isDone && 'bg-success text-white',
+                  isActive && 'bg-text-primary text-white',
+                  !isDone && !isActive && 'bg-border text-text-muted'
+                )}
+              >
+                {isDone ? <CheckCircle size={16} weight="fill" /> : stepNum}
+              </div>
+              <span
+                className={cn(
+                  'text-[11px] font-body mt-1 whitespace-nowrap',
+                  isActive ? 'text-text-primary font-semibold' : 'text-text-muted'
+                )}
+              >
+                {label}
+              </span>
+            </div>
+            {idx < STEPS.length - 1 && (
+              <div
+                className={cn(
+                  'h-[2px] w-12 mx-1 mb-5 transition-colors',
+                  stepNum < currentStep ? 'bg-success' : 'bg-border'
+                )}
+              />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function Step1Dates({ checkIn, checkOut, onSelect, bookedRanges = [], minStay = 1 }) {
+  const nights = checkIn && checkOut ? differenceInCalendarDays(checkOut, checkIn) : 0
+
+  function isBooked(day) {
+    return bookedRanges.some((range) => {
+      try {
+        return isWithinInterval(day, {
+          start: typeof range.start === 'string' ? parseISO(range.start) : range.start,
+          end: typeof range.end === 'string' ? parseISO(range.end) : range.end,
+        })
+      } catch (err) {
+        console.warn('[isBooked] invalid date range skipped:', range, err)
+        return false
+      }
+    })
+  }
+
+  const selected = checkIn && checkOut ? { from: checkIn, to: checkOut } : checkIn ? { from: checkIn } : undefined
+
+  return (
+    <div>
+      <h3 className="font-body font-semibold text-[16px] text-text-primary mb-4">
+        Select check-in &amp; check-out dates
+      </h3>
+      <div className="flex justify-center">
+        <DayPicker
+          mode="range"
+          selected={selected}
+          onSelect={(range) => {
+            if (!range) {
+              onSelect(null, null)
+              return
+            }
+            onSelect(range.from ?? null, range.to ?? null)
+          }}
+          numberOfMonths={2}
+          disabled={[{ before: new Date() }, isBooked]}
+          fromDate={new Date()}
+        />
+      </div>
+      {checkIn && checkOut && (
+        <div className="mt-4 flex items-center gap-2 p-3 bg-info-bg border border-info rounded-[6px]">
+          <span className="font-body text-[14px] text-info">
+            {format(checkIn, 'MMM d, yyyy')} → {format(checkOut, 'MMM d, yyyy')}
+          </span>
+          <span className="font-mono text-[14px] text-info font-semibold ml-auto">
+            {nights} {nights === 1 ? 'night' : 'nights'}
+          </span>
+        </div>
+      )}
+      {minStay > 1 && nights > 0 && nights < minStay && (
+        <p className="mt-2 text-[13px] text-danger font-body">
+          Minimum stay is {minStay} nights
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Step2Rooms({ rooms = [], selectedRoomIds, onToggle }) {
+  const totalCents = rooms
+    .filter((r) => selectedRoomIds.includes(r.id))
+    .reduce((sum, r) => sum + (r.base_rate_cents ?? 0), 0)
+
+  return (
+    <div>
+      <h3 className="font-body font-semibold text-[16px] text-text-primary mb-4">
+        Select room(s)
+      </h3>
+      {rooms.length === 0 && (
+        <p className="text-text-muted font-body text-[14px]">No rooms found.</p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {rooms.map((room) => {
+          const isSelected = selectedRoomIds.includes(room.id)
+          return (
+            <button
+              key={room.id}
+              type="button"
+              onClick={() => onToggle(room.id)}
+              className={cn(
+                'text-left transition-all',
+                isSelected && 'ring-2 ring-info rounded-[8px]'
+              )}
+            >
+              <FolderCard
+                tabLabel={room.name}
+                color={isSelected ? 'info' : 'primary'}
+                className="w-full"
+              >
+                <p className="font-body text-[13px] text-text-secondary capitalize">
+                  {room.type ?? 'Room'}
+                </p>
+                <p className="font-mono text-[14px] text-text-primary mt-1">
+                  ${((room.base_rate_cents ?? 0) / 100).toFixed(2)} / night
+                </p>
+                <p className="font-body text-[13px] text-text-muted mt-1">
+                  Max {room.max_guests ?? 2} guests
+                </p>
+                {isSelected && (
+                  <span className="inline-flex items-center gap-1 mt-2 text-[12px] font-semibold text-info font-body">
+                    <CheckCircle size={14} weight="fill" /> Selected
+                  </span>
+                )}
+              </FolderCard>
+            </button>
+          )
+        })}
+      </div>
+      {selectedRoomIds.length > 0 && (
+        <div className="mt-4 flex items-center justify-between p-3 bg-surface border border-border rounded-[6px]">
+          <span className="font-body text-[14px] text-text-secondary">
+            {selectedRoomIds.length} room{selectedRoomIds.length > 1 ? 's' : ''} selected
+          </span>
+          <span className="font-mono text-[14px] text-text-primary font-semibold">
+            ${(totalCents / 100).toFixed(2)} / night
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Step3Guest({ form, maxGuests, emailDebounced }) {
+  const { data: existingGuest } = useGuestByEmail(emailDebounced)
+  const { register, setValue, watch, formState: { errors } } = form
+  const numGuests = watch('num_guests')
+
+  useEffect(() => {
+    if (existingGuest) {
+      setValue('first_name', existingGuest.first_name ?? '')
+      setValue('last_name', existingGuest.last_name ?? '')
+      setValue('phone', existingGuest.phone ?? '')
+    }
+  }, [existingGuest, setValue])
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 className="font-body font-semibold text-[16px] text-text-primary">
+        Guest information
+      </h3>
+
+      <Input
+        label="Email"
+        id="email"
+        type="email"
+        placeholder="guest@example.com"
+        error={errors.email?.message}
+        {...register('email')}
+      />
+
+      {existingGuest && (
+        <div className="flex items-center gap-2 p-3 bg-success-bg border border-success rounded-[6px]">
+          <span className="font-body text-[13px] text-success">
+            Existing guest: {existingGuest.first_name} {existingGuest.last_name}
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          label="First Name"
+          id="first_name"
+          error={errors.first_name?.message}
+          {...register('first_name')}
+        />
+        <Input
+          label="Last Name"
+          id="last_name"
+          error={errors.last_name?.message}
+          {...register('last_name')}
+        />
+      </div>
+
+      <Input
+        label="Phone"
+        id="phone"
+        type="tel"
+        placeholder="+1 (555) 000-0000"
+        error={errors.phone?.message}
+        {...register('phone')}
+      />
+
+      <div>
+        <Input
+          label={`Number of Guests (max ${maxGuests})`}
+          id="num_guests"
+          type="number"
+          min={1}
+          max={maxGuests}
+          error={errors.num_guests?.message || (numGuests > maxGuests ? `Max ${maxGuests} guests for selected rooms` : undefined)}
+          {...register('num_guests')}
+        />
+      </div>
+
+      <div className="flex flex-col">
+        <label
+          htmlFor="notes"
+          className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1"
+        >
+          Notes
+        </label>
+        <textarea
+          id="notes"
+          rows={3}
+          placeholder="Any special requests or notes..."
+          className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-none"
+          {...register('notes')}
+        />
+      </div>
+    </div>
+  )
+}
+
+function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSubmit, loading, conflict, error }) {
+  const nightlyTotal = selectedRooms.reduce((sum, r) => sum + (r.base_rate_cents ?? 0), 0)
+  const subtotalCents = nightlyTotal * nights
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 className="font-body font-semibold text-[16px] text-text-primary">
+        Review &amp; confirm
+      </h3>
+
+      <div className="bg-surface border border-border rounded-[8px] p-4 flex flex-col gap-3">
+        <div className="flex justify-between items-center">
+          <span className="font-body text-[14px] text-text-secondary">Check-in</span>
+          <span className="font-mono text-[14px] text-text-primary">
+            {checkIn ? format(checkIn, 'MMM d, yyyy') : '—'}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-body text-[14px] text-text-secondary">Check-out</span>
+          <span className="font-mono text-[14px] text-text-primary">
+            {checkOut ? format(checkOut, 'MMM d, yyyy') : '—'}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-body text-[14px] text-text-secondary">Nights</span>
+          <span className="font-mono text-[14px] text-text-primary">{nights}</span>
+        </div>
+        <div className="border-t border-border pt-3">
+          <span className="font-body text-[13px] text-text-secondary uppercase tracking-wider font-semibold">Rooms</span>
+          {selectedRooms.map((r) => (
+            <div key={r.id} className="flex justify-between mt-2">
+              <span className="font-body text-[14px] text-text-primary">{r.name}</span>
+              <span className="font-mono text-[14px] text-text-secondary">
+                ${((r.base_rate_cents ?? 0) / 100).toFixed(2)}/night
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-border pt-3">
+          <div className="flex justify-between items-center">
+            <span className="font-body text-[14px] text-text-secondary">Subtotal ({nights} nights)</span>
+            <span className="font-mono text-[14px] text-text-primary">
+              ${(subtotalCents / 100).toFixed(2)}
+            </span>
+          </div>
+        </div>
+        <div className="border-t border-border pt-3">
+          <span className="font-body text-[13px] text-text-secondary uppercase tracking-wider font-semibold">Guest</span>
+          <p className="font-body text-[14px] text-text-primary mt-1">
+            {guestData.first_name} {guestData.last_name}
+          </p>
+          <p className="font-body text-[13px] text-text-secondary">{guestData.email}</p>
+          {guestData.num_guests && (
+            <p className="font-body text-[13px] text-text-muted">{guestData.num_guests} guest(s)</p>
+          )}
+        </div>
+      </div>
+
+      {conflict && <ConflictBanner conflictingIds={conflict} />}
+
+      {error && !conflict && (
+        <div className="bg-danger-bg border border-danger rounded-[6px] p-3">
+          <p className="font-body text-[14px] text-danger">{error}</p>
+        </div>
+      )}
+
+      <Button
+        variant="primary"
+        size="lg"
+        loading={loading}
+        onClick={onSubmit}
+        className="w-full"
+      >
+        Confirm Reservation
+      </Button>
+    </div>
+  )
+}
+
+export function ReservationModal({ open, onClose, reservationToEdit }) {
+  const [step, setStep] = useState(1)
+  const [checkIn, setCheckIn] = useState(null)
+  const [checkOut, setCheckOut] = useState(null)
+  const [selectedRoomIds, setSelectedRoomIds] = useState([])
+  const [emailDebounced, setEmailDebounced] = useState('')
+  const [conflict, setConflict] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
+
+  const { data: rooms = [] } = useRooms()
+  const createReservation = useCreateReservation()
+  const updateReservation = useUpdateReservation()
+  const { addToast } = useToast()
+
+  const isEditMode = !!reservationToEdit
+  const isLoading = createReservation.isPending || updateReservation.isPending
+
+  const form = useForm({
+    resolver: zodResolver(guestSchema),
+    defaultValues: {
+      email: '',
+      first_name: '',
+      last_name: '',
+      phone: '',
+      num_guests: 1,
+      notes: '',
+    },
+  })
+
+  // Track email for debounced guest lookup
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const emailWatch = form.watch('email')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setEmailDebounced(emailWatch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [emailWatch])
+
+  useEffect(() => {
+    if (reservationToEdit) {
+      setCheckIn(reservationToEdit.check_in ? new Date(reservationToEdit.check_in) : null)
+      setCheckOut(reservationToEdit.check_out ? new Date(reservationToEdit.check_out) : null)
+      setSelectedRoomIds(reservationToEdit.room_ids ?? [])
+      const g = reservationToEdit.guests ?? {}
+      form.reset({
+        email: g.email ?? '',
+        first_name: g.first_name ?? '',
+        last_name: g.last_name ?? '',
+        phone: g.phone ?? '',
+        num_guests: reservationToEdit.num_guests ?? 1,
+        notes: reservationToEdit.notes ?? '',
+      })
+    }
+  }, [reservationToEdit, form])
+
+  function resetModal() {
+    setStep(1)
+    setCheckIn(null)
+    setCheckOut(null)
+    setSelectedRoomIds([])
+    setEmailDebounced('')
+    setConflict(null)
+    setSubmitError(null)
+    form.reset()
+  }
+
+  function handleClose() {
+    if (isLoading) return
+    resetModal()
+    onClose()
+  }
+
+  function toggleRoom(roomId) {
+    setSelectedRoomIds((prev) =>
+      prev.includes(roomId) ? prev.filter((id) => id !== roomId) : [...prev, roomId]
+    )
+  }
+
+  const nights = checkIn && checkOut ? differenceInCalendarDays(checkOut, checkIn) : 0
+  const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id))
+  const maxGuests = selectedRooms.reduce((sum, r) => sum + (r.max_guests ?? 2), 0) || 10
+
+  function canAdvance() {
+    if (step === 1) return checkIn && checkOut && nights > 0
+    if (step === 2) return selectedRoomIds.length > 0
+    if (step === 3) {
+      const vals = form.getValues()
+      return vals.email && vals.first_name && vals.last_name
+    }
+    return true
+  }
+
+  async function handleNext() {
+    if (step === 3) {
+      const valid = await form.trigger(['email', 'first_name', 'last_name', 'num_guests'])
+      if (!valid) return
+    }
+    setStep((s) => Math.min(s + 1, 4))
+  }
+
+  async function handleSubmit() {
+    setConflict(null)
+    setSubmitError(null)
+
+    const guestData = form.getValues()
+    const payload = {
+      check_in: format(checkIn, 'yyyy-MM-dd'),
+      check_out: format(checkOut, 'yyyy-MM-dd'),
+      room_ids: selectedRoomIds,
+      num_guests: Number(guestData.num_guests),
+      notes: guestData.notes ?? '',
+      guest: {
+        email: guestData.email,
+        first_name: guestData.first_name,
+        last_name: guestData.last_name,
+        phone: guestData.phone ?? '',
+      },
+    }
+
+    const mutation = isEditMode
+      ? updateReservation.mutateAsync({ ...payload, id: reservationToEdit.id })
+      : createReservation.mutateAsync(payload)
+
+    try {
+      const result = await mutation
+      const confirmationNumber = result?.confirmation_number ?? result?.id ?? 'N/A'
+      addToast({ message: `Reservation confirmed — ${confirmationNumber}`, variant: 'success' })
+      resetModal()
+      onClose()
+    } catch (err) {
+      if (err?.code === 'CONFLICT' || err?.conflicting_ids) {
+        setConflict(err.conflicting_ids ?? [])
+      } else {
+        setSubmitError(err?.message ?? 'An error occurred. Please try again.')
+      }
+    }
+  }
+
+  const modalTitle = isEditMode ? 'Edit Reservation' : 'New Reservation'
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={modalTitle}
+      className="max-w-[720px] w-full overflow-y-auto max-h-[90vh]"
+    >
+      <StepIndicator currentStep={step} />
+
+      {step === 1 && (
+        <Step1Dates
+          checkIn={checkIn}
+          checkOut={checkOut}
+          onSelect={(ci, co) => { setCheckIn(ci); setCheckOut(co) }}
+          minStay={1}
+        />
+      )}
+
+      {step === 2 && (
+        <Step2Rooms
+          rooms={rooms}
+          selectedRoomIds={selectedRoomIds}
+          onToggle={toggleRoom}
+        />
+      )}
+
+      {step === 3 && (
+        <Step3Guest
+          form={form}
+          maxGuests={maxGuests}
+          emailDebounced={emailDebounced}
+        />
+      )}
+
+      {step === 4 && (
+        <Step4Review
+          checkIn={checkIn}
+          checkOut={checkOut}
+          selectedRooms={selectedRooms}
+          guestData={form.getValues()}
+          nights={nights}
+          onSubmit={handleSubmit}
+          loading={isLoading}
+          conflict={conflict}
+          error={submitError}
+        />
+      )}
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => setStep((s) => Math.max(s - 1, 1))}
+          disabled={step === 1 || isLoading}
+        >
+          <ArrowLeft size={16} /> Back
+        </Button>
+
+        {step < 4 && (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleNext}
+            disabled={!canAdvance() || isLoading}
+          >
+            Next <ArrowRight size={16} />
+          </Button>
+        )}
+      </div>
+    </Modal>
+  )
+}

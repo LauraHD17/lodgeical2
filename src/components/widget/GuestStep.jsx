@@ -1,0 +1,107 @@
+// src/components/widget/GuestStep.jsx
+
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { differenceInCalendarDays, format } from 'date-fns'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+
+function formatCents(cents) {
+  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+}
+
+export function GuestStep({ room, checkIn, checkOut, onNext, onBack }) {
+  const nights = differenceInCalendarDays(
+    new Date(checkOut + 'T12:00:00'),
+    new Date(checkIn + 'T12:00:00')
+  )
+
+  const guestSchema = z.object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    email: z.string().email('Enter a valid email address'),
+    phone: z.string().optional(),
+    numGuests: z.coerce.number().int().min(1, 'At least 1 guest required')
+      .max(room.max_guests, `Maximum ${room.max_guests} guest${room.max_guests !== 1 ? 's' : ''} for this room`),
+  })
+
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(guestSchema),
+    defaultValues: { numGuests: 1 },
+  })
+
+  function onSubmit(data) {
+    onNext(data)
+  }
+
+  return (
+    <div>
+      {/* Room summary */}
+      <div className="bg-surface border border-border rounded-[6px] p-4 mb-6">
+        <p className="font-body font-semibold text-[15px] text-text-primary">{room.name}</p>
+        <p className="font-body text-[13px] text-text-secondary mt-0.5">
+          {format(new Date(checkIn + 'T12:00:00'), 'MMM d')} – {format(new Date(checkOut + 'T12:00:00'), 'MMM d, yyyy')} · {nights} night{nights !== 1 ? 's' : ''}
+        </p>
+        <p className="font-mono text-[14px] text-text-primary mt-1">
+          {formatCents(room.base_rate_cents * nights)}
+        </p>
+      </div>
+
+      <h2 className="font-heading text-[24px] text-text-primary mb-6">Your information</h2>
+
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="First Name"
+              id="firstName"
+              error={errors.firstName?.message}
+              {...register('firstName')}
+            />
+            <Input
+              label="Last Name"
+              id="lastName"
+              error={errors.lastName?.message}
+              {...register('lastName')}
+            />
+          </div>
+          <Input
+            label="Email"
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            error={errors.email?.message}
+            {...register('email')}
+          />
+          <Input
+            label="Phone (optional)"
+            id="phone"
+            type="tel"
+            placeholder="+1 (555) 000-0000"
+            error={errors.phone?.message}
+            {...register('phone')}
+          />
+          <Input
+            label={`Number of Guests (max ${room.max_guests})`}
+            id="numGuests"
+            type="number"
+            min="1"
+            max={room.max_guests}
+            error={errors.numGuests?.message}
+            {...register('numGuests')}
+          />
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <Button variant="ghost" size="md" onClick={onBack} type="button" className="text-text-secondary">
+            ← Back
+          </Button>
+          <Button variant="primary" size="lg" type="submit" className="flex-1">
+            Review booking
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}
