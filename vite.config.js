@@ -13,11 +13,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         // When mock mode is on, swap the real Supabase client for the in-memory
-        // mock BEFORE the general `@` alias so the specific path wins.
+        // mock. Alias the ABSOLUTE path so both relative (`../supabaseClient`)
+        // and `@/` imports are intercepted — Vite matches on the resolved path.
         ...(isMock && {
-          '@/lib/supabaseClient': fileURLToPath(
-            new URL('./src/mocks/supabaseMock.js', import.meta.url),
-          ),
+          [fileURLToPath(new URL('./src/lib/supabaseClient.js', import.meta.url))]:
+            fileURLToPath(new URL('./src/mocks/supabaseMock.js', import.meta.url)),
         }),
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
