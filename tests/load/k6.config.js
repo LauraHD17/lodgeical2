@@ -66,7 +66,7 @@ export const options = {
     // Scenario 3: Guest portal lookup (unauthenticated, rate-limited)
     guest_portal: {
       executor: 'constant-arrival-rate',
-      rate: 8,           // 8 req/s (stay under 10/min rate limit per IP in prod)
+      rate: 8,           // 8 req/min (stay under 10/min rate limit per IP in prod)
       timeUnit: '1m',
       duration: '1m',
       preAllocatedVUs: 5,
