@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'node_modules', 'supabase']),
+  globalIgnores(['dist', 'node_modules', 'supabase', 'public/mockServiceWorker.js']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
