@@ -1,10 +1,12 @@
 // src/pages/admin/Settings.jsx
-// Settings page with Radix Tabs: Property, Check-in/out, Tax & Policy, Team.
+// Settings page with Radix Tabs: Property, Check-in/out, Tax & Policy, Team,
+// iCal Feeds, Channel Sync.
 
 import { useState, useEffect } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import * as Switch from '@radix-ui/react-switch'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Copy, Check, ArrowsClockwise, Link, CalendarPlus } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -191,7 +193,7 @@ export default function Settings() {
 
       <Tabs.Root defaultValue="property">
         <Tabs.List className="flex gap-0 border-b border-border mb-6">
-          {['property', 'checkin', 'tax', 'team'].map((tab) => (
+          {['property', 'checkin', 'tax', 'team', 'ical', 'sync'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -205,6 +207,8 @@ export default function Settings() {
               {tab === 'checkin' && 'Check-in/out'}
               {tab === 'tax' && 'Tax & Policy'}
               {tab === 'team' && 'Team'}
+              {tab === 'ical' && 'iCal Feeds'}
+              {tab === 'sync' && 'Channel Sync'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -341,6 +345,16 @@ export default function Settings() {
           </div>
         </Tabs.Content>
 
+        {/* iCal Feeds Tab */}
+        <Tabs.Content value="ical">
+          <ICalFeedsTab />
+        </Tabs.Content>
+
+        {/* Channel Sync Tab */}
+        <Tabs.Content value="sync">
+          <ChannelSyncTab />
+        </Tabs.Content>
+
         {/* Team Tab */}
         <Tabs.Content value="team">
           <div className="flex flex-col gap-5">
@@ -365,6 +379,346 @@ export default function Settings() {
           </div>
         </Tabs.Content>
       </Tabs.Root>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// iCal Feeds tab — shows per-room export feed URLs
+// ---------------------------------------------------------------------------
+
+function useRoomsWithTokens() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['rooms-ical', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name, ical_token, is_active')
+        .eq('property_id', propertyId)
+        .order('name')
+      if (error) return []
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy URL"
+      className="flex items-center gap-1 text-info hover:opacity-80 transition-opacity font-body text-[13px]"
+    >
+      {copied ? <Check size={14} weight="bold" className="text-success" /> : <Copy size={14} />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  )
+}
+
+function ICalFeedsTab() {
+  const { data: rooms = [], isLoading } = useRoomsWithTokens()
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? ''
+  const baseUrl = supabaseUrl
+    ? `${supabaseUrl}/functions/v1/ical-export`
+    : 'https://<project>.supabase.co/functions/v1/ical-export'
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionHeader>iCal Feed URLs</SectionHeader>
+      <p className="font-body text-[14px] text-text-secondary -mt-2">
+        Subscribe to these URLs in Google Calendar, Apple Calendar, or any platform that
+        supports iCal feeds. Each room has a unique, stable URL — anyone with the URL can
+        read the calendar, so treat it like a password.
+      </p>
+
+      {isLoading ? (
+        <div className="animate-pulse flex flex-col gap-3">
+          {[1, 2, 3].map(i => <div key={i} className="h-14 bg-border rounded-[6px]" />)}
+        </div>
+      ) : rooms.length === 0 ? (
+        <div className="flex items-start gap-3 bg-info-bg border border-info rounded-[8px] p-4">
+          <CalendarPlus size={18} className="text-info mt-0.5 shrink-0" />
+          <p className="font-body text-[14px] text-info">
+            No rooms found. Add rooms in the Rooms section to generate iCal feeds.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {rooms.map(room => {
+            const feedUrl = `${baseUrl}?token=${room.ical_token}`
+            return (
+              <div
+                key={room.id}
+                className="border border-border rounded-[8px] p-4 flex flex-col gap-2 bg-surface"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-body font-semibold text-[15px] text-text-primary">
+                    {room.name}
+                  </span>
+                  {!room.is_active && (
+                    <span className="font-body text-[12px] text-text-muted bg-border px-2 py-0.5 rounded-full">
+                      Inactive
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 bg-surface-raised border border-border rounded-[6px] px-3 py-2">
+                    <Link size={13} className="text-text-muted shrink-0" />
+                    <span className="font-mono text-[12px] text-text-secondary truncate">
+                      {feedUrl}
+                    </span>
+                  </div>
+                  <CopyButton text={feedUrl} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Channel Sync tab — manage external iCal feeds (Airbnb, VRBO, etc.)
+// ---------------------------------------------------------------------------
+
+function useExternalFeeds() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['external-feeds', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data, error } = await supabase
+        .from('room_external_feeds')
+        .select('id, room_id, label, feed_url, last_synced_at, rooms(name)')
+        .eq('property_id', propertyId)
+        .order('created_at')
+      if (error) return []
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
+function useRoomsSimple() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['rooms-simple', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('property_id', propertyId)
+        .order('name')
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
+function ChannelSyncTab() {
+  const { propertyId } = useProperty()
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
+
+  const { data: feeds = [], isLoading: feedsLoading } = useExternalFeeds()
+  const { data: rooms = [] } = useRoomsSimple()
+
+  const [newRoomId, setNewRoomId] = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const [newUrl, setNewUrl] = useState('')
+  const [syncing, setSyncing] = useState(null) // room_id being synced
+
+  const roomOptions = rooms.map(r => ({ value: r.id, label: r.name }))
+
+  // Rooms that don't already have a feed configured
+  const feedRoomIds = new Set(feeds.map(f => f.room_id))
+  const availableRooms = rooms.filter(r => !feedRoomIds.has(r.id))
+
+  async function handleAddFeed() {
+    if (!newRoomId || !newUrl) {
+      addToast({ message: 'Room and feed URL are required', variant: 'error' })
+      return
+    }
+    try {
+      const { error } = await supabase.from('room_external_feeds').upsert(
+        {
+          room_id: newRoomId,
+          property_id: propertyId,
+          label: newLabel || 'External Calendar',
+          feed_url: newUrl,
+        },
+        { onConflict: 'room_id' },
+      )
+      if (error) throw error
+      addToast({ message: 'External feed saved', variant: 'success' })
+      setNewRoomId('')
+      setNewLabel('')
+      setNewUrl('')
+      queryClient.invalidateQueries({ queryKey: ['external-feeds', propertyId] })
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to save feed', variant: 'error' })
+    }
+  }
+
+  async function handleSync(feed) {
+    setSyncing(feed.room_id)
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/ical-import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token ?? anonKey}`,
+        },
+        body: JSON.stringify({ room_id: feed.room_id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Sync failed')
+      addToast({
+        message: `Synced: ${json.synced} new block(s), ${json.skipped} skipped`,
+        variant: 'success',
+      })
+      queryClient.invalidateQueries({ queryKey: ['external-feeds', propertyId] })
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Sync failed', variant: 'error' })
+    } finally {
+      setSyncing(null)
+    }
+  }
+
+  async function handleDelete(feed) {
+    if (!confirm(`Remove external feed for "${feed.rooms?.name}"?`)) return
+    const { error } = await supabase
+      .from('room_external_feeds')
+      .delete()
+      .eq('id', feed.id)
+    if (error) {
+      addToast({ message: 'Failed to remove feed', variant: 'error' })
+    } else {
+      addToast({ message: 'Feed removed', variant: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['external-feeds', propertyId] })
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SectionHeader>External Calendar Sync</SectionHeader>
+      <p className="font-body text-[14px] text-text-secondary -mt-4">
+        Paste iCal feed URLs from Airbnb, VRBO, Booking.com, or any other platform. Lodge-ical
+        will import them as blocked dates so your availability stays accurate.
+      </p>
+
+      {/* Add new feed */}
+      {availableRooms.length > 0 && (
+        <div className="border border-border rounded-[8px] p-5 flex flex-col gap-4 bg-surface">
+          <h3 className="font-body font-semibold text-[15px] text-text-primary">
+            Add External Feed
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Select
+              label="Room"
+              options={availableRooms.map(r => ({ value: r.id, label: r.name }))}
+              value={newRoomId}
+              onValueChange={setNewRoomId}
+              placeholder="Select a room"
+            />
+            <Input
+              label="Label (optional)"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              placeholder="e.g. Airbnb, VRBO"
+            />
+          </div>
+          <Input
+            label="iCal Feed URL"
+            value={newUrl}
+            onChange={e => setNewUrl(e.target.value)}
+            placeholder="https://www.airbnb.com/calendar/ical/..."
+          />
+          <Button variant="primary" size="md" onClick={handleAddFeed} className="self-start">
+            <CalendarPlus size={16} /> Save Feed
+          </Button>
+        </div>
+      )}
+
+      {/* Existing feeds */}
+      {feedsLoading ? (
+        <div className="animate-pulse flex flex-col gap-3">
+          {[1, 2].map(i => <div key={i} className="h-20 bg-border rounded-[6px]" />)}
+        </div>
+      ) : feeds.length === 0 ? (
+        <p className="font-body text-[14px] text-text-muted">
+          No external feeds configured yet.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {feeds.map(feed => (
+            <div
+              key={feed.id}
+              className="border border-border rounded-[8px] p-4 flex flex-col gap-2 bg-surface"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-body font-semibold text-[15px] text-text-primary">
+                    {feed.rooms?.name ?? '—'}
+                  </span>
+                  <span className="ml-2 font-body text-[13px] text-text-muted">
+                    {feed.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={syncing === feed.room_id}
+                    onClick={() => handleSync(feed)}
+                  >
+                    <ArrowsClockwise size={14} />
+                    {syncing === feed.room_id ? 'Syncing…' : 'Sync Now'}
+                  </Button>
+                  <button
+                    onClick={() => handleDelete(feed)}
+                    className="font-body text-[13px] text-danger hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 min-w-0 bg-surface-raised border border-border rounded-[6px] px-3 py-2">
+                <Link size={13} className="text-text-muted shrink-0" />
+                <span className="font-mono text-[12px] text-text-secondary truncate">
+                  {feed.feed_url}
+                </span>
+              </div>
+              {feed.last_synced_at && (
+                <p className="font-body text-[12px] text-text-muted">
+                  Last synced:{' '}
+                  {new Date(feed.last_synced_at).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: 'numeric', minute: '2-digit',
+                  })}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

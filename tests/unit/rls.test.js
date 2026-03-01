@@ -118,12 +118,12 @@ describe('RLS: user_property_access', () => {
 })
 
 describe('Schema: migration files exist', () => {
-  it('All 9 migration files are accounted for', async () => {
+  it('All 11 migration files are accounted for', async () => {
     const { readdirSync } = await import('fs')
     const { join } = await import('path')
     const migrationsDir = join(process.cwd(), 'supabase/migrations')
     const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
-    expect(files).toHaveLength(9)
+    expect(files).toHaveLength(11)
 
     const expectedFiles = [
       '001_properties.sql',
@@ -135,6 +135,8 @@ describe('Schema: migration files exist', () => {
       '007_user_property_access.sql',
       '008_enable_rls.sql',
       '009_rls_policies.sql',
+      '010_room_ical_tokens.sql',
+      '011_room_external_feeds.sql',
     ]
     for (const expected of expectedFiles) {
       expect(files).toContain(expected)
