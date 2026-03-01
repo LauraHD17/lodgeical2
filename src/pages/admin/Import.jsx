@@ -1,9 +1,13 @@
 // src/pages/admin/Import.jsx
-// Import page with CSV drag-and-drop (visual) and template download.
+// Import page — CSV drag-and-drop with live column-mapping preview.
+// On submit, the file is parsed client-side and the rows are sent to the
+// import-csv edge function which handles guest upsert + reservation creation.
 
 import { useState, useRef } from 'react'
-import { UploadSimple, DownloadSimple, Info, FileText, X } from '@phosphor-icons/react'
+import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/Button'
+import { supabase } from '@/lib/supabaseClient'
+import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
 
 const CSV_TEMPLATE_HEADERS = [
@@ -47,19 +51,94 @@ function downloadTemplate() {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Parse a CSV text into headers + row objects, per RFC 4180.
+ * Handles quoted fields that contain commas, escaped quotes (""), and
+ * CRLF/LF line endings.
+ */
+function parseCsvToRows(text) {
+  if (!text?.trim()) return { headers: [], rows: [] }
+
+  const records = parseRfc4180(text)
+  if (records.length < 2) return { headers: [], rows: [] }
+
+  const headers = records[0].map(h => h.trim())
+  const rows = records.slice(1)
+    .filter(cells => cells.some(c => c !== ''))  // skip blank lines
+    .map(cells => {
+      const obj = {}
+      headers.forEach((h, i) => { obj[h] = cells[i] ?? '' })
+      return obj
+    })
+
+  return { headers, rows }
+}
+
+/**
+ * RFC 4180 CSV parser. Returns a 2-D array of string cells.
+ * Handles: quoted fields, escaped double-quotes (""), CRLF and LF.
+ */
+function parseRfc4180(text) {
+  const records = []
+  let row = []
+  let i = 0
+  const n = text.length
+
+  while (i < n) {
+    // Quoted field
+    if (text[i] === '"') {
+      i++ // skip opening quote
+      let field = ''
+      while (i < n) {
+        if (text[i] === '"') {
+          if (text[i + 1] === '"') {
+            field += '"'  // escaped quote
+            i += 2
+          } else {
+            i++  // closing quote
+            break
+          }
+        } else {
+          field += text[i++]
+        }
+      }
+      row.push(field)
+      // Skip delimiter or line ending after closing quote
+      if (text[i] === ',') i++
+      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
+      else if (text[i] === '\n') { records.push(row); row = []; i++ }
+    } else {
+      // Unquoted field — read until comma or line ending
+      let field = ''
+      while (i < n && text[i] !== ',' && text[i] !== '\r' && text[i] !== '\n') {
+        field += text[i++]
+      }
+      row.push(field.trim())
+      if (text[i] === ',') i++
+      else if (text[i] === '\r' && text[i + 1] === '\n') { records.push(row); row = []; i += 2 }
+      else if (text[i] === '\n') { records.push(row); row = []; i++ }
+      else if (i >= n && row.length > 0) { records.push(row); row = [] }
+    }
+  }
+
+  if (row.length > 0) records.push(row)
+  return records
+}
+
 export default function Import() {
+  const { addToast } = useToast()
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState(null)
-  const [preview, setPreview] = useState(null)
+  const [preview, setPreview] = useState(null)   // { headers, previewRows, allRows }
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState(null)     // { imported, skipped, errors }
   const fileInputRef = useRef(null)
 
   function handleDrop(e) {
     e.preventDefault()
     setDragActive(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped && dropped.name.endsWith('.csv')) {
-      loadFile(dropped)
-    }
+    if (dropped && dropped.name.endsWith('.csv')) loadFile(dropped)
   }
 
   function handleFileChange(e) {
@@ -69,15 +148,15 @@ export default function Import() {
 
   function loadFile(f) {
     setFile(f)
+    setResult(null)
     const reader = new FileReader()
     reader.onload = (evt) => {
-      const text = evt.target.result
-      const lines = text.split('\n').filter(Boolean)
-      const headers = lines[0]?.split(',').map((h) => h.trim())
-      const rows = lines.slice(1, 6).map((line) =>
-        line.split(',').map((cell) => cell.trim())
-      )
-      setPreview({ headers, rows })
+      const { headers, rows } = parseCsvToRows(evt.target.result)
+      setPreview({
+        headers,
+        previewRows: rows.slice(0, 5),
+        allRows: rows,
+      })
     }
     reader.readAsText(f)
   }
@@ -85,7 +164,43 @@ export default function Import() {
   function clearFile() {
     setFile(null)
     setPreview(null)
+    setResult(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleImport() {
+    if (!preview?.allRows?.length) return
+    setImporting(true)
+    setResult(null)
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        addToast({ message: 'Your session has expired. Please log in again.', variant: 'error' })
+        setImporting(false)
+        return
+      }
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/import-csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ rows: preview.allRows }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Import failed')
+      setResult(json)
+      addToast({
+        message: `Import complete: ${json.imported} created, ${json.skipped} skipped`,
+        variant: 'success',
+      })
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Import failed', variant: 'error' })
+    } finally {
+      setImporting(false)
+    }
   }
 
   return (
@@ -98,11 +213,13 @@ export default function Import() {
         </Button>
       </div>
 
-      {/* Coming Soon callout */}
+      {/* Instructions */}
       <div className="bg-info-bg border border-info rounded-[8px] p-4 flex items-start gap-3">
         <Info size={18} className="text-info shrink-0 mt-0.5" />
         <p className="font-body text-[14px] text-info">
-          This feature is coming soon. You can preview your CSV structure below, but import processing is not yet active.
+          Upload a CSV file using the template format. Check-in and check-out dates must be
+          <strong className="font-semibold"> YYYY-MM-DD</strong>. Room names must exactly match
+          the names in your Rooms page.
         </p>
       </div>
 
@@ -134,6 +251,7 @@ export default function Import() {
             <p className="font-body font-semibold text-[16px] text-text-primary">{file.name}</p>
             <p className="font-mono text-[13px] text-text-muted">
               {(file.size / 1024).toFixed(1)} KB
+              {preview && ` · ${preview.allRows.length} row${preview.allRows.length !== 1 ? 's' : ''}`}
             </p>
             <button
               onClick={(e) => { e.stopPropagation(); clearFile() }}
@@ -176,14 +294,14 @@ export default function Import() {
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.map((row, i) => (
+                {preview.previewRows.map((row, i) => (
                   <tr
                     key={i}
                     className={i % 2 === 0 ? 'bg-white' : 'bg-tableAlt'}
                   >
-                    {row.map((cell, j) => (
+                    {preview.headers.map((h, j) => (
                       <td key={j} className="px-3 py-2 font-body text-[13px] text-text-secondary whitespace-nowrap">
-                        {cell || <span className="text-text-muted italic">empty</span>}
+                        {row[h] || <span className="text-text-muted italic">empty</span>}
                       </td>
                     ))}
                   </tr>
@@ -192,12 +310,69 @@ export default function Import() {
             </table>
           </div>
           <p className="font-body text-[13px] text-text-muted">
-            Showing first {Math.min(preview.rows.length, 5)} rows of {file?.name}
+            Showing first {preview.previewRows.length} of {preview.allRows.length} row(s)
           </p>
 
-          <Button variant="primary" size="md" disabled className="self-start">
-            <UploadSimple size={16} /> Import (coming soon)
+          <Button
+            variant="primary"
+            size="md"
+            loading={importing}
+            onClick={handleImport}
+            className="self-start"
+          >
+            <UploadSimple size={16} />
+            {importing
+              ? 'Importing…'
+              : `Import ${preview.allRows.length} Row${preview.allRows.length !== 1 ? 's' : ''}`}
           </Button>
+        </div>
+      )}
+
+      {/* Import result */}
+      {result && (
+        <div className="flex flex-col gap-3">
+          <div className={cn(
+            'border rounded-[8px] p-4 flex items-start gap-3',
+            result.errors?.length > 0
+              ? 'bg-warning-bg border-warning'
+              : 'bg-success-bg border-success'
+          )}>
+            {result.errors?.length > 0
+              ? <Warning size={18} className="text-warning mt-0.5 shrink-0" />
+              : <CheckCircle size={18} className="text-success mt-0.5 shrink-0" />
+            }
+            <div className="flex flex-col gap-1">
+              <p className="font-body font-semibold text-[14px] text-text-primary">
+                Import complete
+              </p>
+              <p className="font-body text-[13px] text-text-secondary">
+                {result.imported} reservation{result.imported !== 1 ? 's' : ''} created
+                {' · '}{result.skipped} skipped (already exist)
+                {result.errors?.length > 0 && ` · ${result.errors.length} error(s)`}
+              </p>
+            </div>
+          </div>
+
+          {result.errors?.length > 0 && (
+            <div className="border border-border rounded-[8px] overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-text-primary">
+                    <th className="px-3 py-2 text-left font-body text-[12px] uppercase tracking-wider text-white font-semibold w-16">Row</th>
+                    <th className="px-3 py-2 text-left font-body text-[12px] uppercase tracking-wider text-white font-semibold">Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.errors.map((e, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-tableAlt'}>
+                      <td className="px-3 py-2 font-mono text-[13px] text-text-secondary">{e.row}</td>
+                      <td className="px-3 py-2 font-body text-[13px] text-danger">{e.error}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
