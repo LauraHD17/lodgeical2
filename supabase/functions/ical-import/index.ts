@@ -205,19 +205,17 @@ serve(async (req) => {
 
   const existingSet = new Set((existing ?? []).map(r => r.confirmation_number))
 
-  // 9. Insert new blocked dates
-  let synced = 0
+  // 9. Insert new blocked dates — build the full batch first, then insert in one call.
   let skipped = 0
+  const toInsert: Record<string, unknown>[] = []
 
   for (const event of events) {
     if (!event.dtstart || !event.dtend) { skipped++; continue }
 
-    // Derive a stable confirmation number from the UID (or date range)
     const confirmationNumber = deriveConfirmationNumber(event, room_id)
-
     if (existingSet.has(confirmationNumber)) { skipped++; continue }
 
-    const { error: insertErr } = await supabase.from('reservations').insert({
+    toInsert.push({
       property_id: propertyId,
       guest_id: systemGuest.id,
       room_ids: [room_id],
@@ -231,16 +229,30 @@ serve(async (req) => {
       confirmation_number: confirmationNumber,
       notes: event.summary ? `External block: ${event.summary}` : 'Blocked from external calendar',
     })
+  }
 
+  let synced = 0
+  if (toInsert.length > 0) {
+    const { error: insertErr } = await supabase.from('reservations').insert(toInsert)
     if (insertErr) {
-      // 23505 = unique_violation (duplicate confirmation_number race) — skip
-      // Any other error code is unexpected and should be logged for debugging.
-      if (insertErr.code !== '23505') {
-        console.error('[ical-import] Unexpected insert error:', insertErr.code, insertErr.message)
+      if (insertErr.code === '23505') {
+        // Partial duplicate — fall back to individual inserts so valid rows still land.
+        for (const row of toInsert) {
+          const { error: rowErr } = await supabase.from('reservations').insert(row)
+          if (!rowErr) { synced++ }
+          else if (rowErr.code !== '23505') {
+            console.error('[ical-import] Unexpected insert error:', rowErr.code, rowErr.message)
+            skipped++
+          } else {
+            skipped++
+          }
+        }
+      } else {
+        console.error('[ical-import] Batch insert error:', insertErr.code, insertErr.message)
+        skipped += toInsert.length
       }
-      skipped++
     } else {
-      synced++
+      synced = toInsert.length
     }
   }
 

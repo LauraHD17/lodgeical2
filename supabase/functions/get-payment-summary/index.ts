@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
+import { calculatePaymentSummary } from '../_shared/paymentSummary.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -16,36 +17,6 @@ const CORS_HEADERS = {
 const inputSchema = z.object({
   reservation_id: z.string().uuid(),
 })
-
-export function calculatePaymentSummary(
-  totalDueCents: number,
-  payments: Array<{ type: string; status: string; amount_cents: number }>
-) {
-  const charges = payments.filter(p => p.type === 'charge' && p.status === 'succeeded')
-  const refunds  = payments.filter(p => p.type === 'refund'  && p.status === 'succeeded')
-
-  const paidCents     = charges.reduce((sum, p) => sum + p.amount_cents, 0)
-  const refundedCents = refunds.reduce((sum, p) => sum + p.amount_cents, 0)
-  const netPaidCents  = paidCents - refundedCents
-  const balanceCents  = Math.max(0, totalDueCents - netPaidCents)
-  const overpaidCents = Math.max(0, netPaidCents - totalDueCents)
-
-  const status =
-    overpaidCents > 0                               ? 'overpaid'  :
-    balanceCents === 0 && netPaidCents > 0          ? 'paid'      :
-    balanceCents > 0  && netPaidCents > 0           ? 'partial'   :
-                                                      'unpaid'
-
-  return {
-    totalDueCents,
-    paidCents,
-    refundedCents,
-    netPaidCents,
-    balanceCents,
-    overpaidCents,
-    status,
-  }
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })

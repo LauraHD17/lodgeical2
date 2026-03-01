@@ -47,10 +47,10 @@ serve(async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // Fetch existing reservation (verify ownership)
+  // Fetch existing reservation (verify ownership) — select only the fields needed for update logic
   const { data: existing, error: fetchError } = await supabase
     .from('reservations')
-    .select('*')
+    .select('id, room_ids, check_in, check_out, total_due_cents')
     .eq('id', input.reservation_id)
     .eq('property_id', propertyId)
     .single()
