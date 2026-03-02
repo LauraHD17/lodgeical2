@@ -6,7 +6,7 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
-import { calculatePaymentSummary } from '../get-payment-summary/index.ts'
+import { calculatePaymentSummary } from '../_shared/paymentSummary.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -85,17 +85,17 @@ serve(async (req) => {
     },
   }
 
-  // Fetch rooms for display
-  const { data: rooms } = await supabase
-    .from('rooms')
-    .select('id, name, type, images')
-    .in('id', reservation.room_ids)
-
-  // Fetch payment summary
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('type, status, amount_cents, method, created_at')
-    .eq('reservation_id', reservation.id)
+  // Fetch rooms and payments in parallel — they are independent queries
+  const [{ data: rooms }, { data: payments }] = await Promise.all([
+    supabase
+      .from('rooms')
+      .select('id, name, type, images')
+      .in('id', reservation.room_ids),
+    supabase
+      .from('payments')
+      .select('type, status, amount_cents, method, created_at')
+      .eq('reservation_id', reservation.id),
+  ])
 
   const paymentSummary = calculatePaymentSummary(reservation.total_due_cents, payments ?? [])
 

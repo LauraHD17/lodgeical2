@@ -7,6 +7,7 @@ import {
   MOCK_USER, MOCK_SESSION,
   MOCK_PROPERTY, MOCK_USER_ACCESS, MOCK_SETTINGS,
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
+  MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
 } from './db.js'
 
 const BASE = import.meta.env.VITE_SUPABASE_URL // e.g. http://127.0.0.1:54321
@@ -211,5 +212,72 @@ export const handlers = [
       { headers: { 'Content-Type': 'text/calendar' } },
     ),
   ),
+
+  // -------------------------------------------------------------------------
+  // contacts
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/contacts`, ({ request }) =>
+    pgRespond(request, MOCK_CONTACTS),
+  ),
+
+  http.post(`${BASE}/rest/v1/contacts`, async ({ request }) => {
+    const body = await request.json()
+    const newContact = { id: `contact-new-${Date.now()}`, ...body, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    return pgRespond(request, newContact)
+  }),
+
+  http.patch(`${BASE}/rest/v1/contacts`, async ({ request }) => {
+    const body = await request.json()
+    const url = new URL(request.url)
+    const idFilter = url.searchParams.get('id')
+    const id = idFilter?.replace('eq.', '')
+    const contact = MOCK_CONTACTS.find(c => c.id === id) ?? MOCK_CONTACTS[0]
+    return pgRespond(request, { ...contact, ...body })
+  }),
+
+  http.delete(`${BASE}/rest/v1/contacts`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
+
+  // -------------------------------------------------------------------------
+  // maintenance_tickets
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/maintenance_tickets`, ({ request }) =>
+    pgRespond(request, MOCK_MAINTENANCE_TICKETS),
+  ),
+
+  http.post(`${BASE}/rest/v1/maintenance_tickets`, async ({ request }) => {
+    const body = await request.json()
+    const newTicket = { id: `ticket-new-${Date.now()}`, ...body, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), rooms: null, contacts: null }
+    return pgRespond(request, newTicket)
+  }),
+
+  http.patch(`${BASE}/rest/v1/maintenance_tickets`, async ({ request }) => {
+    const body = await request.json()
+    const url = new URL(request.url)
+    const idFilter = url.searchParams.get('id')
+    const id = idFilter?.replace('eq.', '')
+    const ticket = MOCK_MAINTENANCE_TICKETS.find(t => t.id === id) ?? MOCK_MAINTENANCE_TICKETS[0]
+    return pgRespond(request, { ...ticket, ...body })
+  }),
+
+  http.delete(`${BASE}/rest/v1/maintenance_tickets`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
+
+  // -------------------------------------------------------------------------
+  // payments (direct table read for Financial Insights)
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/payments`, ({ request }) =>
+    pgRespond(request, MOCK_PAYMENTS),
+  ),
+
+  http.post(`${BASE}/rest/v1/payments`, async ({ request }) => {
+    const body = await request.json()
+    return pgRespond(request, { id: `pay-new-${Date.now()}`, ...body, created_at: new Date().toISOString() })
+  }),
 
 ]

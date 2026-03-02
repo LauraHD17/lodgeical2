@@ -29,14 +29,12 @@ const inputSchema = z.object({
 }).refine(d => d.guest_id || d.guest_email, { message: 'Either guest_id or guest_email is required' })
   .refine(d => new Date(d.check_out) > new Date(d.check_in), { message: 'check_out must be after check_in' })
 
-/** Generate a 6-char alphanumeric confirmation number (excludes 0, O, I, 1) */
+/** Generate a cryptographically random 6-char confirmation number (excludes 0, O, I, 1) */
 function generateConfirmationNumber(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let result = ''
-  for (let i = 0; i < 6; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return result
+  const bytes = new Uint8Array(6)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => chars[b % chars.length]).join('')
 }
 
 serve(async (req) => {
@@ -156,54 +154,49 @@ serve(async (req) => {
   const taxTotal = Math.round(baseTotal * (Number(taxRate) / 100))
   const totalDueCents = baseTotal + taxTotal
 
-  // 9. Generate confirmation number with retry on collision
-  let confirmationNumber = ''
-  let attempts = 0
-  while (attempts < 10) {
+  // 9. INSERT reservation — generate confirmation number and insert directly.
+  // Rely on the DB UNIQUE constraint (error code 23505) to detect the rare collision
+  // rather than a check-then-insert loop, which has a race condition under concurrency.
+  const reservationStatus = settings?.require_payment_at_booking ? 'pending' : 'confirmed'
+
+  let reservation: Record<string, unknown> | null = null
+  for (let attempt = 0; attempt < 10; attempt++) {
     const candidate = generateConfirmationNumber()
-    const { data: existing } = await supabase
+    const { data, error: insertError } = await supabase
       .from('reservations')
-      .select('id')
-      .eq('confirmation_number', candidate)
+      .insert({
+        property_id: propertyId,
+        guest_id: guestId,
+        room_ids: input.room_ids,
+        check_in: input.check_in,
+        check_out: input.check_out,
+        num_guests: input.num_guests,
+        status: reservationStatus,
+        origin: input.origin,
+        total_due_cents: totalDueCents,
+        confirmation_number: candidate,
+        notes: input.notes ?? null,
+      })
+      .select()
       .single()
-    if (!existing) { confirmationNumber = candidate; break }
-    attempts++
+
+    if (!insertError) { reservation = data; break }
+    // 23505 = unique_violation on confirmation_number — retry with new candidate
+    if (insertError.code !== '23505') {
+      console.error('[create-reservation] insert error:', insertError.message)
+      return new Response(JSON.stringify({ error: 'Failed to create reservation' }), { status: 500, headers: CORS_HEADERS })
+    }
   }
-  if (!confirmationNumber) {
+
+  if (!reservation) {
     return new Response(JSON.stringify({ error: 'Could not generate confirmation number' }), { status: 500, headers: CORS_HEADERS })
   }
 
-  // 10. INSERT reservation
-  const reservationStatus = settings?.require_payment_at_booking ? 'pending' : 'confirmed'
-
-  const { data: reservation, error: insertError } = await supabase
-    .from('reservations')
-    .insert({
-      property_id: propertyId,
-      guest_id: guestId,
-      room_ids: input.room_ids,
-      check_in: input.check_in,
-      check_out: input.check_out,
-      num_guests: input.num_guests,
-      status: reservationStatus,
-      origin: input.origin,
-      total_due_cents: totalDueCents,
-      confirmation_number: confirmationNumber,
-      notes: input.notes ?? null,
-    })
-    .select()
-    .single()
-
-  if (insertError || !reservation) {
-    console.error('[create-reservation] insert error:', insertError?.message)
-    return new Response(JSON.stringify({ error: 'Failed to create reservation' }), { status: 500, headers: CORS_HEADERS })
-  }
-
-  // 11. Send confirmation email (fire-and-forget)
+  // 10. Send confirmation email (fire-and-forget)
   sendBookingConfirmation(guestRecord, reservation).catch(e => console.error('[create-reservation] email error:', e))
 
   return new Response(
-    JSON.stringify({ success: true, reservation, confirmation_number: confirmationNumber }),
+    JSON.stringify({ success: true, reservation, confirmation_number: reservation.confirmation_number }),
     { status: 201, headers: CORS_HEADERS }
   )
 })
