@@ -7,6 +7,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { sendBookingConfirmation } from '../_shared/email.ts'
+import { calculatePricing } from '../_shared/pricing.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -138,21 +139,21 @@ serve(async (req) => {
     guestRecord = guest
   }
 
-  // 8. Calculate total_due_cents server-side (authoritative)
-  const nights = Math.ceil(
-    (new Date(input.check_out).getTime() - new Date(input.check_in).getTime()) / (1000 * 60 * 60 * 24)
-  )
-
-  const { data: settings } = await supabase
-    .from('settings')
-    .select('tax_rate, require_payment_at_booking')
-    .eq('property_id', propertyId)
-    .single()
-
-  const baseTotal = rooms.reduce((sum, r) => sum + r.base_rate_cents * nights, 0)
-  const taxRate = settings?.tax_rate ?? 0
-  const taxTotal = Math.round(baseTotal * (Number(taxRate) / 100))
-  const totalDueCents = baseTotal + taxTotal
+  // 8. Calculate total_due_cents server-side (authoritative, with seasonal overrides)
+  const [pricing, { data: settings }] = await Promise.all([
+    calculatePricing(supabase, {
+      propertyId,
+      roomIds: input.room_ids,
+      checkIn: input.check_in,
+      checkOut: input.check_out,
+    }),
+    supabase
+      .from('settings')
+      .select('tax_rate, require_payment_at_booking, pass_through_stripe_fee')
+      .eq('property_id', propertyId)
+      .single(),
+  ])
+  const totalDueCents = pricing.totalCents
 
   // 9. INSERT reservation — generate confirmation number and insert directly.
   // Rely on the DB UNIQUE constraint (error code 23505) to detect the rare collision
@@ -192,8 +193,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Could not generate confirmation number' }), { status: 500, headers: CORS_HEADERS })
   }
 
-  // 10. Send confirmation email (fire-and-forget)
-  sendBookingConfirmation(guestRecord, reservation).catch(e => console.error('[create-reservation] email error:', e))
+  // 10. Send confirmation email (fire-and-forget, uses property template if set)
+  sendBookingConfirmation(guestRecord, { ...reservation, property_id: propertyId, room_ids: input.room_ids }, supabase)
+    .catch(e => console.error('[create-reservation] email error:', e))
 
   return new Response(
     JSON.stringify({ success: true, reservation, confirmation_number: reservation.confirmation_number }),

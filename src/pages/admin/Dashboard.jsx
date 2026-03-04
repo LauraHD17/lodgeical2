@@ -6,9 +6,10 @@
 
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { createElement } from 'react'
 import {
   format, isToday, parseISO, addDays, startOfDay,
-  isWithinInterval, subMonths, startOfMonth,
+  subMonths, startOfMonth,
 } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -88,11 +89,9 @@ function WeatherStrip() {
   const temp = Math.round(data.current_weather.temperature ?? 0)
   const high = Math.round(data.daily?.temperature_2m_max?.[0] ?? 0)
   const low  = Math.round(data.daily?.temperature_2m_min?.[0] ?? 0)
-  const WeatherIcon = wmoToIcon(code)
-
   return (
     <div className="flex items-center gap-1.5 select-none" aria-hidden="true">
-      <WeatherIcon size={14} weight="thin" className="text-text-muted shrink-0" />
+      {createElement(wmoToIcon(code), { size: 14, weight: 'thin', className: 'text-text-muted shrink-0' })}
       <span className="font-mono text-[13px] text-text-secondary">{temp}°</span>
       <span className="font-mono text-[11px] text-text-muted">H:{high} L:{low}</span>
     </div>
@@ -472,7 +471,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
       }
     }
     return result
-  }, [days, reservations, blockingTicket]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [days, reservations, blockingTicket])
 
   const hasUrgent = openTickets.some(t => t.priority === 'urgent')
 

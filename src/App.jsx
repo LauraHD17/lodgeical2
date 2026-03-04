@@ -4,7 +4,7 @@
 // Admin routes wrapped in RouteGuard + AdminLayout.
 
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { AuthProvider } from '@/lib/auth/AuthContext'
@@ -37,6 +37,7 @@ const Widget              = lazy(() => import('@/pages/public/Widget'))
 const GuestPortal         = lazy(() => import('@/pages/public/GuestPortal'))
 const BookingConfirmation = lazy(() => import('@/pages/public/BookingConfirmation'))
 const Invoice             = lazy(() => import('@/pages/public/Invoice'))
+const GuestCheckIn        = lazy(() => import('@/pages/public/GuestCheckIn'))
 
 // Map pageName strings (from routes.js) to lazy-loaded components
 const pageMap = {
@@ -59,6 +60,7 @@ const pageMap = {
   GuestPortal,
   BookingConfirmation,
   Invoice,
+  GuestCheckIn,
 }
 
 const queryClient = new QueryClient({
@@ -95,6 +97,7 @@ export default function App() {
                       )
                     return <Route key={route.path} path={route.path} element={element} />
                   })}
+                  <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
               </Suspense>
             </ToastProvider>

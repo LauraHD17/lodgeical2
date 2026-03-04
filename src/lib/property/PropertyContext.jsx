@@ -17,6 +17,7 @@ export function PropertyProvider({ children }) {
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ propertyId: null, property: null, settings: null, role: null, permissions: [], isLoading: false, error: null })
       return
     }
