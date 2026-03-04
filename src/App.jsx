@@ -4,7 +4,7 @@
 // Admin routes wrapped in RouteGuard + AdminLayout.
 
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { AuthProvider } from '@/lib/auth/AuthContext'
@@ -97,6 +97,7 @@ export default function App() {
                       )
                     return <Route key={route.path} path={route.path} element={element} />
                   })}
+                  <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
               </Suspense>
             </ToastProvider>
