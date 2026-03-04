@@ -280,8 +280,11 @@ function AddRoomModal({ open, onClose, roomToEdit }) {
           max_guests: String(roomToEdit.max_guests ?? 2),
           base_rate_cents: String(roomToEdit.base_rate_cents ?? 0),
           description: roomToEdit.description ?? '',
+          allows_pets: roomToEdit.allows_pets ?? false,
+          cleaning_fee_dollars: roomToEdit.cleaning_fee_cents != null ? (roomToEdit.cleaning_fee_cents / 100).toFixed(2) : '',
+          pet_fee_dollars: roomToEdit.pet_fee_cents != null ? (roomToEdit.pet_fee_cents / 100).toFixed(2) : '',
         }
-      : { name: '', type: 'standard', max_guests: '2', base_rate_cents: '0', description: '' }
+      : { name: '', type: 'standard', max_guests: '2', base_rate_cents: '0', description: '', allows_pets: false, cleaning_fee_dollars: '', pet_fee_dollars: '' }
   )
   const [errors, setErrors] = useState({})
 
@@ -302,6 +305,9 @@ function AddRoomModal({ open, onClose, roomToEdit }) {
       max_guests: Number(form.max_guests),
       base_rate_cents: Math.round(Number(form.base_rate_cents) * 100),
       description: form.description.trim(),
+      allows_pets: form.allows_pets,
+      cleaning_fee_cents: form.cleaning_fee_dollars === '' ? null : Math.round(Number(form.cleaning_fee_dollars) * 100),
+      pet_fee_cents: form.pet_fee_dollars === '' ? null : Math.round(Number(form.pet_fee_dollars) * 100),
     }
     try {
       if (isEdit) {
@@ -384,6 +390,67 @@ function AddRoomModal({ open, onClose, roomToEdit }) {
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised resize-none focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
           />
+        </div>
+
+        {/* Pet-friendly toggle */}
+        <div className="flex items-center justify-between p-3 border border-border rounded-[6px] bg-surface">
+          <div>
+            <p className="font-body font-semibold text-[14px] text-text-primary">Pet-friendly room</p>
+            <p className="font-body text-[12px] text-text-muted mt-0.5">Shown to guests on the booking widget</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch.Root
+              checked={form.allows_pets}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, allows_pets: v }))}
+              className={cn('w-10 h-6 rounded-full transition-colors', form.allows_pets ? 'bg-success' : 'bg-border')}
+            >
+              <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+            </Switch.Root>
+            <span className="font-body text-[13px] text-text-secondary">{form.allows_pets ? 'Yes' : 'No'}</span>
+          </div>
+        </div>
+
+        {/* Per-room fee overrides */}
+        <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
+          <p className="font-body font-semibold text-[13px] text-text-secondary uppercase tracking-[0.06em]">
+            Fee Overrides <span className="normal-case font-normal text-text-muted">(leave blank to use property default)</span>
+          </p>
+          <div className="flex flex-col">
+            <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+              Cleaning Fee ($)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.cleaning_fee_dollars}
+                onChange={(e) => setForm((f) => ({ ...f, cleaning_fee_dollars: e.target.value }))}
+                placeholder="Use property default"
+                className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 placeholder:text-text-muted"
+              />
+            </div>
+          </div>
+          {form.allows_pets && (
+            <div className="flex flex-col">
+              <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Pet Fee ($)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={form.pet_fee_dollars}
+                  onChange={(e) => setForm((f) => ({ ...f, pet_fee_dollars: e.target.value }))}
+                  placeholder="Use property default"
+                  className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 placeholder:text-text-muted"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Photos — only shown when editing an existing room */}
@@ -505,6 +572,12 @@ function RoomCard({ room, onEdit, onToggleActive }) {
         <p className="font-body text-[13px] text-text-muted">
           Max {room.max_guests ?? 2} guests
         </p>
+
+        {room.allows_pets && (
+          <span className="inline-flex items-center gap-1 font-body text-[11px] font-semibold text-success bg-success-bg border border-success rounded-full px-2 py-0.5 self-start">
+            Pet-friendly
+          </span>
+        )}
 
         {room.description && (
           <p className="font-body text-[13px] text-text-secondary line-clamp-2">

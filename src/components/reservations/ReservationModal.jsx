@@ -1,6 +1,6 @@
 // src/components/reservations/ReservationModal.jsx
 // Multi-step modal for creating / editing reservations.
-// Steps: 1=Dates, 2=Rooms, 3=Guest, 4=Review
+// Steps: 1=Dates, 2=Rooms, 3=Guest, 4=Fees, 5=Review
 
 import { useState, useEffect } from 'react'
 import { DayPicker } from 'react-day-picker'
@@ -10,7 +10,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { CheckCircle, ArrowLeft, ArrowRight } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import * as Switch from '@radix-ui/react-switch'
 
+import { supabase } from '@/lib/supabaseClient'
+import { useProperty } from '@/lib/property/useProperty'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -22,7 +26,28 @@ import { useCreateReservation, useUpdateReservation } from '@/hooks/useReservati
 import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
 
-const STEPS = ['Dates', 'Rooms', 'Guest', 'Review']
+function usePropertyFeeSettings() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['property-fee-settings', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return null
+      const [propRes, settingsRes] = await Promise.all([
+        supabase.from('properties').select('cleaning_fee_cents, pet_fee_cents, pet_fee_type').eq('id', propertyId).single(),
+        supabase.from('settings').select('tax_rate').eq('property_id', propertyId).maybeSingle(),
+      ])
+      return {
+        cleaning_fee_cents: propRes.data?.cleaning_fee_cents ?? 0,
+        pet_fee_cents: propRes.data?.pet_fee_cents ?? 0,
+        pet_fee_type: propRes.data?.pet_fee_type ?? 'flat',
+        tax_rate: settingsRes.data?.tax_rate ?? 0,
+      }
+    },
+    enabled: !!propertyId,
+  })
+}
+
+const STEPS = ['Dates', 'Rooms', 'Guest', 'Fees', 'Review']
 
 const guestSchema = z.object({
   email: z.string().email('Valid email required'),
@@ -291,9 +316,21 @@ function Step3Guest({ form, maxGuests, emailDebounced }) {
   )
 }
 
-function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSubmit, loading, conflict, error }) {
+function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSubmit, loading, conflict, error, feesData, propertySettings }) {
   const nightlyTotal = selectedRooms.reduce((sum, r) => sum + (r.base_rate_cents ?? 0), 0)
-  const subtotalCents = nightlyTotal * nights
+  const nightsSubtotalCents = nightlyTotal * nights
+
+  const cleaningFee = effectiveCleaningFee(selectedRooms, propertySettings)
+  const cleaningFeeApplied = feesData?.cleaningFeeWaived ? 0 : cleaningFee
+
+  const petFeeRate = effectivePetFee(selectedRooms, propertySettings)
+  const petFeeType = propertySettings?.pet_fee_type ?? 'flat'
+  const petFeeTotal = feesData?.petFeeApplied ? (petFeeType === 'per_night' ? petFeeRate * nights : petFeeRate) : 0
+
+  const taxRate = propertySettings?.tax_rate ?? 0
+  const preTaxSubtotal = nightsSubtotalCents + cleaningFeeApplied + petFeeTotal
+  const taxAmount = feesData?.taxExempt ? 0 : Math.round(preTaxSubtotal * taxRate / 100)
+  const totalCents = preTaxSubtotal + taxAmount
 
   return (
     <div className="flex flex-col gap-4">
@@ -329,12 +366,50 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
             </div>
           ))}
         </div>
-        <div className="border-t border-border pt-3">
+        <div className="border-t border-border pt-3 flex flex-col gap-2">
           <div className="flex justify-between items-center">
-            <span className="font-body text-[14px] text-text-secondary">Subtotal ({nights} nights)</span>
+            <span className="font-body text-[14px] text-text-secondary">Nightly subtotal ({nights} nights)</span>
             <span className="font-mono text-[14px] text-text-primary">
-              ${(subtotalCents / 100).toFixed(2)}
+              ${(nightsSubtotalCents / 100).toFixed(2)}
             </span>
+          </div>
+          {cleaningFee > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="font-body text-[14px] text-text-secondary">
+                Cleaning fee
+                {feesData?.cleaningFeeWaived && (
+                  <span className="ml-1 font-body text-[12px] text-warning">(waived)</span>
+                )}
+              </span>
+              <span className={cn('font-mono text-[14px]', feesData?.cleaningFeeWaived ? 'text-text-muted line-through' : 'text-text-primary')}>
+                ${(cleaningFee / 100).toFixed(2)}
+              </span>
+            </div>
+          )}
+          {feesData?.petFeeApplied && petFeeTotal > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="font-body text-[14px] text-text-secondary">
+                Pet fee {petFeeType === 'per_night' ? `(${nights} nights)` : '(one-time)'}
+              </span>
+              <span className="font-mono text-[14px] text-text-primary">${(petFeeTotal / 100).toFixed(2)}</span>
+            </div>
+          )}
+          {taxRate > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="font-body text-[14px] text-text-secondary">
+                Tax ({taxRate}%)
+                {feesData?.taxExempt && (
+                  <span className="ml-1 font-body text-[12px] text-success">(exempt)</span>
+                )}
+              </span>
+              <span className={cn('font-mono text-[14px]', feesData?.taxExempt ? 'text-text-muted line-through' : 'text-text-primary')}>
+                ${(Math.round(preTaxSubtotal * taxRate / 100) / 100).toFixed(2)}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between items-center border-t border-border pt-2 mt-1">
+            <span className="font-body font-semibold text-[15px] text-text-primary">Total</span>
+            <span className="font-mono font-semibold text-[16px] text-text-primary">${(totalCents / 100).toFixed(2)}</span>
           </div>
         </div>
         <div className="border-t border-border pt-3">
@@ -370,6 +445,133 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
   )
 }
 
+function effectiveCleaningFee(selectedRooms, propertySettings) {
+  return selectedRooms.reduce((sum, r) => {
+    const roomFee = r.cleaning_fee_cents != null ? r.cleaning_fee_cents : (propertySettings?.cleaning_fee_cents ?? 0)
+    return sum + roomFee
+  }, 0)
+}
+
+function effectivePetFee(selectedRooms, propertySettings) {
+  const petRoom = selectedRooms.find((r) => r.allows_pets)
+  if (!petRoom) return 0
+  return petRoom.pet_fee_cents != null ? petRoom.pet_fee_cents : (propertySettings?.pet_fee_cents ?? 0)
+}
+
+function Step4Fees({ selectedRooms, nights, propertySettings, feesData, onFeesChange }) {
+  const cleaningFee = effectiveCleaningFee(selectedRooms, propertySettings)
+  const anyRoomAllowsPets = selectedRooms.some((r) => r.allows_pets)
+  const petFeeRate = effectivePetFee(selectedRooms, propertySettings)
+  const petFeeType = propertySettings?.pet_fee_type ?? 'flat'
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h3 className="font-body font-semibold text-[16px] text-text-primary">
+        Fees &amp; Tax
+      </h3>
+
+      {/* Cleaning fee */}
+      {cleaningFee > 0 && (
+        <div className="border border-border rounded-[8px] p-4 flex flex-col gap-3 bg-surface">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-body font-semibold text-[15px] text-text-primary">Cleaning Fee</p>
+              <p className="font-mono text-[14px] text-text-secondary">${(cleaningFee / 100).toFixed(2)} (one-time)</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch.Root
+                checked={feesData.cleaningFeeWaived}
+                onCheckedChange={(v) => onFeesChange({ cleaningFeeWaived: v })}
+                className={cn('w-10 h-6 rounded-full transition-colors', feesData.cleaningFeeWaived ? 'bg-warning' : 'bg-success')}
+              >
+                <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+              </Switch.Root>
+              <span className="font-body text-[13px] text-text-secondary w-14">
+                {feesData.cleaningFeeWaived ? 'Waived' : 'Applied'}
+              </span>
+            </div>
+          </div>
+          {feesData.cleaningFeeWaived && (
+            <Input
+              label="Waive reason (optional)"
+              placeholder="e.g. Long-stay discount, loyalty comp"
+              value={feesData.cleaningFeeWaiveReason}
+              onChange={(e) => onFeesChange({ cleaningFeeWaiveReason: e.target.value })}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Pet fee */}
+      {anyRoomAllowsPets && (
+        <div className="border border-border rounded-[8px] p-4 flex flex-col gap-2 bg-surface">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-body font-semibold text-[15px] text-text-primary">Pet Fee</p>
+              {petFeeRate > 0 ? (
+                <p className="font-mono text-[14px] text-text-secondary">
+                  ${(petFeeRate / 100).toFixed(2)}
+                  {petFeeType === 'per_night' ? ` × ${nights} night${nights !== 1 ? 's' : ''}` : ' (one-time)'}
+                </p>
+              ) : (
+                <p className="font-body text-[13px] text-text-muted">No fee amount configured</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch.Root
+                checked={feesData.petFeeApplied}
+                onCheckedChange={(v) => onFeesChange({ petFeeApplied: v })}
+                className={cn('w-10 h-6 rounded-full transition-colors', feesData.petFeeApplied ? 'bg-info' : 'bg-border')}
+              >
+                <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+              </Switch.Root>
+              <span className="font-body text-[13px] text-text-secondary w-20">
+                {feesData.petFeeApplied ? 'Applied' : 'Not applied'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tax exempt */}
+      <div className="border border-border rounded-[8px] p-4 flex flex-col gap-3 bg-surface">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-body font-semibold text-[15px] text-text-primary">Tax Exempt</p>
+            <p className="font-body text-[13px] text-text-muted">State &amp; local tax waived</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch.Root
+              checked={feesData.taxExempt}
+              onCheckedChange={(v) => onFeesChange({ taxExempt: v })}
+              className={cn('w-10 h-6 rounded-full transition-colors', feesData.taxExempt ? 'bg-success' : 'bg-border')}
+            >
+              <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+            </Switch.Root>
+            <span className="font-body text-[13px] text-text-secondary w-20">
+              {feesData.taxExempt ? 'Exempt' : 'Standard'}
+            </span>
+          </div>
+        </div>
+        {feesData.taxExempt && (
+          <Input
+            label="Organization name / cert # (optional)"
+            placeholder="e.g. American Red Cross or cert #12345"
+            value={feesData.taxExemptOrg}
+            onChange={(e) => onFeesChange({ taxExemptOrg: e.target.value })}
+          />
+        )}
+      </div>
+
+      {cleaningFee === 0 && !anyRoomAllowsPets && (
+        <p className="font-body text-[14px] text-text-muted text-center py-2">
+          No cleaning or pet fees configured for the selected room(s). You can still mark this reservation as tax-exempt above.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function ReservationModal({ open, onClose, reservationToEdit }) {
   const [step, setStep] = useState(1)
   const [checkIn, setCheckIn] = useState(null)
@@ -378,8 +580,16 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
   const [emailDebounced, setEmailDebounced] = useState('')
   const [conflict, setConflict] = useState(null)
   const [submitError, setSubmitError] = useState(null)
+  const [feesData, setFeesData] = useState({
+    cleaningFeeWaived: false,
+    cleaningFeeWaiveReason: '',
+    petFeeApplied: false,
+    taxExempt: false,
+    taxExemptOrg: '',
+  })
 
   const { data: rooms = [] } = useRooms()
+  const { data: propertySettings } = usePropertyFeeSettings()
   const createReservation = useCreateReservation()
   const updateReservation = useUpdateReservation()
   const { addToast } = useToast()
@@ -435,6 +645,7 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
     setEmailDebounced('')
     setConflict(null)
     setSubmitError(null)
+    setFeesData({ cleaningFeeWaived: false, cleaningFeeWaiveReason: '', petFeeApplied: false, taxExempt: false, taxExemptOrg: '' })
     form.reset()
   }
 
@@ -469,7 +680,7 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
       const valid = await form.trigger(['email', 'first_name', 'last_name', 'num_guests'])
       if (!valid) return
     }
-    setStep((s) => Math.min(s + 1, 4))
+    setStep((s) => Math.min(s + 1, 5))
   }
 
   async function handleSubmit() {
@@ -489,6 +700,11 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
         last_name: guestData.last_name,
         phone: guestData.phone ?? '',
       },
+      cleaning_fee_waived: feesData.cleaningFeeWaived,
+      cleaning_fee_waive_reason: feesData.cleaningFeeWaived ? (feesData.cleaningFeeWaiveReason || null) : null,
+      pet_fee_applied: feesData.petFeeApplied,
+      tax_exempt: feesData.taxExempt,
+      tax_exempt_org: feesData.taxExempt ? (feesData.taxExemptOrg || null) : null,
     }
 
     const mutation = isEditMode
@@ -547,6 +763,16 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
       )}
 
       {step === 4 && (
+        <Step4Fees
+          selectedRooms={selectedRooms}
+          nights={nights}
+          propertySettings={propertySettings}
+          feesData={feesData}
+          onFeesChange={(updates) => setFeesData((f) => ({ ...f, ...updates }))}
+        />
+      )}
+
+      {step === 5 && (
         <Step4Review
           checkIn={checkIn}
           checkOut={checkOut}
@@ -557,6 +783,8 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
           loading={isLoading}
           conflict={conflict}
           error={submitError}
+          feesData={feesData}
+          propertySettings={propertySettings}
         />
       )}
 
@@ -571,7 +799,7 @@ export function ReservationModal({ open, onClose, reservationToEdit }) {
           <ArrowLeft size={16} /> Back
         </Button>
 
-        {step < 4 && (
+        {step < 5 && (
           <Button
             variant="primary"
             size="md"

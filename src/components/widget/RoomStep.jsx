@@ -48,10 +48,15 @@ export function RoomStep({ rooms, checkIn, checkOut, onNext, onBack }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-body font-semibold text-[18px] text-text-primary">{room.name}</h3>
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <span className="flex items-center gap-1 font-body text-[13px] text-text-secondary">
                       <Users size={13} /> Up to {room.max_guests} guest{room.max_guests !== 1 ? 's' : ''}
                     </span>
+                    {room.allows_pets && (
+                      <span className="inline-flex items-center font-body text-[11px] font-semibold text-success bg-success-bg border border-success rounded-full px-2 py-0.5">
+                        Pet-friendly
+                      </span>
+                    )}
                   </div>
                   {room.description && (
                     <p className="font-body text-[13px] text-text-secondary mt-2 line-clamp-2">{room.description}</p>

@@ -107,6 +107,7 @@ export default function Settings() {
   // Tax & Policy tab state
   const [taxPolicy, setTaxPolicy] = useState({
     tax_rate: 0, cancellation_policy: 'flexible', cleaning_fee_cents: 0,
+    pet_fee_cents: 0, pet_fee_type: 'flat',
   })
 
   useEffect(() => {
@@ -129,6 +130,8 @@ export default function Settings() {
         tax_rate: settings.tax_rate ?? 0,
         cancellation_policy: settings.cancellation_policy ?? 'flexible',
         cleaning_fee_cents: settings.cleaning_fee_cents ?? 0,
+        pet_fee_cents: settings.pet_fee_cents ?? 0,
+        pet_fee_type: settings.pet_fee_type ?? 'flat',
       })
     }
   }, [settings])
@@ -390,11 +393,56 @@ export default function Settings() {
               </div>
               <p className="mt-1 font-body text-[12px] text-text-muted">Applied once per reservation. Used in the Rates fee calculator.</p>
             </div>
+
+            <SectionHeader>Pet Fee</SectionHeader>
+            <div className="flex flex-col">
+              <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Pet Fee ($)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={(taxPolicy.pet_fee_cents / 100).toFixed(2)}
+                  onChange={(e) =>
+                    setTaxPolicy((t) => ({ ...t, pet_fee_cents: Math.round(Number(e.target.value) * 100) }))
+                  }
+                  className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+                />
+              </div>
+              <p className="mt-1 font-body text-[12px] text-text-muted">Property-wide default. Override per room in the Rooms section.</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+                Pet Fee Type
+              </label>
+              <div className="flex gap-5">
+                {[
+                  { value: 'flat', label: 'Flat (one-time charge)' },
+                  { value: 'per_night', label: 'Per night' },
+                ].map(({ value, label }) => (
+                  <label key={value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pet_fee_type"
+                      value={value}
+                      checked={taxPolicy.pet_fee_type === value}
+                      onChange={() => setTaxPolicy((t) => ({ ...t, pet_fee_type: value }))}
+                      className="accent-info w-4 h-4"
+                    />
+                    <span className="font-body text-[14px] text-text-primary">{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <Button
               variant="primary"
               size="md"
               loading={saving}
-              onClick={() => saveTab({ tax_rate: taxPolicy.tax_rate, cancellation_policy: taxPolicy.cancellation_policy, cleaning_fee_cents: taxPolicy.cleaning_fee_cents })}
+              onClick={() => saveTab({ tax_rate: taxPolicy.tax_rate, cancellation_policy: taxPolicy.cancellation_policy, cleaning_fee_cents: taxPolicy.cleaning_fee_cents, pet_fee_cents: taxPolicy.pet_fee_cents, pet_fee_type: taxPolicy.pet_fee_type })}
               className="self-start"
             >
               Save Tax &amp; Policy Settings
