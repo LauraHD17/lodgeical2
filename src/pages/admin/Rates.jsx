@@ -8,14 +8,9 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
 import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag } from '@phosphor-icons/react'
 
-// Stripe standard processing fee constants — keep in sync with _shared/pricing.ts
-const STRIPE_FIXED_FEE_CENTS = 30   // $0.30 fixed per transaction
-const STRIPE_PCT_FEE = 0.029        // 2.9% of transaction
-
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { useRooms, useUpdateRoom } from '@/hooks/useRooms'
-import { useProperty } from '@/lib/property/useProperty'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -62,65 +57,35 @@ function useSettingsPricing() {
 }
 
 // ---------------------------------------------------------------------------
-// Base rate row (inline editable)
+// ---------------------------------------------------------------------------
+// Reusable inline-edit cell
 // ---------------------------------------------------------------------------
 
-// Stripe processing fee: 2.9% + $0.30
-const STRIPE_RATE = 0.029
-const STRIPE_FIXED = 30 // cents
-
-function usePropertySettings() {
-  const { propertyId } = useProperty()
-  return useQuery({
-    queryKey: ['property-settings-rates', propertyId],
-    queryFn: async () => {
-      if (!propertyId) return null
-      const { data, error } = await supabase
-        .from('properties')
-        .select('tax_rate, cleaning_fee_cents')
-        .eq('id', propertyId)
-        .single()
-      if (error) return null
-      return data
-    },
-    enabled: !!propertyId,
-  })
-}
-
-function InlineEdit({ value, onSave, prefix, type = 'number', min = 0, step }) {
+/**
+ * InlineEditCell — pencil-click inline editor for a single table cell value.
+ * Props:
+ *   displayValue  — what to show in read mode (string/node)
+ *   inputValue    — controlled string value for the input
+ *   onInputChange — called with new string on every keystroke
+ *   onSave        — async fn; called on Enter or checkmark click
+ *   onCancel      — called on Escape or X click; should reset inputValue
+ *   saving        — disables the save button while pending
+ *   prefix        — optional string rendered before the input (e.g. "$")
+ *   inputProps    — extra props forwarded to <input> (type, min, step, className width)
+ */
+function InlineEditCell({ displayValue, inputValue, onInputChange, onSave, onCancel, saving, prefix, inputProps = {} }) {
   const [editing, setEditing] = useState(false)
-  const [rateValue, setRateValue] = useState(((room.base_rate_cents ?? 0) / 100).toFixed(2))
-  const [saving, setSaving] = useState(false)
-
-  async function handleSave() {
-    setSaving(true)
-    await onSave(draft)
-    setSaving(false)
-    setEditing(false)
-  }
 
   function handleKeyDown(e) {
-    if (e.key === 'Enter') handleSave()
-    if (e.key === 'Escape') {
-      setDraft(String(value))
-      setEditing(false)
-    }
+    if (e.key === 'Enter') { onSave().then(() => setEditing(false)).catch(() => {}) }
+    if (e.key === 'Escape') { onCancel(); setEditing(false) }
   }
 
   if (!editing) {
     return (
-      <button
-        onClick={() => { setDraft(String(value)); setEditing(true) }}
-        className="flex items-center gap-2 group"
-        title="Click to edit"
-      >
-        <span className="font-mono text-[15px] text-text-primary">
-          {prefix}{value}
-        </span>
-        <PencilSimple
-          size={14}
-          className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
-        />
+      <button onClick={() => setEditing(true)} className="flex items-center gap-2 group" title="Click to edit">
+        <span className="font-mono text-[15px] text-text-primary">{displayValue}</span>
+        <PencilSimple size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
       </button>
     )
   }
@@ -129,29 +94,24 @@ function InlineEdit({ value, onSave, prefix, type = 'number', min = 0, step }) {
     <div className="flex items-center gap-2">
       {prefix && <span className="font-mono text-[15px] text-text-muted">{prefix}</span>}
       <input
-        type={type}
-        min={min}
-        step={step}
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onKeyDown={handleKeyDown}
         autoFocus
-        className={cn(
-          'w-24 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised',
-          'focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1'
-        )}
+        value={inputValue}
+        onChange={e => onInputChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1"
+        {...inputProps}
       />
       <button
-        onClick={handleSave}
+        onClick={() => onSave().then(() => setEditing(false)).catch(() => {})}
         disabled={saving}
-        className="text-success hover:opacity-80 transition-opacity"
+        className="text-success hover:opacity-80"
         title="Save"
       >
         <Check size={18} weight="bold" />
       </button>
       <button
-        onClick={() => { setDraft(String(value)); setEditing(false) }}
-        className="text-text-muted hover:text-danger transition-colors"
+        onClick={() => { onCancel(); setEditing(false) }}
+        className="text-text-muted hover:text-danger"
         title="Cancel"
       >
         <X size={18} weight="bold" />
@@ -160,48 +120,57 @@ function InlineEdit({ value, onSave, prefix, type = 'number', min = 0, step }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Base rate row (inline editable)
+// ---------------------------------------------------------------------------
+
 function RateRow({ room }) {
   const updateRoom = useUpdateRoom()
   const { addToast } = useToast()
+  const [rateValue, setRateValue] = useState(((room.base_rate_cents ?? 0) / 100).toFixed(2))
+  const [guestsValue, setGuestsValue] = useState(String(room.max_guests ?? ''))
 
-  async function saveRate(val) {
-    try {
-      await updateRoom.mutateAsync({ id: room.id, base_rate_cents: Math.round(Number(rateValue) * 100) })
-      addToast({ message: `Base rate updated for ${room.name}`, variant: 'success' })
-      setEditing(false)
-    } catch {
-      addToast({ message: 'Failed to update rate', variant: 'error' })
-    }
+  async function saveRate() {
+    await updateRoom.mutateAsync({ id: room.id, base_rate_cents: Math.round(Number(rateValue) * 100) })
+    addToast({ message: `Base rate updated for ${room.name}`, variant: 'success' })
   }
 
-  function handleKeyDown(e) {
-    if (e.key === 'Enter') handleSave()
-    if (e.key === 'Escape') { setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2)); setEditing(false) }
+  async function saveGuests() {
+    const parsed = parseInt(guestsValue, 10)
+    if (isNaN(parsed) || parsed < 1) {
+      addToast({ message: 'Max guests must be a positive number', variant: 'error' })
+      throw new Error('invalid')
+    }
+    await updateRoom.mutateAsync({ id: room.id, max_guests: parsed })
+    addToast({ message: `Max guests updated for ${room.name}`, variant: 'success' })
   }
 
   return (
     <tr className="border-b border-border hover:bg-info-bg transition-colors">
       <td className="px-4 py-4 font-body text-[15px] text-text-primary">{room.name}</td>
       <td className="px-4 py-4">
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[15px] text-text-muted">$</span>
-            <input
-              type="number" min={0} step={0.01} value={rateValue}
-              onChange={e => setRateValue(e.target.value)} onKeyDown={handleKeyDown} autoFocus
-              className="w-28 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1"
-            />
-            <button onClick={handleSave} disabled={saving} className="text-success hover:opacity-80" title="Save"><Check size={18} weight="bold" /></button>
-            <button onClick={() => { setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2)); setEditing(false) }} className="text-text-muted hover:text-danger" title="Cancel"><X size={18} weight="bold" /></button>
-          </div>
-        ) : (
-          <button onClick={() => setEditing(true)} className="flex items-center gap-2 group" title="Click to edit">
-            <span className="font-mono text-[15px] text-text-primary">${((room.base_rate_cents ?? 0) / 100).toFixed(2)}</span>
-            <PencilSimple size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        )}
+        <InlineEditCell
+          displayValue={`$${((room.base_rate_cents ?? 0) / 100).toFixed(2)}`}
+          inputValue={rateValue}
+          onInputChange={setRateValue}
+          onSave={saveRate}
+          onCancel={() => setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2))}
+          saving={updateRoom.isPending}
+          prefix="$"
+          inputProps={{ type: 'number', min: 0, step: 0.01, className: 'w-28 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1' }}
+        />
       </td>
-      <td className="px-4 py-4 font-mono text-[14px] text-text-secondary">{room.max_guests ?? '—'}</td>
+      <td className="px-4 py-4">
+        <InlineEditCell
+          displayValue={room.max_guests ?? '—'}
+          inputValue={guestsValue}
+          onInputChange={setGuestsValue}
+          onSave={saveGuests}
+          onCancel={() => setGuestsValue(String(room.max_guests ?? ''))}
+          saving={updateRoom.isPending}
+          inputProps={{ type: 'number', min: 1, step: 1, className: 'w-20 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1' }}
+        />
+      </td>
       <td className="px-4 py-4 font-body text-[14px] text-text-secondary capitalize">{room.type ?? '—'}</td>
     </tr>
   )
@@ -286,6 +255,9 @@ function OverrideModal({ open, onClose, rooms, existing, propertyId }) {
 // ---------------------------------------------------------------------------
 // Pricing Calculator
 // ---------------------------------------------------------------------------
+
+const STRIPE_FIXED_FEE_CENTS = 30
+const STRIPE_PCT_FEE = 0.029
 
 function PricingCalculator({ rooms, overrides, settings }) {
   const [roomId, setRoomId] = useState(rooms[0]?.id ?? '')
@@ -396,7 +368,6 @@ function OverrideList({ overrides, rooms, propertyId }) {
   const queryClient = useQueryClient()
   const [editTarget, setEditTarget] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const roomMap = Object.fromEntries(rooms.map(r => [r.id, r.name]))
 
   const deleteMutation = useMutation({
@@ -452,18 +423,10 @@ function OverrideList({ overrides, rooms, propertyId }) {
                   </td>
                   <td className="px-4 py-3 font-mono text-[15px] text-text-primary">${(ov.rate_cents / 100).toFixed(2)}</td>
                   <td className="px-4 py-3">
-                    {confirmDeleteId === ov.id ? (
-                      <div className="flex items-center gap-2">
-                        <span className="font-body text-[12px] text-danger">Remove?</span>
-                        <button onClick={() => { deleteMutation.mutate(ov.id); setConfirmDeleteId(null) }} className="font-body text-[12px] text-danger font-semibold hover:opacity-70">Yes</button>
-                        <button onClick={() => setConfirmDeleteId(null)} className="font-body text-[12px] text-text-muted hover:opacity-70">No</button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => setEditTarget(ov)} className="text-info hover:opacity-70" title="Edit"><PencilSimple size={15} /></button>
-                        <button onClick={() => setConfirmDeleteId(ov.id)} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setEditTarget(ov)} className="text-info hover:opacity-70" title="Edit"><PencilSimple size={15} /></button>
+                      <button onClick={() => { if (confirm('Remove this override?')) deleteMutation.mutate(ov.id) }} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -495,7 +458,7 @@ export default function Rates() {
       {/* Base Rates */}
       <div className="flex flex-col gap-4">
         <h2 className="font-heading text-[22px] text-text-primary">Base Rates</h2>
-        <p className="font-body text-[14px] text-text-secondary -mt-2">Click any rate to edit inline. Press Enter to save or Escape to cancel.</p>
+        <p className="font-body text-[14px] text-text-secondary -mt-2">Click any rate or guest count to edit inline. Press Enter to save or Escape to cancel.</p>
         <div className="border border-border rounded-[8px] overflow-hidden">
           <table className="w-full border-collapse">
             <thead>

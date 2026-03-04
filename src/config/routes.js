@@ -19,6 +19,7 @@ export const ROUTES = [
   { path: '/reports',              pageName: 'Reports',             permission: 'view_reports',        isPublic: false },
   { path: '/settings',             pageName: 'Settings',            permission: 'manage_settings',     isPublic: false },
   { path: '/import',               pageName: 'Import',              permission: 'manage_reservations', isPublic: false },
+  { path: '/calendar',             pageName: 'Calendar',            permission: 'view_reservations',   isPublic: false, navLabel: 'Calendar' },
 
   // Public routes (no auth required)
   { path: '/check-in',             pageName: 'GuestCheckIn',        isPublic: true },

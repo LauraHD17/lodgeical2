@@ -27,9 +27,6 @@ const Maintenance     = lazy(() => import('@/pages/admin/Maintenance'))
 const Contacts        = lazy(() => import('@/pages/admin/Contacts'))
 const Messaging       = lazy(() => import('@/pages/admin/Messaging'))
 const Documents       = lazy(() => import('@/pages/admin/Documents'))
-const Financials      = lazy(() => import('@/pages/admin/Financials'))
-const Maintenance     = lazy(() => import('@/pages/admin/Maintenance'))
-const Contacts        = lazy(() => import('@/pages/admin/Contacts'))
 const Reports         = lazy(() => import('@/pages/admin/Reports'))
 const Settings        = lazy(() => import('@/pages/admin/Settings'))
 const Import          = lazy(() => import('@/pages/admin/Import'))
@@ -56,12 +53,10 @@ const pageMap = {
   Contacts,
   Messaging,
   Documents,
-  Financials,
-  Maintenance,
-  Contacts,
   Reports,
   Settings,
   Import,
+  Calendar,
   Login,
   Widget,
   GuestPortal,

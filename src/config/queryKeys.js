@@ -22,6 +22,7 @@ export const queryKeys = {
     list: (search) => ['guests', 'list', search],
     detail: (id) => ['guests', 'detail', id],
     byEmail: (email) => ['guests', 'byEmail', email],
+    reservations: (guestId) => ['guests', 'reservations', guestId],
   },
 
   settings: {
