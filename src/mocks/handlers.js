@@ -10,6 +10,9 @@ import {
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
 } from './db.js'
 
+// rate_overrides — empty by default in mock
+const MOCK_RATE_OVERRIDES = []
+
 const BASE = import.meta.env.VITE_SUPABASE_URL // e.g. http://127.0.0.1:54321
 
 // ---------------------------------------------------------------------------
@@ -206,6 +209,50 @@ export const handlers = [
     HttpResponse.json({ success: true, imported: 0, skipped: 0, errors: [] }),
   ),
 
+  // Public booking widget bootstrap
+  http.get(`${BASE}/functions/v1/public-bootstrap`, ({ request }) => {
+    const url  = new URL(request.url)
+    const slug = url.searchParams.get('slug')
+    if (!slug || slug !== MOCK_PROPERTY.slug) {
+      return new HttpResponse(null, { status: 404 })
+    }
+    return HttpResponse.json({
+      property: MOCK_PROPERTY,
+      rooms:    MOCK_ROOMS.filter(r => r.is_active),
+      settings: { ...MOCK_SETTINGS, currency: 'USD', min_stay_nights: 1, require_payment_at_booking: false, allow_partial_payment: true },
+    })
+  }),
+
+  // Guest portal lookup
+  http.post(`${BASE}/functions/v1/guest-portal-lookup`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const { confirmation_number, email } = body
+    const res = MOCK_RESERVATIONS.find(
+      r => r.confirmation_number === confirmation_number && r.guests?.email === email
+    )
+    if (!res) {
+      return HttpResponse.json({ error: 'Reservation not found. Please check your confirmation number and email.' }, { status: 404 })
+    }
+    return HttpResponse.json({
+      reservation: res,
+      payment_summary: {
+        total_due_cents:  res.total_due_cents ?? 0,
+        total_paid_cents: 0,
+        balance_cents:    res.total_due_cents ?? 0,
+        status:           'unpaid',
+      },
+    })
+  }),
+
+  // Cancel reservation (guest-facing)
+  http.post(`${BASE}/functions/v1/cancel-reservation`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    if (body.preview_only) {
+      return HttpResponse.json({ refund_cents: 0, policy: 'strict', message: 'No refund per cancellation policy.' })
+    }
+    return HttpResponse.json({ success: true, message: 'Reservation cancelled.' })
+  }),
+
   http.get(`${BASE}/functions/v1/ical-export`, () =>
     new HttpResponse(
       'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR',
@@ -268,6 +315,25 @@ export const handlers = [
   ),
 
   // -------------------------------------------------------------------------
+  // rate_overrides
+  http.get(`${BASE}/rest/v1/rate_overrides`, ({ request }) =>
+    pgRespond(request, MOCK_RATE_OVERRIDES),
+  ),
+
+  http.post(`${BASE}/rest/v1/rate_overrides`, async ({ request }) => {
+    const body = await request.json()
+    return pgRespond(request, { id: `ro-new-${Date.now()}`, ...body })
+  }),
+
+  http.patch(`${BASE}/rest/v1/rate_overrides`, async ({ request }) => {
+    const body = await request.json()
+    return pgRespond(request, body)
+  }),
+
+  http.delete(`${BASE}/rest/v1/rate_overrides`, () =>
+    new HttpResponse(null, { status: 204 }),
+  ),
+
   // payments (direct table read for Financial Insights)
   // -------------------------------------------------------------------------
 
