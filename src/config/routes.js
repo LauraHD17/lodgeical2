@@ -8,18 +8,18 @@ export const ROUTES = [
   { path: '/',                     pageName: 'Dashboard',           permission: 'view_dashboard',      isPublic: false },
   { path: '/reservations',         pageName: 'Reservations',        permission: 'view_reservations',   isPublic: false },
   { path: '/rooms',                pageName: 'Rooms',               permission: 'manage_rooms',        isPublic: false },
-  { path: '/guests',               pageName: 'Guests',              permission: 'manage_guests',       isPublic: false, navLabel: 'Contacts' },
+  { path: '/guests',               pageName: 'Guests',              permission: 'manage_guests',       isPublic: false },
   { path: '/rates',                pageName: 'Rates',               permission: 'manage_rooms',        isPublic: false },
   { path: '/payments',             pageName: 'Payments',            permission: 'manage_payments',     isPublic: false },
   { path: '/messaging',            pageName: 'Messaging',           permission: 'manage_messaging',    isPublic: false },
-  { path: '/documents',            pageName: 'Documents',           permission: 'manage_documents',    isPublic: false },
+  { path: '/documents',            pageName: 'Documents',           permission: 'manage_documents',    isPublic: false, navHidden: true },
   { path: '/financials',           pageName: 'Financials',          permission: 'view_reports',        isPublic: false },
   { path: '/maintenance',          pageName: 'Maintenance',         permission: 'manage_maintenance',  isPublic: false },
-  { path: '/contacts',             pageName: 'Contacts',            permission: 'manage_contacts',     isPublic: false },
+  { path: '/contacts',             pageName: 'Contacts',            permission: 'manage_contacts',     isPublic: false, navLabel: 'Admin Contacts' },
   { path: '/reports',              pageName: 'Reports',             permission: 'view_reports',        isPublic: false },
   { path: '/settings',             pageName: 'Settings',            permission: 'manage_settings',     isPublic: false },
-  { path: '/import',               pageName: 'Import',              permission: 'manage_reservations', isPublic: false },
-  { path: '/calendar',             pageName: 'Calendar',            permission: 'view_reservations',   isPublic: false, navLabel: 'Calendar' },
+  { path: '/import',               pageName: 'Import',              permission: 'manage_reservations', isPublic: false, navHidden: true },
+  { path: '/calendar',             pageName: 'Calendar',            permission: 'view_reservations',   isPublic: false },
 
   // Public routes (no auth required)
   { path: '/check-in',             pageName: 'GuestCheckIn',        isPublic: true },
@@ -33,8 +33,8 @@ export const ROUTES = [
 /** Array of all public paths (used by RouteGuard to skip auth checks) */
 export const PUBLIC_PATHS = ROUTES.filter(r => r.isPublic).map(r => r.path)
 
-/** Admin nav items (non-public routes with a display name) */
-export const NAV_ITEMS = ROUTES.filter(r => !r.isPublic).map(r => ({
+/** Admin nav items (non-public, non-hidden routes) */
+export const NAV_ITEMS = ROUTES.filter(r => !r.isPublic && !r.navHidden).map(r => ({
   path: r.path,
   label: r.navLabel ?? r.pageName,
   permission: r.permission,

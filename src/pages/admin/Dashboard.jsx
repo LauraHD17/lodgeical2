@@ -1,12 +1,12 @@
 // src/pages/admin/Dashboard.jsx
 // Dashboard layout:
-//   1. WeatherStrip — single ambient line in the header, reads lat/lon from property
-//   2. Two folder panels — Reservations, Earnings
-//   3. RoomCalendar — 14-day horizontal timeline with maintenance indicators
+//   1. Header — greeting, weather, New Reservation button
+//   2. KPI stat cards — today's arrivals/departures/in-house, month earnings
+//   3. Quick-nav tile grid — icon + label link to every section
+//   4. RoomCalendar — 14-day horizontal timeline
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, createElement } from 'react'
 import { Link } from 'react-router-dom'
-import { createElement } from 'react'
 import {
   format, isToday, parseISO, addDays, startOfDay,
   subMonths, startOfMonth,
@@ -15,13 +15,14 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning,
   WarningCircle, Plus, ArrowRight,
+  CalendarBlank, Door, Users, Tag, CreditCard, ChatCircle,
+  TrendUp, Wrench, AddressBook, ChartBar, Gear, CalendarDots,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { queryKeys } from '@/config/queryKeys'
 import { useReservations } from '@/hooks/useReservations'
-import { FolderCard } from '@/components/shared/FolderCard'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { Button } from '@/components/ui/Button'
 import { cn, dollars } from '@/lib/utils'
@@ -41,7 +42,6 @@ function greeting() {
 // Weather Strip
 // ---------------------------------------------------------------------------
 
-// WMO code → Phosphor icon (Thin weight)
 function wmoToIcon(code) {
   if (code === 0)                                                              return Sun
   if (code <= 2)                                                               return CloudSun
@@ -79,12 +79,8 @@ function WeatherStrip() {
   const { property } = useProperty()
   const lat = property?.lat != null ? Number(property.lat) : null
   const lon = property?.lon != null ? Number(property.lon) : null
-
   const { data } = useWeather(lat, lon)
-
-  if (lat == null || lon == null) return null
-  if (!data?.current_weather) return null
-
+  if (lat == null || lon == null || !data?.current_weather) return null
   const code = data.current_weather.weathercode ?? 0
   const temp = Math.round(data.current_weather.temperature ?? 0)
   const high = Math.round(data.daily?.temperature_2m_max?.[0] ?? 0)
@@ -190,78 +186,78 @@ function usePaymentsSummary() {
 }
 
 // ---------------------------------------------------------------------------
-// Folder panel helpers
+// KPI stat cards
 // ---------------------------------------------------------------------------
 
-function PanelSkeleton() {
+function StatCard({ label, value, loading }) {
   return (
-    <div className="inline-block w-full">
-      <div className="animate-pulse bg-border h-7 w-28 rounded-tl-[8px] rounded-tr-[8px]" />
-      <div className="animate-pulse bg-border rounded-tr-[8px] rounded-bl-[8px] rounded-br-[8px] h-32" />
+    <div className="bg-surface-raised border border-border rounded-[8px] px-4 py-4 flex flex-col gap-1">
+      <p className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-muted">{label}</p>
+      {loading
+        ? <div className="animate-pulse bg-border h-8 w-16 rounded-[4px]" />
+        : <p className="font-mono text-[28px] text-text-primary leading-none">{value}</p>
+      }
+    </div>
+  )
+}
+
+function KpiRow({ reservations, loading }) {
+  const { data: payments, isLoading: payLoading } = usePaymentsSummary()
+  const now = new Date()
+
+  const arrivals   = useMemo(() => reservations.filter(r => r.check_in  && isToday(parseISO(r.check_in))).length,  [reservations])
+  const departures = useMemo(() => reservations.filter(r => r.check_out && isToday(parseISO(r.check_out))).length, [reservations])
+  const inHouse    = useMemo(() => reservations.filter(r => {
+    if (!r.check_in || !r.check_out || r.status !== 'confirmed') return false
+    return parseISO(r.check_in) <= now && parseISO(r.check_out) >= now
+  }).length, [reservations]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <StatCard label="Arrivals today"   value={arrivals}                          loading={loading} />
+      <StatCard label="Departures today" value={departures}                        loading={loading} />
+      <StatCard label="In-house"         value={inHouse}                           loading={loading} />
+      <StatCard label="This month"       value={dollars(payments?.thisMonth ?? 0)} loading={loading || payLoading} />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Folder panels
+// Quick-nav tile grid
 // ---------------------------------------------------------------------------
 
-function ReservationsPanel({ reservations, loading }) {
-  const now = new Date()
-  const todayArrivals   = useMemo(() => reservations.filter(r => r.check_in  && isToday(parseISO(r.check_in))).length,  [reservations])
-  const todayDepartures = useMemo(() => reservations.filter(r => r.check_out && isToday(parseISO(r.check_out))).length, [reservations])
-  const currentlyIn     = useMemo(() => reservations.filter(r => {
-    if (!r.check_in || !r.check_out || r.status !== 'confirmed') return false
-    return parseISO(r.check_in) <= now && parseISO(r.check_out) >= now
-  }).length, [reservations]) // eslint-disable-line react-hooks/exhaustive-deps
+const NAV_TILES = [
+  { path: '/reservations', label: 'Reservations',   icon: CalendarBlank },
+  { path: '/calendar',     label: 'Calendar',        icon: CalendarDots  },
+  { path: '/rooms',        label: 'Rooms',           icon: Door          },
+  { path: '/guests',       label: 'Guests',          icon: Users         },
+  { path: '/rates',        label: 'Rates',           icon: Tag           },
+  { path: '/payments',     label: 'Payments',        icon: CreditCard    },
+  { path: '/messaging',    label: 'Messaging',       icon: ChatCircle    },
+  { path: '/financials',   label: 'Financials',      icon: TrendUp       },
+  { path: '/reports',      label: 'Reports',         icon: ChartBar      },
+  { path: '/maintenance',  label: 'Maintenance',     icon: Wrench        },
+  { path: '/contacts',     label: 'Admin Contacts',  icon: AddressBook   },
+  { path: '/settings',     label: 'Settings',        icon: Gear          },
+]
 
-  if (loading) return <PanelSkeleton />
+function QuickNavGrid() {
   return (
-    <FolderCard color="info" tabLabel="Today's Reservations">
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="font-mono text-[26px] text-text-primary leading-none">{todayArrivals}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">Arrivals</p>
-          </div>
-          <div>
-            <p className="font-mono text-[26px] text-text-primary leading-none">{todayDepartures}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">Departures</p>
-          </div>
-          <div>
-            <p className="font-mono text-[26px] text-text-primary leading-none">{currentlyIn}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">In-house</p>
-          </div>
-        </div>
-        <Link to="/reservations" className="flex items-center justify-end gap-1 font-body text-[12px] text-info hover:underline">
-          View all <ArrowRight size={11} />
-        </Link>
+    <div>
+      <h2 className="font-heading text-[18px] text-text-primary mb-3">Navigate</h2>
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+        {NAV_TILES.map(({ path, label, icon: Icon }) => (
+          <Link
+            key={path}
+            to={path}
+            className="flex flex-col items-center gap-2 py-4 px-2 rounded-[8px] border border-border bg-surface-raised hover:border-info hover:bg-info-bg transition-colors text-center group"
+          >
+            <Icon size={22} weight="light" className="text-text-secondary group-hover:text-info transition-colors" />
+            <span className="font-body text-[12px] text-text-secondary group-hover:text-text-primary transition-colors leading-tight">{label}</span>
+          </Link>
+        ))}
       </div>
-    </FolderCard>
-  )
-}
-
-function EarningsPanel({ loading }) {
-  const { data, isLoading } = usePaymentsSummary()
-  if (loading || isLoading) return <PanelSkeleton />
-  return (
-    <FolderCard color="success" tabLabel="Earnings">
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="font-mono text-[22px] text-text-primary leading-none">{dollars(data?.thisMonth ?? 0)}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">This month</p>
-          </div>
-          <div>
-            <p className="font-mono text-[22px] text-text-primary leading-none">{dollars(data?.ytd ?? 0)}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">Year to date</p>
-          </div>
-        </div>
-        <Link to="/financials" className="flex items-center justify-end gap-1 font-body text-[12px] text-success hover:underline">
-          Financial insights <ArrowRight size={11} />
-        </Link>
-      </div>
-    </FolderCard>
+    </div>
   )
 }
 
@@ -296,9 +292,9 @@ function RoomCalendar({ rooms, reservations, maintenanceTickets }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-heading text-[22px] text-text-primary">Room Calendar</h2>
+        <h2 className="font-heading text-[18px] text-text-primary">Room Calendar</h2>
         <Link to="/calendar" className="flex items-center gap-1 font-body text-[13px] text-info hover:underline">
-          View full calendar <ArrowRight size={13} />
+          Full calendar <ArrowRight size={13} />
         </Link>
       </div>
       <div className="overflow-x-auto rounded-[8px] border border-border">
@@ -383,10 +379,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
   const hasUrgent = openTickets.some(t => t.priority === 'urgent')
 
   return (
-    <tr className={cn(
-      !isLast && 'border-b border-border',
-      'hover:bg-tableAlt transition-colors'
-    )}>
+    <tr className={cn(!isLast && 'border-b border-border', 'hover:bg-tableAlt transition-colors')}>
       <td className="px-4 py-2 border-r border-border align-middle min-w-[128px]">
         <div className="flex items-center gap-1.5">
           <span className="font-body text-[13px] text-text-primary font-medium truncate">{room.name}</span>
@@ -409,9 +402,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
               key={idx}
               colSpan={span.span}
               className="py-1 px-1"
-              style={{
-                background: 'repeating-linear-gradient(135deg, #D4D4D4 0px, #D4D4D4 2px, #F4F4F4 2px, #F4F4F4 9px)',
-              }}
+              style={{ background: 'repeating-linear-gradient(135deg, #D4D4D4 0px, #D4D4D4 2px, #F4F4F4 2px, #F4F4F4 9px)' }}
             >
               <span className="font-body text-[11px] text-text-muted">Maintenance</span>
             </td>
@@ -429,10 +420,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
                   ? 'bg-warning-bg border border-dashed border-warning'
                   : 'bg-info-bg border-l-[3px] border-l-info border border-info/30'
               )}>
-                <span className={cn(
-                  'font-mono text-[11px] truncate',
-                  isPending ? 'text-warning italic' : 'text-info'
-                )}>
+                <span className={cn('font-mono text-[11px] truncate', isPending ? 'text-warning italic' : 'text-info')}>
                   {r.guests?.last_name ?? '—'}
                 </span>
               </div>
@@ -443,10 +431,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
         return (
           <td
             key={idx}
-            className={cn(
-              'py-1 px-0.5 h-10',
-              isToday(span.day) && 'bg-info-bg/30'
-            )}
+            className={cn('py-1 px-0.5 h-10', isToday(span.day) && 'bg-info-bg/30')}
           />
         )
       })}
@@ -481,11 +466,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Summary panels */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <ReservationsPanel reservations={allReservations} loading={isLoading} />
-        <EarningsPanel loading={isLoading} />
-      </div>
+      {/* KPI stat cards */}
+      <KpiRow reservations={allReservations} loading={isLoading} />
+
+      {/* Quick-nav tile grid */}
+      <QuickNavGrid />
 
       {/* 14-day room calendar */}
       <RoomCalendar
