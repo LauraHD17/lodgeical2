@@ -53,13 +53,15 @@ function useSettingsPricing() {
           .single(),
         supabase
           .from('properties')
-          .select('cleaning_fee_cents')
+          .select('cleaning_fee_cents, pet_fee_cents, pet_fee_type')
           .eq('id', propertyId)
           .single(),
       ])
       return {
         ...(settingsRes.data ?? {}),
         cleaning_fee_cents: propRes.data?.cleaning_fee_cents ?? 0,
+        pet_fee_cents: propRes.data?.pet_fee_cents ?? 0,
+        pet_fee_type: propRes.data?.pet_fee_type ?? 'flat',
       }
     },
     enabled: !!propertyId,
@@ -273,11 +275,15 @@ function PricingCalculator({ rooms, overrides, settings }) {
   const [roomId, setRoomId] = useState(rooms[0]?.id ?? '')
   const [checkIn, setCheckIn] = useState('')
   const [checkOut, setCheckOut] = useState('')
+  const [includePetFee, setIncludePetFee] = useState(false)
 
   const room = rooms.find(r => r.id === roomId)
   const taxRate      = Number(settings?.tax_rate ?? 0)
   const passThrough  = settings?.pass_through_stripe_fee ?? false
-  const cleaningFee  = Number(settings?.cleaning_fee_cents ?? 0)
+  const cleaningFee  = Number(room?.cleaning_fee_cents != null ? room.cleaning_fee_cents : (settings?.cleaning_fee_cents ?? 0))
+  const petFeeRate   = Number(room?.pet_fee_cents != null ? room.pet_fee_cents : (settings?.pet_fee_cents ?? 0))
+  const petFeeType   = settings?.pet_fee_type ?? 'flat'
+  const roomAllowsPets = room?.allows_pets ?? false
 
   const breakdown = (() => {
     if (!room || !checkIn || !checkOut || checkIn >= checkOut) return null
@@ -295,13 +301,16 @@ function PricingCalculator({ rooms, overrides, settings }) {
     })
 
     const nightsSubtotal = lines.reduce((s, l) => s + l.cents, 0)
-    const subtotal = nightsSubtotal + cleaningFee          // cleaning fee added before tax
+    const petFee = (roomAllowsPets && includePetFee && petFeeRate > 0)
+      ? (petFeeType === 'per_night' ? petFeeRate * nights.length : petFeeRate)
+      : 0
+    const subtotal = nightsSubtotal + cleaningFee + petFee
     const tax = Math.round(subtotal * taxRate / 100)
     const preFee = subtotal + tax
     let fee = 0, total = preFee
     if (passThrough) { const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)); fee = gross - preFee; total = gross }
 
-    return { lines, nightsSubtotal, cleaningFee, subtotal, tax, fee, total }
+    return { lines, nightsSubtotal, cleaningFee, petFee, subtotal, tax, fee, total }
   })()
 
   return (
@@ -312,10 +321,23 @@ function PricingCalculator({ rooms, overrides, settings }) {
         <span className="font-body text-[13px] text-text-muted">(preview what the guest pays)</span>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Select label="Room" options={rooms.map(r => ({ value: r.id, label: r.name }))} value={roomId} onValueChange={setRoomId} />
+        <Select label="Room" options={rooms.map(r => ({ value: r.id, label: r.name }))} value={roomId} onValueChange={(v) => { setRoomId(v); setIncludePetFee(false) }} />
         <Input label="Check-in" type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} />
         <Input label="Check-out" type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} />
       </div>
+      {roomAllowsPets && petFeeRate > 0 && (
+        <label className="flex items-center gap-2 cursor-pointer self-start">
+          <input
+            type="checkbox"
+            checked={includePetFee}
+            onChange={e => setIncludePetFee(e.target.checked)}
+            className="w-4 h-4 accent-info"
+          />
+          <span className="font-body text-[14px] text-text-secondary">
+            Include pet fee (${(petFeeRate / 100).toFixed(2)} {petFeeType === 'per_night' ? '/ night' : 'flat'})
+          </span>
+        </label>
+      )}
 
       {breakdown ? (
         <div className="flex flex-col gap-0 border border-border rounded-[6px] overflow-hidden">
@@ -343,6 +365,12 @@ function PricingCalculator({ rooms, overrides, settings }) {
               <div className="flex justify-between font-body text-[14px] text-text-secondary">
                 <span>Cleaning fee (one-time)</span>
                 <span className="font-mono">${(breakdown.cleaningFee / 100).toFixed(2)}</span>
+              </div>
+            )}
+            {breakdown.petFee > 0 && (
+              <div className="flex justify-between font-body text-[14px] text-text-secondary">
+                <span>Pet fee ({petFeeType === 'per_night' ? `${breakdown.lines.length} night${breakdown.lines.length !== 1 ? 's' : ''}` : 'one-time'})</span>
+                <span className="font-mono">${(breakdown.petFee / 100).toFixed(2)}</span>
               </div>
             )}
             {(taxRate > 0 || breakdown.cleaningFee > 0) && (
