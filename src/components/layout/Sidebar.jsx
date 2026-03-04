@@ -1,3 +1,8 @@
+// src/components/layout/Sidebar.jsx
+// Navigation sidebar with Phosphor icons.
+// Active state: bg-text-primary + white text.
+// Quick Links section provides shortcut access to guest-facing pages.
+
 import { NavLink } from 'react-router-dom'
 import {
   SquaresFour,
@@ -5,6 +10,9 @@ import {
   Door,
   Users,
   CurrencyDollar,
+  TrendUp,
+  Wrench,
+  AddressBook,
   ChartBar,
   Gear,
   ChatText,
@@ -12,6 +20,7 @@ import {
   Tag,
   UploadSimple,
   SignOut,
+  ArrowSquareOut,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth/useAuth'
@@ -20,17 +29,20 @@ import { NAV_ITEMS } from '@/config/routes'
 import { hasPermission } from '@/lib/auth/permissions'
 
 const ICON_MAP = {
-  Dashboard: SquaresFour,
-  Reservations: CalendarBlank,
-  Rooms: Door,
-  Guests: Users,
-  Rates: Tag,
-  Payments: CurrencyDollar,
-  Messaging: ChatText,
-  Documents: Files,
-  Reports: ChartBar,
-  Settings: Gear,
-  Import: UploadSimple,
+  Dashboard:        SquaresFour,
+  Reservations:     CalendarBlank,
+  Rooms:            Door,
+  Guests:           Users,
+  Rates:            Tag,
+  Payments:         CurrencyDollar,
+  Messaging:        ChatText,
+  Documents:        Files,
+  Financials:       TrendUp,
+  Maintenance:      Wrench,
+  'Admin Contacts': AddressBook,
+  Reports:          ChartBar,
+  Settings:         Gear,
+  Import:           UploadSimple,
 }
 
 export function Sidebar({ onClose }) {
@@ -81,6 +93,37 @@ export function Sidebar({ onClose }) {
             )
           })}
         </ul>
+
+        {/* Quick Links — preview guest-facing pages */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="px-3 mb-1.5 font-body text-[11px] uppercase tracking-[0.08em] font-semibold text-text-muted">
+            Quick Links
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            <li>
+              <a
+                href="/widget"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[6px] font-body text-[15px] text-text-secondary hover:bg-border hover:text-text-primary transition-colors duration-100"
+              >
+                <span>Booking Widget</span>
+                <ArrowSquareOut size={14} className="shrink-0 text-text-muted" />
+              </a>
+            </li>
+            <li>
+              <a
+                href="/guest-portal"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[6px] font-body text-[15px] text-text-secondary hover:bg-border hover:text-text-primary transition-colors duration-100"
+              >
+                <span>Guest Portal</span>
+                <ArrowSquareOut size={14} className="shrink-0 text-text-muted" />
+              </a>
+            </li>
+          </ul>
+        </div>
       </nav>
 
       {/* Sign out */}

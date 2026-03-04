@@ -4,7 +4,7 @@
 // Admin routes wrapped in RouteGuard + AdminLayout.
 
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { AuthProvider } from '@/lib/auth/AuthContext'
@@ -24,9 +24,13 @@ const Rates           = lazy(() => import('@/pages/admin/Rates'))
 const Payments        = lazy(() => import('@/pages/admin/Payments'))
 const Messaging       = lazy(() => import('@/pages/admin/Messaging'))
 const Documents       = lazy(() => import('@/pages/admin/Documents'))
+const Financials      = lazy(() => import('@/pages/admin/Financials'))
+const Maintenance     = lazy(() => import('@/pages/admin/Maintenance'))
+const Contacts        = lazy(() => import('@/pages/admin/Contacts'))
 const Reports         = lazy(() => import('@/pages/admin/Reports'))
 const Settings        = lazy(() => import('@/pages/admin/Settings'))
 const Import          = lazy(() => import('@/pages/admin/Import'))
+const Calendar        = lazy(() => import('@/pages/admin/Calendar'))
 
 // Public pages (lazy-loaded)
 const Login               = lazy(() => import('@/pages/public/Login'))
@@ -45,6 +49,9 @@ const pageMap = {
   Payments,
   Messaging,
   Documents,
+  Financials,
+  Maintenance,
+  Contacts,
   Reports,
   Settings,
   Import,
@@ -89,6 +96,16 @@ export default function App() {
                       )
                     return <Route key={route.path} path={route.path} element={element} />
                   })}
+                  {/* Full calendar view — sub-route, not in nav */}
+                  <Route
+                    path="/reservations/calendar"
+                    element={
+                      <AdminPage permission="view_reservations">
+                        <Calendar />
+                      </AdminPage>
+                    }
+                  />
+                  <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
               </Suspense>
             </ToastProvider>

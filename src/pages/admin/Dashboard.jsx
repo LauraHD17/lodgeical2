@@ -1,14 +1,16 @@
 // src/pages/admin/Dashboard.jsx
-// Phase 6 — Admin Dashboard
+// Admin dashboard: stats, today at a glance, calendar preview, recent reservations.
 
 import { useState, useMemo } from 'react'
-import { format, isToday, parseISO } from 'date-fns'
+import { Link } from 'react-router-dom'
+import { format, isToday, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns'
 import {
   CalendarBlank,
   SignIn,
   SignOut,
   Buildings,
   Plus,
+  ArrowRight,
 } from '@phosphor-icons/react'
 
 import { useReservations } from '@/hooks/useReservations'
@@ -55,6 +57,60 @@ function WeatherWidget() {
       </p>
       <p className="font-mono text-[14px] text-text-primary">{format(now, 'EEEE, MMMM d, yyyy')}</p>
       <p className="font-mono text-[14px] text-text-muted">{format(now, 'h:mm a')}</p>
+    </div>
+  )
+}
+
+// Mini month-view calendar with occupied days highlighted
+function MiniCalendar({ reservations }) {
+  const today = new Date()
+  const monthStart = startOfMonth(today)
+  const monthEnd = endOfMonth(today)
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+  const startPadding = getDay(monthStart) // 0=Sun
+
+  // Build a set of dates that have check-ins or check-outs
+  const occupiedDates = useMemo(() => {
+    const set = new Set()
+    reservations.forEach(r => {
+      if (r.check_in)  set.add(r.check_in.slice(0, 10))
+      if (r.check_out) set.add(r.check_out.slice(0, 10))
+    })
+    return set
+  }, [reservations])
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 mb-1">
+        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+          <div key={d} className="text-center font-body text-[11px] font-semibold text-text-muted py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {Array.from({ length: startPadding }).map((_, i) => (
+          <div key={`pad-${i}`} />
+        ))}
+        {days.map(day => {
+          const dateStr = format(day, 'yyyy-MM-dd')
+          const isOccupied = occupiedDates.has(dateStr)
+          const isTodayDate = isToday(day)
+          return (
+            <div
+              key={dateStr}
+              className={cn(
+                'text-center font-mono text-[12px] py-1 rounded-[4px]',
+                isTodayDate && 'bg-text-primary text-white font-semibold',
+                !isTodayDate && isOccupied && 'bg-info-bg text-info font-semibold',
+                !isTodayDate && !isOccupied && 'text-text-secondary'
+              )}
+            >
+              {format(day, 'd')}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -225,6 +281,31 @@ export default function Dashboard() {
             </p>
             <p className="font-mono text-[32px] text-warning leading-none">{isLoading ? '—' : todayDepartures}</p>
           </div>
+        </div>
+      </div>
+
+      {/* Calendar Preview */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-heading text-[22px] text-text-primary">
+            {format(new Date(), 'MMMM yyyy')}
+          </h2>
+          <Link
+            to="/reservations/calendar"
+            className="flex items-center gap-1.5 font-body text-[14px] text-info hover:underline"
+          >
+            View full calendar <ArrowRight size={14} />
+          </Link>
+        </div>
+        <div className="bg-surface border border-border rounded-[8px] p-5">
+          {isLoading ? (
+            <div className="animate-pulse bg-border rounded h-40 w-full" />
+          ) : (
+            <MiniCalendar reservations={allReservations} />
+          )}
+          <p className="mt-3 font-body text-[12px] text-text-muted">
+            Blue = check-in or check-out date
+          </p>
         </div>
       </div>
 

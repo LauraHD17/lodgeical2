@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import * as Switch from '@radix-ui/react-switch'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Check, ArrowsClockwise, Link, CalendarPlus } from '@phosphor-icons/react'
+import { Copy, Check, ArrowsClockwise, Link, CalendarPlus, Code } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -105,7 +105,7 @@ export default function Settings() {
 
   // Tax & Policy tab state
   const [taxPolicy, setTaxPolicy] = useState({
-    tax_rate: 0, cancellation_policy: 'flexible',
+    tax_rate: 0, cancellation_policy: 'flexible', cleaning_fee_cents: 0,
   })
 
   useEffect(() => {
@@ -125,6 +125,7 @@ export default function Settings() {
       setTaxPolicy({
         tax_rate: settings.tax_rate ?? 0,
         cancellation_policy: settings.cancellation_policy ?? 'flexible',
+        cleaning_fee_cents: settings.cleaning_fee_cents ?? 0,
       })
     }
   }, [settings])
@@ -193,7 +194,7 @@ export default function Settings() {
 
       <Tabs.Root defaultValue="property">
         <Tabs.List className="flex gap-0 border-b border-border mb-6">
-          {['property', 'checkin', 'tax', 'team', 'ical', 'sync'].map((tab) => (
+          {['property', 'checkin', 'tax', 'team', 'ical', 'sync', 'widget'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -209,6 +210,7 @@ export default function Settings() {
               {tab === 'team' && 'Team'}
               {tab === 'ical' && 'iCal Feeds'}
               {tab === 'sync' && 'Channel Sync'}
+              {tab === 'widget' && 'Booking Widget'}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
@@ -333,11 +335,30 @@ export default function Settings() {
               value={taxPolicy.cancellation_policy}
               onValueChange={(v) => setTaxPolicy((t) => ({ ...t, cancellation_policy: v }))}
             />
+            <div className="flex flex-col">
+              <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Cleaning Fee ($)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={(taxPolicy.cleaning_fee_cents / 100).toFixed(2)}
+                  onChange={(e) =>
+                    setTaxPolicy((t) => ({ ...t, cleaning_fee_cents: Math.round(Number(e.target.value) * 100) }))
+                  }
+                  className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+                />
+              </div>
+              <p className="mt-1 font-body text-[12px] text-text-muted">Applied once per reservation. Used in the Rates fee calculator.</p>
+            </div>
             <Button
               variant="primary"
               size="md"
               loading={saving}
-              onClick={() => saveTab(taxPolicy)}
+              onClick={() => saveTab({ tax_rate: taxPolicy.tax_rate, cancellation_policy: taxPolicy.cancellation_policy, cleaning_fee_cents: taxPolicy.cleaning_fee_cents })}
               className="self-start"
             >
               Save Tax &amp; Policy Settings
@@ -353,6 +374,11 @@ export default function Settings() {
         {/* Channel Sync Tab */}
         <Tabs.Content value="sync">
           <ChannelSyncTab />
+        </Tabs.Content>
+
+        {/* Booking Widget Tab */}
+        <Tabs.Content value="widget">
+          <BookingWidgetTab property={settings} />
         </Tabs.Content>
 
         {/* Team Tab */}
@@ -721,6 +747,78 @@ function ChannelSyncTab() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Booking Widget tab — iframe embed snippet for embedding on external websites
+// ---------------------------------------------------------------------------
+
+function BookingWidgetTab({ property }) {
+  const [copied, setCopied] = useState(false)
+  const slug = property?.slug ?? 'your-property'
+  const origin = window.location.origin
+  const iframeSnippet = `<iframe\n  src="${origin}/widget?property=${slug}"\n  width="100%"\n  height="700"\n  frameborder="0"\n  style="border: none; border-radius: 8px;"\n  title="Booking Widget"\n></iframe>`
+
+  function handleCopy() {
+    navigator.clipboard.writeText(iframeSnippet).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-6 max-w-2xl">
+      <SectionHeader>Embed Booking Widget</SectionHeader>
+      <p className="font-body text-[14px] text-text-secondary -mt-2">
+        Copy this code and paste it into your website's HTML wherever you want the booking form to appear.
+        The widget allows guests to check availability and create reservations directly on your site.
+      </p>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+            iframe Snippet
+          </label>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 font-body text-[13px] text-info hover:opacity-80 transition-opacity"
+          >
+            {copied ? <Check size={14} weight="bold" className="text-success" /> : <Copy size={14} />}
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <div className="relative bg-surface-raised border border-border rounded-[6px] p-4 overflow-x-auto">
+          <Code size={14} className="text-text-muted absolute top-3 left-3" />
+          <pre className="pl-5 font-mono text-[12px] text-text-secondary whitespace-pre-wrap break-all">
+            {iframeSnippet}
+          </pre>
+        </div>
+      </div>
+
+      <div className="bg-info-bg border border-info rounded-[8px] p-4">
+        <p className="font-body text-[14px] text-info">
+          <span className="font-semibold">Property slug:</span> {slug}
+          {slug === 'your-property' && (
+            <span className="ml-2 text-warning">
+              {' '}— Set your property slug in the Property tab to personalize this URL.
+            </span>
+          )}
+        </p>
+      </div>
+
+      <div>
+        <p className="font-body text-[13px] text-text-muted font-semibold mb-2">Preview</p>
+        <a
+          href={`/widget?property=${slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-body text-[14px] text-info hover:underline"
+        >
+          Open widget preview in new tab →
+        </a>
+      </div>
     </div>
   )
 }
