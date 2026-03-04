@@ -1,7 +1,7 @@
 // src/pages/admin/Dashboard.jsx
-// Feature Supplement redesign:
+// Dashboard layout:
 //   1. WeatherStrip — single ambient line in the header, reads lat/lon from property
-//   2. Five folder panels — Reservations, Earnings, Guests, Maintenance, Contacts
+//   2. Two folder panels — Reservations, Earnings
 //   3. RoomCalendar — 14-day horizontal timeline with maintenance indicators
 
 import { useState, useMemo } from 'react'
@@ -189,27 +189,6 @@ function usePaymentsSummary() {
   })
 }
 
-function useContactCounts() {
-  const { propertyId } = useProperty()
-  return useQuery({
-    queryKey: ['dashboard-contacts', propertyId],
-    queryFn: async () => {
-      if (!propertyId) return { vendors: 0, staff: 0 }
-      const { data } = await supabase
-        .from('contacts')
-        .select('type')
-        .eq('property_id', propertyId)
-        .eq('is_active', true)
-      const rows = data ?? []
-      return {
-        vendors: rows.filter(c => c.type === 'vendor').length,
-        staff:   rows.filter(c => c.type === 'staff').length,
-      }
-    },
-    enabled: !!propertyId,
-  })
-}
-
 // ---------------------------------------------------------------------------
 // Folder panel helpers
 // ---------------------------------------------------------------------------
@@ -291,78 +270,6 @@ function EarningsPanel({ loading }) {
   )
 }
 
-function GuestsPanel({ guestCount, loading }) {
-  if (loading) return <PanelSkeleton />
-  return (
-    <FolderCard color="warning" tabLabel="Guests">
-      <div className="flex flex-col gap-3">
-        <p className="font-mono text-[36px] text-text-primary leading-none">{guestCount}</p>
-        <p className="font-body text-[13px] text-text-secondary">
-          {guestCount === 1 ? 'guest on record' : 'guests on record'}
-        </p>
-        <Link to="/guests" className="flex items-center justify-end gap-1 font-body text-[12px] text-warning hover:underline">
-          View guests <ArrowRight size={11} />
-        </Link>
-      </div>
-    </FolderCard>
-  )
-}
-
-function MaintenancePanel({ loading }) {
-  const { data: tickets = [], isLoading } = useOpenMaintenanceTickets()
-  if (loading || isLoading) return <PanelSkeleton />
-  const urgentCount = tickets.filter(t => t.priority === 'urgent').length
-
-  return (
-    <FolderCard color="danger" tabLabel="Maintenance">
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="font-mono text-[36px] text-text-primary leading-none">{tickets.length}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">Open tickets</p>
-          </div>
-          {urgentCount > 0 && (
-            <div>
-              <p className="font-mono text-[36px] text-danger leading-none">{urgentCount}</p>
-              <p className="font-body text-[12px] text-danger mt-1 flex items-center gap-1">
-                <WarningCircle size={11} weight="fill" /> Urgent
-              </p>
-            </div>
-          )}
-        </div>
-        <Link to="/maintenance" className="flex items-center justify-end gap-1 font-body text-[12px] text-danger hover:underline">
-          View tickets <ArrowRight size={11} />
-        </Link>
-      </div>
-    </FolderCard>
-  )
-}
-
-function ContactsPanel({ loading }) {
-  const { data, isLoading } = useContactCounts()
-  if (loading || isLoading) return <PanelSkeleton />
-
-  return (
-    <FolderCard color="primary" tabLabel="Contacts">
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="font-mono text-[36px] text-text-primary leading-none">{data?.vendors ?? 0}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">Vendors</p>
-          </div>
-          <div>
-            <p className="font-mono text-[36px] text-text-primary leading-none">{data?.staff ?? 0}</p>
-            <p className="font-body text-[12px] text-text-muted mt-1">Staff</p>
-          </div>
-        </div>
-        <Link to="/contacts" className="flex items-center justify-end gap-1 font-body text-[12px] text-text-secondary hover:underline">
-          Manage contacts <ArrowRight size={11} />
-        </Link>
-      </div>
-    </FolderCard>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Room Calendar — 14-day horizontal Gantt-style table
 // ---------------------------------------------------------------------------
@@ -393,7 +300,12 @@ function RoomCalendar({ rooms, reservations, maintenanceTickets }) {
 
   return (
     <div>
-      <h2 className="font-heading text-[22px] text-text-primary mb-4">Room Calendar</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-heading text-[22px] text-text-primary">Room Calendar</h2>
+        <Link to="/calendar" className="flex items-center gap-1 font-body text-[13px] text-info hover:underline">
+          View full calendar <ArrowRight size={13} />
+        </Link>
+      </div>
       <div className="overflow-x-auto rounded-[8px] border border-border">
         <table className="min-w-full border-collapse">
           <thead>
@@ -557,11 +469,6 @@ export default function Dashboard() {
 
   const allReservations = useMemo(() => data?.pages?.flatMap(p => p.data) ?? [], [data])
 
-  const guestCount = useMemo(() => {
-    const ids = new Set(allReservations.map(r => r.guest_id).filter(Boolean))
-    return ids.size
-  }, [allReservations])
-
   const { data: rooms = [] }              = useRoomsForCalendar()
   const { data: calReservations = [] }    = useCalendarReservations()
   const { data: maintenanceTickets = [] } = useOpenMaintenanceTickets()
@@ -579,13 +486,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Five folder panels */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Summary panels */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ReservationsPanel reservations={allReservations} loading={isLoading} />
         <EarningsPanel loading={isLoading} />
-        <GuestsPanel guestCount={guestCount} loading={isLoading} />
-        <MaintenancePanel loading={isLoading} />
-        <ContactsPanel loading={isLoading} />
       </div>
 
       {/* 14-day room calendar */}

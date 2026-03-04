@@ -3,12 +3,12 @@
 // Merge: Step 1 — search for secondary guest. Step 2 — confirm primary wins all data.
 // Merge is executed via supabase edge function 'merge-guests'.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
 import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight } from '@phosphor-icons/react'
 
 import { useGuests, useUpdateGuest } from '@/hooks/useGuests'
-import { useReservations } from '@/hooks/useReservations'
+import { useQuery } from '@tanstack/react-query'
 import { DataTable } from '@/components/shared/DataTable'
 import { StatusChip } from '@/components/shared/StatusChip'
 import { Button } from '@/components/ui/Button'
@@ -159,7 +159,6 @@ function MergeModal({ primaryGuest, onClose, onMerged }) {
 // ─── Guest Drawer ─────────────────────────────────────────────────────────────
 
 function GuestDrawer({ guest, onClose, onMergeStart }) {
-  const { data, isLoading } = useReservations()
   const { addToast } = useToast()
   const updateGuest = useUpdateGuest()
   const [editMode, setEditMode] = useState(false)
@@ -169,10 +168,19 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
     phone: guest.phone ?? '',
   })
 
-  const guestReservations = useMemo(() => {
-    const all = data?.pages?.flatMap((p) => p.data) ?? []
-    return all.filter((r) => r.guests?.id === guest.id)
-  }, [data, guest.id])
+  const { data: guestReservations = [], isLoading } = useQuery({
+    queryKey: ['guest-reservations', guest.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, confirmation_number, check_in, check_out, status, total_due_cents')
+        .eq('guest_id', guest.id)
+        .order('check_in', { ascending: false })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!guest.id,
+  })
 
   async function handleSave() {
     try {
