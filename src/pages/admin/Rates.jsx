@@ -57,102 +57,119 @@ function useSettingsPricing() {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Reusable inline-edit cell
+// ---------------------------------------------------------------------------
+
+/**
+ * InlineEditCell — pencil-click inline editor for a single table cell value.
+ * Props:
+ *   displayValue  — what to show in read mode (string/node)
+ *   inputValue    — controlled string value for the input
+ *   onInputChange — called with new string on every keystroke
+ *   onSave        — async fn; called on Enter or checkmark click
+ *   onCancel      — called on Escape or X click; should reset inputValue
+ *   saving        — disables the save button while pending
+ *   prefix        — optional string rendered before the input (e.g. "$")
+ *   inputProps    — extra props forwarded to <input> (type, min, step, className width)
+ */
+function InlineEditCell({ displayValue, inputValue, onInputChange, onSave, onCancel, saving, prefix, inputProps = {} }) {
+  const [editing, setEditing] = useState(false)
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') { onSave().then(() => setEditing(false)).catch(() => {}) }
+    if (e.key === 'Escape') { onCancel(); setEditing(false) }
+  }
+
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} className="flex items-center gap-2 group" title="Click to edit">
+        <span className="font-mono text-[15px] text-text-primary">{displayValue}</span>
+        <PencilSimple size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {prefix && <span className="font-mono text-[15px] text-text-muted">{prefix}</span>}
+      <input
+        autoFocus
+        value={inputValue}
+        onChange={e => onInputChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1"
+        {...inputProps}
+      />
+      <button
+        onClick={() => onSave().then(() => setEditing(false)).catch(() => {})}
+        disabled={saving}
+        className="text-success hover:opacity-80"
+        title="Save"
+      >
+        <Check size={18} weight="bold" />
+      </button>
+      <button
+        onClick={() => { onCancel(); setEditing(false) }}
+        className="text-text-muted hover:text-danger"
+        title="Cancel"
+      >
+        <X size={18} weight="bold" />
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Base rate row (inline editable)
 // ---------------------------------------------------------------------------
 
 function RateRow({ room }) {
   const updateRoom = useUpdateRoom()
   const { addToast } = useToast()
-
-  // Base rate editing
-  const [editingRate, setEditingRate] = useState(false)
   const [rateValue, setRateValue] = useState(((room.base_rate_cents ?? 0) / 100).toFixed(2))
-  const [savingRate, setSavingRate] = useState(false)
-
-  // Max guests editing
-  const [editingGuests, setEditingGuests] = useState(false)
   const [guestsValue, setGuestsValue] = useState(String(room.max_guests ?? ''))
-  const [savingGuests, setSavingGuests] = useState(false)
 
-  async function handleSaveRate() {
-    setSavingRate(true)
-    try {
-      await updateRoom.mutateAsync({ id: room.id, base_rate_cents: Math.round(Number(rateValue) * 100) })
-      addToast({ message: `Base rate updated for ${room.name}`, variant: 'success' })
-      setEditingRate(false)
-    } catch {
-      addToast({ message: 'Failed to update rate', variant: 'error' })
-    } finally {
-      setSavingRate(false)
-    }
+  async function saveRate() {
+    await updateRoom.mutateAsync({ id: room.id, base_rate_cents: Math.round(Number(rateValue) * 100) })
+    addToast({ message: `Base rate updated for ${room.name}`, variant: 'success' })
   }
 
-  async function handleSaveGuests() {
+  async function saveGuests() {
     const parsed = parseInt(guestsValue, 10)
     if (isNaN(parsed) || parsed < 1) {
-      addToast({ message: 'Max guests must be a positive number', variant: 'error' }); return
+      addToast({ message: 'Max guests must be a positive number', variant: 'error' })
+      throw new Error('invalid')
     }
-    setSavingGuests(true)
-    try {
-      await updateRoom.mutateAsync({ id: room.id, max_guests: parsed })
-      addToast({ message: `Max guests updated for ${room.name}`, variant: 'success' })
-      setEditingGuests(false)
-    } catch {
-      addToast({ message: 'Failed to update max guests', variant: 'error' })
-    } finally {
-      setSavingGuests(false)
-    }
-  }
-
-  function handleRateKeyDown(e) {
-    if (e.key === 'Enter') handleSaveRate()
-    if (e.key === 'Escape') { setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2)); setEditingRate(false) }
-  }
-
-  function handleGuestsKeyDown(e) {
-    if (e.key === 'Enter') handleSaveGuests()
-    if (e.key === 'Escape') { setGuestsValue(String(room.max_guests ?? '')); setEditingGuests(false) }
+    await updateRoom.mutateAsync({ id: room.id, max_guests: parsed })
+    addToast({ message: `Max guests updated for ${room.name}`, variant: 'success' })
   }
 
   return (
     <tr className="border-b border-border hover:bg-info-bg transition-colors">
       <td className="px-4 py-4 font-body text-[15px] text-text-primary">{room.name}</td>
       <td className="px-4 py-4">
-        {editingRate ? (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[15px] text-text-muted">$</span>
-            <input
-              type="number" min={0} step={0.01} value={rateValue}
-              onChange={e => setRateValue(e.target.value)} onKeyDown={handleRateKeyDown} autoFocus
-              className="w-28 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1"
-            />
-            <button onClick={handleSaveRate} disabled={savingRate} className="text-success hover:opacity-80" title="Save"><Check size={18} weight="bold" /></button>
-            <button onClick={() => { setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2)); setEditingRate(false) }} className="text-text-muted hover:text-danger" title="Cancel"><X size={18} weight="bold" /></button>
-          </div>
-        ) : (
-          <button onClick={() => setEditingRate(true)} className="flex items-center gap-2 group" title="Click to edit">
-            <span className="font-mono text-[15px] text-text-primary">${((room.base_rate_cents ?? 0) / 100).toFixed(2)}</span>
-            <PencilSimple size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        )}
+        <InlineEditCell
+          displayValue={`$${((room.base_rate_cents ?? 0) / 100).toFixed(2)}`}
+          inputValue={rateValue}
+          onInputChange={setRateValue}
+          onSave={saveRate}
+          onCancel={() => setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2))}
+          saving={updateRoom.isPending}
+          prefix="$"
+          inputProps={{ type: 'number', min: 0, step: 0.01, className: 'w-28 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1' }}
+        />
       </td>
       <td className="px-4 py-4">
-        {editingGuests ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="number" min={1} step={1} value={guestsValue}
-              onChange={e => setGuestsValue(e.target.value)} onKeyDown={handleGuestsKeyDown} autoFocus
-              className="w-20 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1"
-            />
-            <button onClick={handleSaveGuests} disabled={savingGuests} className="text-success hover:opacity-80" title="Save"><Check size={18} weight="bold" /></button>
-            <button onClick={() => { setGuestsValue(String(room.max_guests ?? '')); setEditingGuests(false) }} className="text-text-muted hover:text-danger" title="Cancel"><X size={18} weight="bold" /></button>
-          </div>
-        ) : (
-          <button onClick={() => { setGuestsValue(String(room.max_guests ?? '')); setEditingGuests(true) }} className="flex items-center gap-2 group" title="Click to edit">
-            <span className="font-mono text-[15px] text-text-primary">{room.max_guests ?? '—'}</span>
-            <PencilSimple size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
-        )}
+        <InlineEditCell
+          displayValue={room.max_guests ?? '—'}
+          inputValue={guestsValue}
+          onInputChange={setGuestsValue}
+          onSave={saveGuests}
+          onCancel={() => setGuestsValue(String(room.max_guests ?? ''))}
+          saving={updateRoom.isPending}
+          inputProps={{ type: 'number', min: 1, step: 1, className: 'w-20 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1' }}
+        />
       </td>
       <td className="px-4 py-4 font-body text-[14px] text-text-secondary capitalize">{room.type ?? '—'}</td>
     </tr>

@@ -87,6 +87,14 @@ serve(async (req: Request) => {
       })
     }
 
+    // Enforce same-property constraint — prevents cross-tenant data corruption
+    if (primaryGuest.property_id !== secondaryGuest.property_id) {
+      return new Response(
+        JSON.stringify({ error: 'Guests must belong to the same property' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Move reservations: secondary → primary
     const { data: updatedReservations, error: resError } = await adminClient
       .from('reservations')
