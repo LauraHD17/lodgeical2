@@ -9,21 +9,28 @@ import { supabase } from '@/lib/supabaseClient'
 import { AuthContext } from './authContext'
 
 export function AuthProvider({ children }) {
-  const [state, setState] = useState({ user: null, isLoading: true, error: null })
+  // Fast-path initial state: read localStorage synchronously.
+  // If the supabase session key is absent we know immediately the user is
+  // unauthenticated — isLoading can start as false so RouteGuard redirects
+  // to /login without waiting for the async auth machinery.
+  //
+  // Background: supabase-js v2 acquires a Navigator Lock to emit INITIAL_SESSION.
+  // React Strict Mode double-mounts components in dev, causing two concurrent
+  // lock acquisitions. The losing acquirer waits up to 5 s for lock recovery,
+  // pushing total resolution past the 10 s Playwright E2E timeout.
+  // The synchronous localStorage check completely bypasses this for the
+  // overwhelmingly common case of an unauthenticated visitor.
+  const [state, setState] = useState(() => {
+    const hasStoredSession = typeof window !== 'undefined' &&
+      !!window.localStorage.getItem('supabase.auth.token')
+    return { user: null, isLoading: hasStoredSession, error: null }
+  })
 
   useEffect(() => {
     let mounted = true
-
-    // onAuthStateChange fires INITIAL_SESSION with the current session (null
-    // when unauthenticated) once initialization completes. Relying solely on
-    // this avoids a Navigator Lock race in React Strict Mode: double-mounting
-    // in dev causes two concurrent getUser() calls to compete for the same
-    // browser lock, delaying resolution by ~5 s and breaking E2E auth-redirect
-    // tests. onAuthStateChange callback registration doesn't acquire the lock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted) setState({ user: session?.user ?? null, isLoading: false, error: null })
     })
-
     return () => { mounted = false; subscription.unsubscribe() }
   }, [])
 
