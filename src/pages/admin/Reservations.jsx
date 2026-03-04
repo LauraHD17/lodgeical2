@@ -15,7 +15,7 @@ import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { BlockModal } from '@/components/reservations/BlockModal'
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
+  { value: 'all', label: 'All Statuses' },
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'pending', label: 'Pending' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -212,7 +212,7 @@ export default function Reservations() {
   const [modalOpen, setModalOpen] = useState(false)
   const [blockOpen, setBlockOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState(null)
-  const [filters, setFilters] = useState({ status: '', dateFrom: '', dateTo: '' })
+  const [filters, setFilters] = useState({ status: 'all', dateFrom: '', dateTo: '' })
   const [activeFilters, setActiveFilters] = useState({})
 
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useReservations(activeFilters)
@@ -223,14 +223,14 @@ export default function Reservations() {
 
   const applyFilters = useCallback(() => {
     const f = {}
-    if (filters.status) f.status = filters.status
+    if (filters.status && filters.status !== 'all') f.status = filters.status
     if (filters.dateFrom) f.dateFrom = filters.dateFrom
     if (filters.dateTo) f.dateTo = filters.dateTo
     setActiveFilters(f)
   }, [filters])
 
   const clearFilters = useCallback(() => {
-    setFilters({ status: '', dateFrom: '', dateTo: '' })
+    setFilters({ status: 'all', dateFrom: '', dateTo: '' })
     setActiveFilters({})
   }, [])
 

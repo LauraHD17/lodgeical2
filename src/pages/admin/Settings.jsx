@@ -96,6 +96,7 @@ export default function Settings() {
   // Property tab state
   const [property, setProperty] = useState({
     name: '', slug: '', location: '', timezone: 'America/New_York', is_active: true,
+    lat: '', lon: '',
   })
 
   // Check-in/out tab state
@@ -116,6 +117,8 @@ export default function Settings() {
         location: settings.location ?? '',
         timezone: settings.timezone ?? 'America/New_York',
         is_active: settings.is_active ?? true,
+        lat: settings.lat ?? '',
+        lon: settings.lon ?? '',
       })
       setCheckinout({
         check_in_time: settings.check_in_time ?? '15:00',
@@ -256,6 +259,38 @@ export default function Settings() {
                 Property is {property.is_active ? 'active' : 'inactive'}
               </label>
             </div>
+
+            <SectionHeader>Property Location</SectionHeader>
+            <p className="font-body text-[14px] text-text-secondary -mt-3">
+              Enter your property's approximate latitude and longitude so we can show you the local weather on your dashboard.{' '}
+              <a
+                href="https://maps.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-info hover:underline"
+              >
+                Find your coordinates
+              </a>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Latitude"
+                type="number"
+                step="any"
+                value={property.lat}
+                onChange={(e) => setProperty((p) => ({ ...p, lat: e.target.value }))}
+                placeholder="e.g. 35.5951"
+              />
+              <Input
+                label="Longitude"
+                type="number"
+                step="any"
+                value={property.lon}
+                onChange={(e) => setProperty((p) => ({ ...p, lon: e.target.value }))}
+                placeholder="e.g. -82.5515"
+              />
+            </div>
+
             <Button
               variant="primary"
               size="md"
