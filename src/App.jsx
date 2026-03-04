@@ -22,6 +22,9 @@ const Rooms           = lazy(() => import('@/pages/admin/Rooms'))
 const Guests          = lazy(() => import('@/pages/admin/Guests'))
 const Rates           = lazy(() => import('@/pages/admin/Rates'))
 const Payments        = lazy(() => import('@/pages/admin/Payments'))
+const Financials      = lazy(() => import('@/pages/admin/Financials'))
+const Maintenance     = lazy(() => import('@/pages/admin/Maintenance'))
+const Contacts        = lazy(() => import('@/pages/admin/Contacts'))
 const Messaging       = lazy(() => import('@/pages/admin/Messaging'))
 const Documents       = lazy(() => import('@/pages/admin/Documents'))
 const Reports         = lazy(() => import('@/pages/admin/Reports'))
@@ -44,6 +47,9 @@ const pageMap = {
   Guests,
   Rates,
   Payments,
+  Financials,
+  Maintenance,
+  Contacts,
   Messaging,
   Documents,
   Reports,

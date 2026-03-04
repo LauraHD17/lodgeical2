@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { PrinterSimple } from '@phosphor-icons/react'
+import { Printer } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabaseClient'
 import { PageLoader } from '@/components/shared/PageLoader'
@@ -117,7 +117,7 @@ export default function Invoice() {
             onClick={() => window.print()}
             className="inline-flex items-center gap-2 h-10 px-4 font-body text-[14px] font-medium bg-transparent border-[1.5px] border-border rounded-none text-text-primary hover:opacity-80 transition-opacity"
           >
-            <PrinterSimple size={16} />
+            <Printer size={16} />
             Print Invoice
           </button>
         </div>

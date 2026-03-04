@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { CheckCircle, PrinterSimple } from '@phosphor-icons/react'
+import { CheckCircle, Printer } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabaseClient'
 import { PageLoader } from '@/components/shared/PageLoader'
@@ -174,7 +174,7 @@ export default function BookingConfirmation() {
             onClick={() => window.print()}
             className="inline-flex items-center justify-center gap-2 h-11 px-4 text-[15px] font-body font-medium bg-transparent border-[1.5px] border-text-primary text-text-primary rounded-none hover:opacity-80 transition-opacity"
           >
-            <PrinterSimple size={16} />
+            <Printer size={16} />
             Print
           </button>
         </div>

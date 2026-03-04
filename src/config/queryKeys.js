@@ -44,4 +44,25 @@ export const queryKeys = {
     all: ['property'],
     current: () => ['property', 'current'],
   },
+
+  financials: {
+    all: ['financials'],
+    monthly: (propertyId, year) => ['financials', 'monthly', propertyId, year],
+  },
+
+  maintenance: {
+    all: ['maintenance'],
+    list: (propertyId, filters) => ['maintenance', 'list', propertyId, filters],
+    open: (propertyId) => ['maintenance', 'open', propertyId],
+  },
+
+  contacts: {
+    all: ['contacts'],
+    list: (propertyId, type) => ['contacts', 'list', propertyId, type],
+    staff: (propertyId) => ['contacts', 'staff', propertyId],
+  },
+
+  weather: {
+    current: (lat, lon) => ['weather', 'current', lat, lon],
+  },
 }
