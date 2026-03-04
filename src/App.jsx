@@ -56,6 +56,7 @@ const pageMap = {
   Reports,
   Settings,
   Import,
+  Calendar,
   Login,
   Widget,
   GuestPortal,

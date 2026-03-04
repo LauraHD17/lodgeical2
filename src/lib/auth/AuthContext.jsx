@@ -14,10 +14,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      if (mounted) setState({ user: user ?? null, isLoading: false, error: error ?? null })
-    })
-
+    // onAuthStateChange fires INITIAL_SESSION with the current session (null
+    // when unauthenticated) once initialization completes. Relying solely on
+    // this avoids a Navigator Lock race in React Strict Mode: double-mounting
+    // in dev causes two concurrent getUser() calls to compete for the same
+    // browser lock, delaying resolution by ~5 s and breaking E2E auth-redirect
+    // tests. onAuthStateChange callback registration doesn't acquire the lock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted) setState({ user: session?.user ?? null, isLoading: false, error: null })
     })
