@@ -34,6 +34,7 @@ const Widget              = lazy(() => import('@/pages/public/Widget'))
 const GuestPortal         = lazy(() => import('@/pages/public/GuestPortal'))
 const BookingConfirmation = lazy(() => import('@/pages/public/BookingConfirmation'))
 const Invoice             = lazy(() => import('@/pages/public/Invoice'))
+const GuestCheckIn        = lazy(() => import('@/pages/public/GuestCheckIn'))
 
 // Map pageName strings (from routes.js) to lazy-loaded components
 const pageMap = {
@@ -53,6 +54,7 @@ const pageMap = {
   GuestPortal,
   BookingConfirmation,
   Invoice,
+  GuestCheckIn,
 }
 
 const queryClient = new QueryClient({
