@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react'
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   getDay, addMonths, subMonths, isToday, isSameMonth,
-  parseISO, startOfDay, differenceInDays, addDays,
+  parseISO, differenceInDays, addDays,
 } from 'date-fns'
 import { CaretLeft, CaretRight, X, User, CalendarBlank, Door, Plus } from '@phosphor-icons/react'
 
@@ -114,45 +114,65 @@ export default function Calendar() {
     return wks
   }, [currentMonth])
 
-  // Compute spanning bars for each week row
+  // Default check-in/out times (hours) — drives time-of-day bar offset
+  const CHECK_IN_HOUR  = 15  // 3 pm
+  const CHECK_OUT_HOUR = 11  // 11 am
+
+  // Compute spanning bars for each week row.
+  // Uses YYYY-MM-DD string comparison throughout — avoids all timezone/DST issues.
   const barsByWeek = useMemo(() => {
-    // Find actual first/last days in view (skip null padding)
     const viewStart = weeks[0]?.find(Boolean)
     const viewEnd   = [...(weeks[weeks.length - 1] ?? [])].reverse().find(Boolean)
     if (!viewStart || !viewEnd) return {}
 
+    const viewFirstStr = format(viewStart, 'yyyy-MM-dd')
+    const viewLastStr  = format(viewEnd,   'yyyy-MM-dd')
+
+    // Add / subtract one day using local-midnight date (avoids parseISO UTC issues)
+    const shiftDay = (str, delta) =>
+      format(addDays(new Date(str + 'T00:00:00'), delta), 'yyyy-MM-dd')
+
     const map = {}
     for (const res of allReservations) {
       if (!res.check_in || !res.check_out) continue
-      const ci = startOfDay(parseISO(res.check_in))
-      const co = startOfDay(parseISO(res.check_out))
-      // Skip if outside this view entirely
-      if (co <= startOfDay(viewStart) || ci > startOfDay(addDays(viewEnd, 1))) continue
+      const ciStr = res.check_in   // YYYY-MM-DD
+      const coStr = res.check_out  // YYYY-MM-DD (exclusive — guest leaves this morning)
+
+      // Skip entirely outside view
+      if (coStr <= viewFirstStr || ciStr > viewLastStr) continue
 
       weeks.forEach((week, wIdx) => {
-        const realDays = week.filter(Boolean)
-        if (!realDays.length) return
-        const weekFirst = startOfDay(realDays[0])
-        const weekLast  = startOfDay(realDays[realDays.length - 1])
+        // Build a parallel array of YYYY-MM-DD strings (null for padding slots)
+        const weekStrs = week.map(d => (d ? format(d, 'yyyy-MM-dd') : null))
+        const realStrs = weekStrs.filter(Boolean)
+        if (!realStrs.length) return
 
-        // Clamp bar to this week
-        const barStart = ci > weekFirst ? ci : weekFirst
-        const barEnd   = co <= addDays(weekLast, 1) ? co : addDays(weekLast, 1)
-        if (barEnd <= barStart) return
+        const weekFirstStr = realStrs[0]
+        const weekLastStr  = realStrs[realStrs.length - 1]
+        const weekNextStr  = shiftDay(weekLastStr, 1)
 
-        // Find column indices within the 7-slot week array
-        const colStart = week.findIndex(d => d && startOfDay(d).getTime() === barStart.getTime())
+        // Clamp bar to this week's date range
+        const barStartStr = ciStr > weekFirstStr ? ciStr : weekFirstStr
+        const barEndStr   = coStr <= weekNextStr  ? coStr : weekNextStr
+        if (barEndStr <= barStartStr) return
+
+        const colStart = weekStrs.indexOf(barStartStr)
         if (colStart === -1) return
-        const barEndDay = addDays(barEnd, -1)
-        let colEnd = week.findIndex(d => d && startOfDay(d).getTime() === barEndDay.getTime())
-        if (colEnd === -1) colEnd = week.reduce((last, d, i) => (d !== null ? i : last), colStart)
+
+        // Last day the guest occupies: one day before the exclusive checkout
+        const barEndDayStr = shiftDay(barEndStr, -1)
+        let colEnd = weekStrs.indexOf(barEndDayStr)
+        if (colEnd === -1) {
+          // Bar continues into next week — extend to last column of this week
+          colEnd = weekStrs.reduce((last, s, i) => (s !== null ? i : last), colStart)
+        }
 
         const colorIdx = roomColorMap[(res.room_ids ?? [])[0]] ?? 0
         const roomName = rooms.find(r => (res.room_ids ?? []).includes(r.id))?.name ?? ''
         ;(map[wIdx] ??= []).push({
           colStart, colEnd, reservation: res, colorIdx, roomName,
-          isStart: ci.getTime() === barStart.getTime(),
-          isEnd:   co.getTime() === barEnd.getTime(),
+          isStart: ciStr === barStartStr,  // arrival day is visible in this week
+          isEnd:   coStr === barEndStr,    // checkout day is visible in this week
         })
       })
     }
@@ -240,30 +260,39 @@ export default function Calendar() {
                   {/* Reservation bars (absolute over the cells) */}
                   <div className="absolute inset-0 top-[36px] pointer-events-none">
                     {weekBars.map((bar, bIdx) => {
-                      const leftPct  = (bar.colStart / 7) * 100
-                      const widthPct = ((bar.colEnd - bar.colStart + 1) / 7) * 100
-                      const res      = bar.reservation
-                      const guest    = res.guests ?? {}
+                      const res       = bar.reservation
+                      const guest     = res.guests ?? {}
                       const isPending = res.status === 'pending'
+                      const multiCell = bar.colEnd > bar.colStart
+
+                      // Time-of-day offsets: only when bar spans >1 column
+                      // (prevents negative-width bars on single-night stays)
+                      const cellPct        = 100 / 7
+                      const arrivalOffset  = (bar.isStart && multiCell) ? (CHECK_IN_HOUR  / 24) * cellPct : 0
+                      const departureOffset= (bar.isEnd   && multiCell) ? ((24 - CHECK_OUT_HOUR) / 24) * cellPct : 0
+
+                      const leftPct  = (bar.colStart / 7) * 100 + arrivalOffset
+                      const widthPct = ((bar.colEnd - bar.colStart + 1) / 7) * 100 - arrivalOffset - departureOffset
 
                       return (
                         <button
                           key={bIdx}
-                          onClick={() => setSelectedRes(res)}
+                          onClick={e => { e.stopPropagation(); setSelectedRes(res) }}
                           className={cn(
-                            'absolute h-6 flex items-center gap-1 pointer-events-auto cursor-pointer transition-opacity hover:opacity-80',
+                            'absolute h-6 flex items-center gap-1 pointer-events-auto cursor-pointer transition-opacity hover:opacity-80 px-2',
                             ROOM_COLORS_BG[bar.colorIdx],
                             ROOM_COLORS_TEXT[bar.colorIdx],
                             isPending && 'border border-dashed border-current opacity-80',
-                            bar.isStart ? 'rounded-l-[3px] pl-2' : 'pl-1',
-                            bar.isEnd   ? 'rounded-r-[3px] pr-2' : 'pr-0',
+                            // Rounded ends: arrival day = left rounded, departure day = right rounded
+                            bar.isStart ? 'rounded-l-[4px]' : 'rounded-l-none',
+                            bar.isEnd   ? 'rounded-r-[4px]' : 'rounded-r-none',
                           )}
                           style={{
-                            left:   `calc(${leftPct}% + 2px)`,
-                            width:  `calc(${widthPct}% - 4px)`,
-                            top:    `${bIdx * 26}px`,
+                            left:  `calc(${leftPct}% + 1px)`,
+                            width: `calc(${widthPct}% - 2px)`,
+                            top:   `${bIdx * 26}px`,
                           }}
-                          title={`${bar.roomName} · ${guest.first_name ?? ''} ${guest.last_name ?? ''}`}
+                          title={`${bar.roomName} · ${guest.first_name ?? ''} ${guest.last_name ?? ''} · Check-in ${CHECK_IN_HOUR}:00, Check-out ${CHECK_OUT_HOUR}:00`}
                         >
                           <span className="font-body text-[11px] font-semibold truncate leading-none">{bar.roomName}</span>
                           {guest.last_name && (
