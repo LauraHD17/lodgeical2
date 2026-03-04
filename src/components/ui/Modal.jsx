@@ -21,8 +21,8 @@ export function Modal({ open, onClose, title, children, className }) {
             <Dialog.Content asChild>
               <Motion.div
                 className={cn(
-                  'fixed left-1/2 top-1/2 z-[9999]',
-                  '-translate-x-1/2 -translate-y-1/2',
+                  'fixed left-1/2 top-[5vh] z-[9999]',
+                  '-translate-x-1/2',
                   'bg-surface-raised rounded-[12px]',
                   'max-w-[560px] w-full mx-4 p-8',
                   'max-h-[90vh] overflow-y-auto',

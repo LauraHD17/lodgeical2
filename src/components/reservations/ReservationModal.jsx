@@ -572,9 +572,9 @@ function Step4Fees({ selectedRooms, nights, propertySettings, feesData, onFeesCh
   )
 }
 
-export function ReservationModal({ open, onClose, reservationToEdit }) {
+export function ReservationModal({ open, onClose, reservationToEdit, defaultCheckIn }) {
   const [step, setStep] = useState(1)
-  const [checkIn, setCheckIn] = useState(null)
+  const [checkIn, setCheckIn] = useState(defaultCheckIn ?? null)
   const [checkOut, setCheckOut] = useState(null)
   const [selectedRoomIds, setSelectedRoomIds] = useState([])
   const [emailDebounced, setEmailDebounced] = useState('')

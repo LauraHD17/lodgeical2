@@ -5,8 +5,8 @@
 
 import { useState, useCallback } from 'react'
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
-import { format, parseISO, eachDayOfInterval } from 'date-fns'
-import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag, CaretDown, CaretUp, Users } from '@phosphor-icons/react'
+import { format, parseISO } from 'date-fns'
+import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag, CaretDown, CaretUp, Users, Moon } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -200,7 +200,7 @@ function RateRow({ room, overrides, settings }) {
       {calcOpen && (
         <tr className="border-b border-border">
           <td colSpan={5} className="p-0">
-            <RoomCalculator room={room} overrides={overrides} settings={settings} />
+            <RoomCalculator room={room} settings={settings} />
           </td>
         </tr>
       )}
@@ -291,16 +291,17 @@ function OverrideModal({ open, onClose, rooms, existing, propertyId }) {
 const STRIPE_FIXED_FEE_CENTS = 30
 const STRIPE_PCT_FEE = 0.029
 
-// Per-room pricing calculator (embedded, no room selector needed)
-function RoomCalculator({ room, overrides, settings }) {
-  const [checkIn, setCheckIn]         = useState('')
-  const [checkOut, setCheckOut]       = useState('')
-  const [numGuests, setNumGuests]     = useState(String(room.max_guests ?? 1))
-  const [includePetFee, setIncludePetFee] = useState(false)
+// Per-room pricing calculator — no dates needed, just nights count
+function RoomCalculator({ room, settings }) {
+  const [nights, setNights]             = useState('3')
+  const [numGuests, setNumGuests]       = useState(String(room.max_guests ?? 1))
+  const [includePetFee, setIncludePetFee]         = useState(false)
   const [includeCleaningFee, setIncludeCleaningFee] = useState(true)
-  const [discountDollars, setDiscountDollars] = useState('')
+  const [discountDollars, setDiscountDollars]       = useState('')
 
+  const nightsNum      = Math.max(1, parseInt(nights, 10) || 1)
   const taxRate        = Number(settings?.tax_rate ?? 0)
+  const taxLabel       = settings?.tax_label || 'Tax'
   const passThrough    = settings?.pass_through_stripe_fee ?? false
   const cleaningFeeCents = Number(room?.cleaning_fee_cents != null ? room.cleaning_fee_cents : (settings?.cleaning_fee_cents ?? 0))
   const petFeeRate     = Number(room?.pet_fee_cents != null ? room.pet_fee_cents : (settings?.pet_fee_cents ?? 0))
@@ -308,73 +309,55 @@ function RoomCalculator({ room, overrides, settings }) {
   const roomAllowsPets = room?.allows_pets ?? false
 
   const breakdown = (() => {
-    if (!checkIn || !checkOut || checkIn >= checkOut) return null
-    let nights
-    try { nights = eachDayOfInterval({ start: parseISO(checkIn), end: parseISO(checkOut) }).slice(0, -1) } catch { return null }
-    if (!nights.length) return null
-
-    const roomOverrides = overrides.filter(o => o.room_id === room.id)
-    const lines = nights.map(d => {
-      const dateStr = format(d, 'yyyy-MM-dd')
-      const applicable = roomOverrides.filter(o => o.start_date <= dateStr && o.end_date >= dateStr)
-      if (!applicable.length) return { date: dateStr, cents: room.base_rate_cents, label: null }
-      const best = applicable.reduce((a, b) => a.rate_cents >= b.rate_cents ? a : b)
-      return { date: dateStr, cents: best.rate_cents, label: best.label }
-    })
-
-    const nightsSubtotal = lines.reduce((s, l) => s + l.cents, 0)
-    const cleaningFee = includeCleaningFee ? cleaningFeeCents : 0
-    const petFee = (roomAllowsPets && includePetFee && petFeeRate > 0)
-      ? (petFeeType === 'per_night' ? petFeeRate * nights.length : petFeeRate)
+    const nightsCents    = (room.base_rate_cents ?? 0) * nightsNum
+    const cleaningFee    = includeCleaningFee ? cleaningFeeCents : 0
+    const petFee         = roomAllowsPets && includePetFee && petFeeRate > 0
+      ? (petFeeType === 'per_night' ? petFeeRate * nightsNum : petFeeRate)
       : 0
-    const discountCents = discountDollars !== '' ? Math.round(Number(discountDollars) * 100) : 0
-    const subtotal   = Math.max(0, nightsSubtotal + cleaningFee + petFee - discountCents)
-    const tax        = Math.round(subtotal * taxRate / 100)
-    const preFee     = subtotal + tax
+    const discountCents  = discountDollars !== '' ? Math.round(Number(discountDollars) * 100) : 0
+    const subtotal       = Math.max(0, nightsCents + cleaningFee + petFee - discountCents)
+    const tax            = Math.round(subtotal * taxRate / 100)
+    const preFee         = subtotal + tax
     let fee = 0, total = preFee
-    if (passThrough) { const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)); fee = gross - preFee; total = gross }
-
-    return { lines, nightsSubtotal, cleaningFee, petFee, discountCents, subtotal, tax, fee, total }
+    if (passThrough) {
+      const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE))
+      fee = gross - preFee
+      total = gross
+    }
+    return { nightsCents, cleaningFee, petFee, discountCents, subtotal, tax, fee, total }
   })()
+
+  const fmt = cents => `$${(Math.abs(cents) / 100).toFixed(2)}`
 
   return (
     <div className="border-t border-border bg-surface px-4 py-4 flex flex-col gap-4">
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2">
         <Calculator size={15} className="text-text-secondary" />
-        <span className="font-body font-semibold text-[13px] text-text-primary">Pricing Calculator</span>
-        <span className="font-body text-[12px] text-text-muted">— preview what the guest pays for {room.name}</span>
+        <span className="font-body font-semibold text-[13px] text-text-primary">Pricing Preview</span>
+        <span className="font-body text-[12px] text-text-muted">for {room.name}</span>
       </div>
 
-      {/* Inputs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Input label="Check-in" type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} />
-        <Input label="Check-out" type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} />
+      {/* Inputs row */}
+      <div className="flex flex-wrap gap-3">
+        {/* Nights */}
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary flex items-center gap-1">
-            <Users size={12} /> Guests
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={room.max_guests ?? 99}
-            value={numGuests}
-            onChange={e => setNumGuests(e.target.value)}
-            className="h-11 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-          />
+          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary flex items-center gap-1"><Moon size={11} /> Nights</label>
+          <input type="number" min={1} value={nights} onChange={e => setNights(e.target.value)}
+            className="h-10 w-20 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1" />
         </div>
+        {/* Guests */}
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Discount ($)</label>
+          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary flex items-center gap-1"><Users size={11} /> Guests</label>
+          <input type="number" min={1} max={room.max_guests ?? 99} value={numGuests} onChange={e => setNumGuests(e.target.value)}
+            className="h-10 w-20 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1" />
+        </div>
+        {/* Discount */}
+        <div className="flex flex-col gap-1">
+          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Discount</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={discountDollars}
-              onChange={e => setDiscountDollars(e.target.value)}
-              placeholder="0.00"
-              className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 placeholder:text-text-muted"
-            />
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[14px] text-text-muted">$</span>
+            <input type="number" min={0} step={0.01} value={discountDollars} onChange={e => setDiscountDollars(e.target.value)} placeholder="0.00"
+              className="h-10 w-28 border-[1.5px] border-border rounded-[6px] pl-6 pr-2 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 placeholder:text-text-muted" />
           </div>
         </div>
       </div>
@@ -384,89 +367,65 @@ function RoomCalculator({ room, overrides, settings }) {
         {cleaningFeeCents > 0 && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={includeCleaningFee} onChange={e => setIncludeCleaningFee(e.target.checked)} className="w-4 h-4 accent-info" />
-            <span className="font-body text-[13px] text-text-secondary">Cleaning fee (${(cleaningFeeCents / 100).toFixed(2)} one-time)</span>
+            <span className="font-body text-[12px] text-text-secondary">Cleaning fee ({fmt(cleaningFeeCents)} one-time)</span>
           </label>
         )}
         {roomAllowsPets && petFeeRate > 0 && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={includePetFee} onChange={e => setIncludePetFee(e.target.checked)} className="w-4 h-4 accent-info" />
-            <span className="font-body text-[13px] text-text-secondary">Pet fee (${(petFeeRate / 100).toFixed(2)} {petFeeType === 'per_night' ? '/ night' : 'flat'})</span>
+            <span className="font-body text-[12px] text-text-secondary">Pet fee ({fmt(petFeeRate)} {petFeeType === 'per_night' ? '/night' : 'flat'})</span>
           </label>
         )}
       </div>
 
       {/* Breakdown */}
-      {breakdown ? (
-        <div className="flex flex-col gap-0 border border-border rounded-[6px] overflow-hidden">
-          <div className="bg-surface-raised">
-            {breakdown.lines.map(line => (
-              <div key={line.date} className="flex items-center justify-between px-4 py-2 border-b border-border last:border-b-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-[12px] text-text-secondary">{format(parseISO(line.date), 'EEE, MMM d')}</span>
-                  {line.label && (
-                    <span className="flex items-center gap-1 font-body text-[11px] text-info bg-info-bg border border-info rounded-full px-2 py-0.5">
-                      <Tag size={10} /> {line.label}
-                    </span>
-                  )}
-                </div>
-                <span className="font-mono text-[13px] text-text-primary">${(line.cents / 100).toFixed(2)}</span>
-              </div>
-            ))}
+      <div className="border border-border rounded-[6px] overflow-hidden text-[13px]">
+        <div className="bg-surface-raised divide-y divide-border">
+          <div className="flex justify-between px-4 py-2">
+            <span className="font-body text-text-secondary">{fmt(room.base_rate_cents ?? 0)} × {nightsNum} night{nightsNum !== 1 ? 's' : ''}</span>
+            <span className="font-mono text-text-primary">{fmt(breakdown.nightsCents)}</span>
           </div>
-          <div className="bg-surface px-4 py-3 flex flex-col gap-1.5">
-            <div className="flex justify-between font-body text-[13px] text-text-secondary">
-              <span>Nightly subtotal ({breakdown.lines.length} night{breakdown.lines.length !== 1 ? 's' : ''})</span>
-              <span className="font-mono">${(breakdown.nightsSubtotal / 100).toFixed(2)}</span>
+          {breakdown.cleaningFee > 0 && (
+            <div className="flex justify-between px-4 py-2">
+              <span className="font-body text-text-secondary">Cleaning fee</span>
+              <span className="font-mono text-text-primary">{fmt(breakdown.cleaningFee)}</span>
             </div>
-            {breakdown.cleaningFee > 0 && (
-              <div className="flex justify-between font-body text-[13px] text-text-secondary">
-                <span>Cleaning fee (one-time)</span>
-                <span className="font-mono">${(breakdown.cleaningFee / 100).toFixed(2)}</span>
-              </div>
-            )}
-            {breakdown.petFee > 0 && (
-              <div className="flex justify-between font-body text-[13px] text-text-secondary">
-                <span>Pet fee</span>
-                <span className="font-mono">${(breakdown.petFee / 100).toFixed(2)}</span>
-              </div>
-            )}
-            {breakdown.discountCents > 0 && (
-              <div className="flex justify-between font-body text-[13px] text-success">
-                <span>Discount</span>
-                <span className="font-mono">−${(breakdown.discountCents / 100).toFixed(2)}</span>
-              </div>
-            )}
-            {taxRate > 0 && (
-              <div className="flex justify-between font-body text-[13px] text-text-secondary">
-                <span>Tax ({taxRate}%)</span>
-                <span className="font-mono">${(breakdown.tax / 100).toFixed(2)}</span>
-              </div>
-            )}
-            {breakdown.fee > 0 && (
-              <div className="flex justify-between font-body text-[12px] text-text-muted">
-                <span>Processing fee (Stripe 2.9% + $0.30)</span>
-                <span className="font-mono">${(breakdown.fee / 100).toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-semibold text-[15px] text-text-primary border-t border-border pt-2 mt-1">
-              <span className="font-body">Guest pays</span>
-              <span className="font-mono text-[17px]">${(breakdown.total / 100).toFixed(2)}</span>
+          )}
+          {breakdown.petFee > 0 && (
+            <div className="flex justify-between px-4 py-2">
+              <span className="font-body text-text-secondary">Pet fee</span>
+              <span className="font-mono text-text-primary">{fmt(breakdown.petFee)}</span>
             </div>
-            {breakdown.fee > 0 && (
-              <p className="font-body text-[11px] text-text-muted">You receive ${((breakdown.total - breakdown.fee) / 100).toFixed(2)} after Stripe fees.</p>
-            )}
-            <p className="font-body text-[12px] text-text-muted mt-1">
-              {breakdown.lines.length} night{breakdown.lines.length !== 1 ? 's' : ''} · {numGuests} guest{Number(numGuests) !== 1 ? 's' : ''}
-            </p>
-          </div>
+          )}
+          {breakdown.discountCents > 0 && (
+            <div className="flex justify-between px-4 py-2">
+              <span className="font-body text-success">Discount</span>
+              <span className="font-mono text-success">−{fmt(breakdown.discountCents)}</span>
+            </div>
+          )}
+          {taxRate > 0 && (
+            <div className="flex justify-between px-4 py-2">
+              <span className="font-body text-text-secondary">{taxLabel} ({taxRate}%)</span>
+              <span className="font-mono text-text-primary">{fmt(breakdown.tax)}</span>
+            </div>
+          )}
+          {breakdown.fee > 0 && (
+            <div className="flex justify-between px-4 py-2">
+              <span className="font-body text-text-muted">Processing fee (2.9% + $0.30)</span>
+              <span className="font-mono text-text-muted">{fmt(breakdown.fee)}</span>
+            </div>
+          )}
         </div>
-      ) : (
-        <p className="font-body text-[12px] text-text-muted">
-          {checkIn && checkOut && checkIn >= checkOut
-            ? 'Check-out must be after check-in.'
-            : 'Enter check-in and check-out dates to see a pricing breakdown.'}
-        </p>
-      )}
+        <div className="bg-surface px-4 py-3 flex justify-between items-baseline border-t border-border">
+          <span className="font-body font-semibold text-text-primary">Guest pays</span>
+          <span className="font-mono text-[18px] font-semibold text-text-primary">{fmt(breakdown.total)}</span>
+        </div>
+        {breakdown.fee > 0 && (
+          <div className="bg-surface px-4 pb-2 text-[11px] font-body text-text-muted">
+            You receive {fmt(breakdown.total - breakdown.fee)} after Stripe fees.
+          </div>
+        )}
+      </div>
     </div>
   )
 }
