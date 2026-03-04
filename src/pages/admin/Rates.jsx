@@ -1,17 +1,69 @@
 // src/pages/admin/Rates.jsx
-// Per-room rate editor with inline editing for base rate and max guests.
-// Fee calculator shows nightly breakdown including Stripe fees and cleaning fee.
+// Base rate inline editor + seasonal date-override pricing.
+// Includes a live pricing calculator showing nightly breakdown,
+// tax, and optional Stripe fee pass-through.
 
-import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { PencilSimple, Check, X, Calculator } from '@phosphor-icons/react'
+import { useState, useCallback } from 'react'
+import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
+import { format, parseISO, eachDayOfInterval } from 'date-fns'
+import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag } from '@phosphor-icons/react'
+
+// Stripe standard processing fee constants — keep in sync with _shared/pricing.ts
+const STRIPE_FIXED_FEE_CENTS = 30   // $0.30 fixed per transaction
+const STRIPE_PCT_FEE = 0.029        // 2.9% of transaction
 
 import { supabase } from '@/lib/supabaseClient'
+import { useProperty } from '@/lib/property/useProperty'
 import { useRooms, useUpdateRoom } from '@/hooks/useRooms'
 import { useProperty } from '@/lib/property/useProperty'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/useToast'
-import { cn } from '@/lib/utils'
+
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+function useRateOverrides() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['rate-overrides', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data, error } = await supabase
+        .from('rate_overrides')
+        .select('id, room_id, label, start_date, end_date, rate_cents')
+        .eq('property_id', propertyId)
+        .order('start_date')
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
+function useSettingsPricing() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['settings-pricing', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return null
+      const { data } = await supabase
+        .from('settings')
+        .select('tax_rate, pass_through_stripe_fee')
+        .eq('property_id', propertyId)
+        .single()
+      return data
+    },
+    enabled: !!propertyId,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Base rate row (inline editable)
+// ---------------------------------------------------------------------------
 
 // Stripe processing fee: 2.9% + $0.30
 const STRIPE_RATE = 0.029
@@ -37,7 +89,7 @@ function usePropertySettings() {
 
 function InlineEdit({ value, onSave, prefix, type = 'number', min = 0, step }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(String(value))
+  const [rateValue, setRateValue] = useState(((room.base_rate_cents ?? 0) / 100).toFixed(2))
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
@@ -114,242 +166,365 @@ function RateRow({ room }) {
 
   async function saveRate(val) {
     try {
-      await updateRoom.mutateAsync({
-        id: room.id,
-        base_rate_cents: Math.round(Number(val) * 100),
-      })
-      addToast({ message: `Rate updated for ${room.name}`, variant: 'success' })
+      await updateRoom.mutateAsync({ id: room.id, base_rate_cents: Math.round(Number(rateValue) * 100) })
+      addToast({ message: `Base rate updated for ${room.name}`, variant: 'success' })
+      setEditing(false)
     } catch {
       addToast({ message: 'Failed to update rate', variant: 'error' })
     }
   }
 
-  async function saveMaxGuests(val) {
-    const n = Number(val)
-    if (!n || n < 1) {
-      addToast({ message: 'Max guests must be at least 1', variant: 'error' })
-      return
-    }
-    try {
-      await updateRoom.mutateAsync({ id: room.id, max_guests: n })
-      addToast({ message: `Max guests updated for ${room.name}`, variant: 'success' })
-    } catch {
-      addToast({ message: 'Failed to update max guests', variant: 'error' })
-    }
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') { setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2)); setEditing(false) }
   }
 
   return (
     <tr className="border-b border-border hover:bg-info-bg transition-colors">
       <td className="px-4 py-4 font-body text-[15px] text-text-primary">{room.name}</td>
       <td className="px-4 py-4">
-        <InlineEdit
-          value={((room.base_rate_cents ?? 0) / 100).toFixed(2)}
-          onSave={saveRate}
-          prefix="$"
-          step={0.01}
-        />
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[15px] text-text-muted">$</span>
+            <input
+              type="number" min={0} step={0.01} value={rateValue}
+              onChange={e => setRateValue(e.target.value)} onKeyDown={handleKeyDown} autoFocus
+              className="w-28 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1"
+            />
+            <button onClick={handleSave} disabled={saving} className="text-success hover:opacity-80" title="Save"><Check size={18} weight="bold" /></button>
+            <button onClick={() => { setRateValue(((room.base_rate_cents ?? 0) / 100).toFixed(2)); setEditing(false) }} className="text-text-muted hover:text-danger" title="Cancel"><X size={18} weight="bold" /></button>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} className="flex items-center gap-2 group" title="Click to edit">
+            <span className="font-mono text-[15px] text-text-primary">${((room.base_rate_cents ?? 0) / 100).toFixed(2)}</span>
+            <PencilSimple size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
+        )}
       </td>
-      <td className="px-4 py-4">
-        <InlineEdit
-          value={room.max_guests ?? 2}
-          onSave={saveMaxGuests}
-          min={1}
-          step={1}
-        />
-      </td>
-      <td className="px-4 py-4 font-body text-[14px] text-text-secondary capitalize">
-        {room.type ?? '—'}
-      </td>
+      <td className="px-4 py-4 font-mono text-[14px] text-text-secondary">{room.max_guests ?? '—'}</td>
+      <td className="px-4 py-4 font-body text-[14px] text-text-secondary capitalize">{room.type ?? '—'}</td>
     </tr>
   )
 }
 
-function FeeCalculator({ settings }) {
-  const [nights, setNights] = useState('3')
-  const [ratePerNight, setRatePerNight] = useState('150')
-  const [includeStripe, setIncludeStripe] = useState(true)
-  const [includeCleaning, setIncludeCleaning] = useState(true)
+// ---------------------------------------------------------------------------
+// Override form modal
+// ---------------------------------------------------------------------------
 
-  const nightsNum = Math.max(0, Number(nights) || 0)
-  const rateNum = Math.max(0, Number(ratePerNight) || 0)
-  const taxRate = (settings?.tax_rate ?? 0) / 100
-  const cleaningFee = settings?.cleaning_fee_cents ?? 0
+function OverrideModal({ open, onClose, rooms, existing, propertyId }) {
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
+  const isEdit = !!existing
 
-  const subtotal = nightsNum * rateNum * 100  // cents
-  const cleaning = includeCleaning ? cleaningFee : 0
-  const subtotalWithCleaning = subtotal + cleaning
-  const tax = Math.round(subtotalWithCleaning * taxRate)
-  const preStripe = subtotalWithCleaning + tax
-  const stripeFeeCents = includeStripe
-    ? Math.round(preStripe * STRIPE_RATE) + STRIPE_FIXED
-    : 0
-  const total = preStripe + stripeFeeCents
+  const [form, setForm] = useState({
+    room_id: existing?.room_id ?? rooms[0]?.id ?? '',
+    label: existing?.label ?? '',
+    start_date: existing?.start_date ?? '',
+    end_date: existing?.end_date ?? '',
+    rate: existing ? (existing.rate_cents / 100).toFixed(2) : '',
+  })
+  const [saving, setSaving] = useState(false)
+  const set = useCallback((k, v) => setForm(f => ({ ...f, [k]: v })), [])
 
-  function fmt(cents) {
-    return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+  async function handleSave() {
+    if (!form.room_id || !form.start_date || !form.end_date || !form.rate) {
+      addToast({ message: 'All fields are required', variant: 'error' }); return
+    }
+    if (form.start_date > form.end_date) {
+      addToast({ message: 'End date must be on or after start date', variant: 'error' }); return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        property_id: propertyId,
+        room_id: form.room_id,
+        label: form.label || 'Seasonal Rate',
+        start_date: form.start_date,
+        end_date: form.end_date,
+        rate_cents: Math.round(Number(form.rate) * 100),
+      }
+      const { error } = isEdit
+        ? await supabase.from('rate_overrides').update(payload).eq('id', existing.id)
+        : await supabase.from('rate_overrides').insert(payload)
+      if (error) throw error
+      addToast({ message: `Seasonal rate ${isEdit ? 'updated' : 'added'}`, variant: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['rate-overrides', propertyId] })
+      onClose()
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to save', variant: 'error' })
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <div className="bg-surface border border-border rounded-[8px] p-6">
-      <div className="flex items-center gap-2 mb-5">
-        <Calculator size={18} className="text-text-muted" />
-        <h2 className="font-heading text-[18px] text-text-primary">Fee Calculator</h2>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Seasonal Rate' : 'Add Seasonal Rate'}>
+      <div className="flex flex-col gap-4 p-1">
+        <Select label="Room" options={rooms.map(r => ({ value: r.id, label: r.name }))} value={form.room_id} onValueChange={v => set('room_id', v)} />
+        <Input label="Label (optional)" placeholder="e.g. Peak Season, Holiday Weekend" value={form.label} onChange={e => set('label', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Start Date" type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
+          <Input label="End Date (inclusive)" type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Rate / Night</label>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[15px] text-text-muted">$</span>
+            <input type="number" min={0} step={0.01} value={form.rate} onChange={e => set('rate', e.target.value)} placeholder="0.00"
+              className="flex-1 h-11 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2" />
+          </div>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <Button variant="primary" size="md" loading={saving} onClick={handleSave} className="flex-1">{isEdit ? 'Save Changes' : 'Add Override'}</Button>
+          <Button variant="secondary" size="md" onClick={onClose}>Cancel</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Pricing Calculator
+// ---------------------------------------------------------------------------
+
+function PricingCalculator({ rooms, overrides, settings }) {
+  const [roomId, setRoomId] = useState(rooms[0]?.id ?? '')
+  const [checkIn, setCheckIn] = useState('')
+  const [checkOut, setCheckOut] = useState('')
+
+  const room = rooms.find(r => r.id === roomId)
+  const taxRate = Number(settings?.tax_rate ?? 0)
+  const passThrough = settings?.pass_through_stripe_fee ?? false
+
+  const breakdown = (() => {
+    if (!room || !checkIn || !checkOut || checkIn >= checkOut) return null
+    let nights
+    try { nights = eachDayOfInterval({ start: parseISO(checkIn), end: parseISO(checkOut) }).slice(0, -1) } catch { return null }
+    if (!nights.length) return null
+
+    const roomOverrides = overrides.filter(o => o.room_id === roomId)
+    const lines = nights.map(d => {
+      const dateStr = format(d, 'yyyy-MM-dd')
+      const applicable = roomOverrides.filter(o => o.start_date <= dateStr && o.end_date >= dateStr)
+      if (!applicable.length) return { date: dateStr, cents: room.base_rate_cents, label: null }
+      const best = applicable.reduce((a, b) => a.rate_cents >= b.rate_cents ? a : b)
+      return { date: dateStr, cents: best.rate_cents, label: best.label }
+    })
+
+    const subtotal = lines.reduce((s, l) => s + l.cents, 0)
+    const tax = Math.round(subtotal * taxRate / 100)
+    const preFee = subtotal + tax
+    let fee = 0, total = preFee
+    if (passThrough) { const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)); fee = gross - preFee; total = gross }
+
+    return { lines, subtotal, tax, fee, total }
+  })()
+
+  return (
+    <div className="border border-border rounded-[8px] bg-surface p-5 flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <Calculator size={18} className="text-text-secondary" />
+        <h3 className="font-body font-semibold text-[15px] text-text-primary">Pricing Calculator</h3>
+        <span className="font-body text-[13px] text-text-muted">(preview what the guest pays)</span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Select label="Room" options={rooms.map(r => ({ value: r.id, label: r.name }))} value={roomId} onValueChange={setRoomId} />
+        <Input label="Check-in" type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} />
+        <Input label="Check-out" type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Nights
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={nights}
-            onChange={e => setNights(e.target.value)}
-            className="h-11 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-          />
-        </div>
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Rate / Night ($)
-          </label>
-          <input
-            type="number"
-            min={0}
-            step={0.01}
-            value={ratePerNight}
-            onChange={e => setRatePerNight(e.target.value)}
-            className="h-11 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-4 mb-6">
-        <label className="flex items-center gap-2 cursor-pointer font-body text-[14px] text-text-secondary">
-          <input
-            type="checkbox"
-            checked={includeCleaning}
-            onChange={e => setIncludeCleaning(e.target.checked)}
-            className="w-4 h-4 accent-text-primary"
-          />
-          Include cleaning fee ({fmt(cleaningFee)})
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer font-body text-[14px] text-text-secondary">
-          <input
-            type="checkbox"
-            checked={includeStripe}
-            onChange={e => setIncludeStripe(e.target.checked)}
-            className="w-4 h-4 accent-text-primary"
-          />
-          Include Stripe fees (2.9% + $0.30)
-        </label>
-      </div>
-
-      {/* Breakdown */}
-      <div className="flex flex-col gap-2">
-        <div className="flex justify-between font-body text-[14px] text-text-secondary">
-          <span>{nightsNum} night{nightsNum !== 1 ? 's' : ''} × {fmt(rateNum * 100)}</span>
-          <span className="font-mono">{fmt(subtotal)}</span>
-        </div>
-        {includeCleaning && cleaningFee > 0 && (
-          <div className="flex justify-between font-body text-[14px] text-text-secondary">
-            <span>Cleaning fee</span>
-            <span className="font-mono">{fmt(cleaning)}</span>
+      {breakdown ? (
+        <div className="flex flex-col gap-0 border border-border rounded-[6px] overflow-hidden">
+          <div className="bg-surface-raised">
+            {breakdown.lines.map(line => (
+              <div key={line.date} className="flex items-center justify-between px-4 py-2.5 border-b border-border last:border-b-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[13px] text-text-secondary">{format(parseISO(line.date), 'EEE, MMM d')}</span>
+                  {line.label && (
+                    <span className="flex items-center gap-1 font-body text-[11px] text-info bg-info-bg border border-info rounded-full px-2 py-0.5">
+                      <Tag size={10} /> {line.label}
+                    </span>
+                  )}
+                </div>
+                <span className="font-mono text-[14px] text-text-primary">${(line.cents / 100).toFixed(2)}</span>
+              </div>
+            ))}
           </div>
-        )}
-        {taxRate > 0 && (
-          <div className="flex justify-between font-body text-[14px] text-text-secondary">
-            <span>Tax ({settings?.tax_rate ?? 0}%)</span>
-            <span className="font-mono">{fmt(tax)}</span>
+          <div className="bg-surface px-4 py-3 flex flex-col gap-2">
+            <div className="flex justify-between font-body text-[14px] text-text-secondary">
+              <span>Subtotal ({breakdown.lines.length} night{breakdown.lines.length !== 1 ? 's' : ''})</span>
+              <span className="font-mono">${(breakdown.subtotal / 100).toFixed(2)}</span>
+            </div>
+            {taxRate > 0 && (
+              <div className="flex justify-between font-body text-[14px] text-text-secondary">
+                <span>Tax ({taxRate}%)</span>
+                <span className="font-mono">${(breakdown.tax / 100).toFixed(2)}</span>
+              </div>
+            )}
+            {breakdown.fee > 0 && (
+              <div className="flex justify-between font-body text-[13px] text-text-muted">
+                <span>Processing fee (Stripe 2.9% + $0.30, guest-facing)</span>
+                <span className="font-mono">${(breakdown.fee / 100).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold text-[16px] text-text-primary border-t border-border pt-2 mt-1">
+              <span className="font-body">Guest pays</span>
+              <span className="font-mono text-[18px]">${(breakdown.total / 100).toFixed(2)}</span>
+            </div>
+            {breakdown.fee > 0 && (
+              <p className="font-body text-[12px] text-text-muted">You receive ${((breakdown.total - breakdown.fee) / 100).toFixed(2)} after Stripe fees.</p>
+            )}
           </div>
-        )}
-        {includeStripe && (
-          <div className="flex justify-between font-body text-[14px] text-text-secondary">
-            <span>Stripe processing (2.9% + $0.30)</span>
-            <span className="font-mono">{fmt(stripeFeeCents)}</span>
-          </div>
-        )}
-        <hr className="border-border" />
-        <div className="flex justify-between font-body text-[15px] font-semibold text-text-primary">
-          <span>Total charged to guest</span>
-          <span className="font-mono text-[16px]">{fmt(total)}</span>
         </div>
-        {includeStripe && (
-          <div className="flex justify-between font-body text-[13px] text-text-muted">
-            <span>Your net after Stripe</span>
-            <span className="font-mono">{fmt(total - stripeFeeCents)}</span>
-          </div>
-        )}
-      </div>
+      ) : (
+        <p className="font-body text-[13px] text-text-muted">
+          {checkIn && checkOut && checkIn >= checkOut
+            ? 'Check-out must be after check-in.'
+            : 'Select a room and date range to see a pricing breakdown.'}
+        </p>
+      )}
     </div>
   )
 }
 
-export default function Rates() {
-  const { data: rooms = [], isLoading } = useRooms()
-  const { data: settings } = usePropertySettings()
+// ---------------------------------------------------------------------------
+// Seasonal overrides list
+// ---------------------------------------------------------------------------
+
+function OverrideList({ overrides, rooms, propertyId }) {
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
+  const [editTarget, setEditTarget] = useState(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const roomMap = Object.fromEntries(rooms.map(r => [r.id, r.name]))
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('rate_overrides').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { addToast({ message: 'Override removed', variant: 'success' }); queryClient.invalidateQueries({ queryKey: ['rate-overrides', propertyId] }) },
+    onError: () => addToast({ message: 'Failed to remove override', variant: 'error' }),
+  })
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Header */}
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Rates</h1>
+        <div className="flex items-center gap-2">
+          <CalendarBlank size={18} className="text-text-secondary" />
+          <h2 className="font-heading text-[22px] text-text-primary">Seasonal Overrides</h2>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => setAddOpen(true)} disabled={rooms.length === 0}>
+          <Plus size={14} weight="bold" /> Add Override
+        </Button>
       </div>
-
-      <p className="font-body text-[14px] text-text-secondary">
-        Click any value to edit it inline. Press Enter to save or Escape to cancel.
-        Set cleaning fees in <a href="/settings" className="text-info hover:underline">Settings → Tax &amp; Policy</a>.
+      <p className="font-body text-[14px] text-text-secondary -mt-2">
+        Override the nightly rate for specific date ranges. When multiple overrides overlap the same date, the highest rate applies.
       </p>
 
-      {/* Rate Table */}
-      <div className="border border-border rounded-[8px] overflow-hidden">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-text-primary">
-              <th className="px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold">
-                Room Name
-              </th>
-              <th className="px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold">
-                Base Rate / Night
-              </th>
-              <th className="px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold">
-                Max Guests
-              </th>
-              <th className="px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold">
-                Type
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <>
-                {[1, 2, 3].map((i) => (
-                  <tr key={i} className="border-b border-border">
-                    {[1, 2, 3, 4].map((j) => (
-                      <td key={j} className="px-4 py-4">
-                        <div className="animate-pulse bg-border rounded h-8 w-full" />
-                      </td>
-                    ))}
-                  </tr>
+      {overrides.length === 0 ? (
+        <div className="border border-border rounded-[8px] py-10 text-center">
+          <p className="font-body text-[15px] text-text-muted">No seasonal overrides yet.</p>
+          <Button variant="secondary" size="sm" className="mt-3" onClick={() => setAddOpen(true)}><Plus size={14} /> Add your first override</Button>
+        </div>
+      ) : (
+        <div className="border border-border rounded-[8px] overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-text-primary">
+                {['Room', 'Label', 'Dates', 'Rate / Night', ''].map(h => (
+                  <th key={h} className="px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold">{h}</th>
                 ))}
-              </>
-            ) : rooms.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-12 text-center">
-                  <p className="font-body text-[15px] text-text-muted">
-                    No rooms found. Add rooms in the Rooms section.
-                  </p>
-                </td>
               </tr>
-            ) : (
-              rooms.map((room) => <RateRow key={room.id} room={room} />)
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {overrides.map(ov => (
+                <tr key={ov.id} className="border-b border-border hover:bg-info-bg transition-colors">
+                  <td className="px-4 py-3 font-body text-[14px] text-text-primary">{roomMap[ov.room_id] ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1 font-body text-[12px] text-info bg-info-bg border border-info rounded-full px-2 py-0.5 w-fit">
+                      <Tag size={10} /> {ov.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-text-secondary whitespace-nowrap">
+                    {format(parseISO(ov.start_date), 'MMM d, yyyy')} – {format(parseISO(ov.end_date), 'MMM d, yyyy')}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-[15px] text-text-primary">${(ov.rate_cents / 100).toFixed(2)}</td>
+                  <td className="px-4 py-3">
+                    {confirmDeleteId === ov.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-body text-[12px] text-danger">Remove?</span>
+                        <button onClick={() => { deleteMutation.mutate(ov.id); setConfirmDeleteId(null) }} className="font-body text-[12px] text-danger font-semibold hover:opacity-70">Yes</button>
+                        <button onClick={() => setConfirmDeleteId(null)} className="font-body text-[12px] text-text-muted hover:opacity-70">No</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setEditTarget(ov)} className="text-info hover:opacity-70" title="Edit"><PencilSimple size={15} /></button>
+                        <button onClick={() => setConfirmDeleteId(ov.id)} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {addOpen && <OverrideModal open onClose={() => setAddOpen(false)} rooms={rooms} existing={null} propertyId={propertyId} />}
+      {editTarget && <OverrideModal open onClose={() => setEditTarget(null)} rooms={rooms} existing={editTarget} propertyId={propertyId} />}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default function Rates() {
+  const { propertyId } = useProperty()
+  const { data: rooms = [], isLoading: roomsLoading } = useRooms()
+  const { data: overrides = [] } = useRateOverrides()
+  const { data: settings } = useSettingsPricing()
+
+  return (
+    <div className="flex flex-col gap-10">
+      <h1 className="font-heading text-[32px] text-text-primary">Rates</h1>
+
+      {/* Base Rates */}
+      <div className="flex flex-col gap-4">
+        <h2 className="font-heading text-[22px] text-text-primary">Base Rates</h2>
+        <p className="font-body text-[14px] text-text-secondary -mt-2">Click any rate to edit inline. Press Enter to save or Escape to cancel.</p>
+        <div className="border border-border rounded-[8px] overflow-hidden">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-text-primary">
+                {['Room Name', 'Base Rate / Night', 'Max Guests', 'Type'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {roomsLoading ? (
+                [1, 2, 3].map(i => <tr key={i} className="border-b border-border">{[1, 2, 3, 4].map(j => <td key={j} className="px-4 py-4"><div className="animate-pulse bg-border rounded h-8" /></td>)}</tr>)
+              ) : rooms.length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-12 text-center font-body text-[15px] text-text-muted">No rooms found. Add rooms in the Rooms section.</td></tr>
+              ) : rooms.map(room => <RateRow key={room.id} room={room} />)}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Fee Calculator */}
-      <FeeCalculator settings={settings} />
+      {/* Seasonal Overrides */}
+      {!roomsLoading && rooms.length > 0 && (
+        <OverrideList overrides={overrides} rooms={rooms} propertyId={propertyId} />
+      )}
+
+      {/* Pricing Calculator */}
+      {!roomsLoading && rooms.length > 0 && (
+        <PricingCalculator rooms={rooms} overrides={overrides} settings={settings} />
+      )}
     </div>
   )
 }

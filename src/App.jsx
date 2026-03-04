@@ -22,6 +22,9 @@ const Rooms           = lazy(() => import('@/pages/admin/Rooms'))
 const Guests          = lazy(() => import('@/pages/admin/Guests'))
 const Rates           = lazy(() => import('@/pages/admin/Rates'))
 const Payments        = lazy(() => import('@/pages/admin/Payments'))
+const Financials      = lazy(() => import('@/pages/admin/Financials'))
+const Maintenance     = lazy(() => import('@/pages/admin/Maintenance'))
+const Contacts        = lazy(() => import('@/pages/admin/Contacts'))
 const Messaging       = lazy(() => import('@/pages/admin/Messaging'))
 const Documents       = lazy(() => import('@/pages/admin/Documents'))
 const Financials      = lazy(() => import('@/pages/admin/Financials'))
@@ -38,6 +41,7 @@ const Widget              = lazy(() => import('@/pages/public/Widget'))
 const GuestPortal         = lazy(() => import('@/pages/public/GuestPortal'))
 const BookingConfirmation = lazy(() => import('@/pages/public/BookingConfirmation'))
 const Invoice             = lazy(() => import('@/pages/public/Invoice'))
+const GuestCheckIn        = lazy(() => import('@/pages/public/GuestCheckIn'))
 
 // Map pageName strings (from routes.js) to lazy-loaded components
 const pageMap = {
@@ -47,6 +51,9 @@ const pageMap = {
   Guests,
   Rates,
   Payments,
+  Financials,
+  Maintenance,
+  Contacts,
   Messaging,
   Documents,
   Financials,
@@ -60,6 +67,7 @@ const pageMap = {
   GuestPortal,
   BookingConfirmation,
   Invoice,
+  GuestCheckIn,
 }
 
 const queryClient = new QueryClient({
@@ -96,15 +104,6 @@ export default function App() {
                       )
                     return <Route key={route.path} path={route.path} element={element} />
                   })}
-                  {/* Full calendar view — sub-route, not in nav */}
-                  <Route
-                    path="/reservations/calendar"
-                    element={
-                      <AdminPage permission="view_reservations">
-                        <Calendar />
-                      </AdminPage>
-                    }
-                  />
                   <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
               </Suspense>

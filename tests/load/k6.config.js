@@ -1,3 +1,4 @@
+/* global __ENV __VU __ITER */
 // K6 load test configuration for Lodge-ical Edge Functions
 // Run with: k6 run tests/load/k6.config.js
 //

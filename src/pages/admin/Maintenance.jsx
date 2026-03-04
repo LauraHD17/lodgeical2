@@ -1,71 +1,62 @@
 // src/pages/admin/Maintenance.jsx
-// Maintenance log — chronological record of completed work.
-// Not a ticket system. Each entry logs what was done, when, cost, and who did it.
-// Optional reminder date: entries with next_reminder_date ≤ today+7 show a reminder badge.
+// Internal tool for logging room problems, repairs, and cleaning tasks.
 
 import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format, parseISO, addDays, isBefore, isAfter } from 'date-fns'
-import {
-  Plus,
-  Wrench,
-  Bell,
-  PencilSimple,
-  Trash,
-  X,
-  CaretDown,
-  CaretUp,
-} from '@phosphor-icons/react'
+import { format, parseISO } from 'date-fns'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Plus, WarningCircle, ArrowCounterClockwise } from '@phosphor-icons/react'
+import * as Switch from '@radix-ui/react-switch'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
-import { useRooms } from '@/hooks/useRooms'
+import { queryKeys } from '@/config/queryKeys'
+import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { Modal } from '@/components/ui/Modal'
+import { Drawer } from '@/components/ui/Drawer'
 import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
 
-const CATEGORIES = [
-  'General',
-  'Plumbing',
-  'HVAC',
-  'Electrical',
-  'Cleaning',
-  'Landscaping',
-  'Appliances',
-  'Structural',
-  'Pest Control',
-  'Safety',
-  'Other',
-]
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-const CATEGORY_COLORS = {
-  General:       'bg-surface text-text-secondary border-border',
-  Plumbing:      'bg-blue-100 text-blue-700 border-blue-200',
-  HVAC:          'bg-orange-100 text-orange-700 border-orange-200',
-  Electrical:    'bg-yellow-100 text-yellow-700 border-yellow-200',
-  Cleaning:      'bg-green-100 text-green-700 border-green-200',
-  Landscaping:   'bg-lime-100 text-lime-700 border-lime-200',
-  Appliances:    'bg-purple-100 text-purple-700 border-purple-200',
-  Structural:    'bg-red-100 text-red-700 border-red-200',
-  'Pest Control':'bg-teal-100 text-teal-700 border-teal-200',
-  Safety:        'bg-rose-100 text-rose-700 border-rose-200',
-  Other:         'bg-surface text-text-secondary border-border',
+const PRIORITY_COLORS = {
+  urgent:  { bg: 'bg-danger-bg',  text: 'text-danger',         border: 'border-danger' },
+  high:    { bg: 'bg-warning-bg', text: 'text-warning',        border: 'border-warning' },
+  medium:  { bg: 'bg-info-bg',    text: 'text-info',           border: 'border-info' },
+  low:     { bg: 'bg-surface',    text: 'text-text-secondary', border: 'border-border' },
 }
 
-function useMaintenanceLogs() {
+const CATEGORIES = ['Plumbing','Electrical','HVAC','Cleaning','Furniture','Appliance','Exterior','Other']
+const PRIORITIES = ['urgent','high','medium','low']
+const STATUSES   = ['open','in_progress','resolved']
+
+const STATUS_LABELS = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved' }
+
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+function useMaintenanceTickets(filters) {
   const { propertyId } = useProperty()
   return useQuery({
-    queryKey: ['maintenance_logs', propertyId],
+    queryKey: queryKeys.maintenance.list(propertyId, filters),
     queryFn: async () => {
       if (!propertyId) return []
-      const { data, error } = await supabase
-        .from('maintenance_logs')
-        .select('*, rooms(name)')
+      let q = supabase
+        .from('maintenance_tickets')
+        .select('*, rooms(id,name), contacts(id,first_name,last_name,role)')
         .eq('property_id', propertyId)
-        .order('completed_date', { ascending: false })
+        .order('created_at', { ascending: false })
+
+      if (filters.status && filters.status !== 'all') q = q.eq('status', filters.status)
+      if (filters.priority && filters.priority !== 'all') q = q.eq('priority', filters.priority)
+      if (filters.room_id) q = q.eq('room_id', filters.room_id)
+      if (filters.category && filters.category !== 'all') q = q.eq('category', filters.category)
+
+      const { data, error } = await q
       if (error) throw error
       return data ?? []
     },
@@ -73,406 +64,508 @@ function useMaintenanceLogs() {
   })
 }
 
-function useUpsertLog() {
+function useRooms() {
   const { propertyId } = useProperty()
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, ...fields }) => {
-      if (id) {
-        const { error } = await supabase
-          .from('maintenance_logs')
-          .update({ ...fields, updated_at: new Date().toISOString() })
-          .eq('id', id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('maintenance_logs')
-          .insert({ ...fields, property_id: propertyId })
-        if (error) throw error
-      }
+  return useQuery({
+    queryKey: queryKeys.rooms.list(),
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('property_id', propertyId)
+        .eq('is_active', true)
+        .order('name')
+      return data ?? []
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['maintenance_logs', propertyId] }),
+    enabled: !!propertyId,
   })
 }
 
-function useDeleteLog() {
+function useStaffContacts() {
   const { propertyId } = useProperty()
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from('maintenance_logs').delete().eq('id', id)
-      if (error) throw error
+  return useQuery({
+    queryKey: queryKeys.contacts.staff(propertyId),
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, role')
+        .eq('property_id', propertyId)
+        .eq('type', 'staff')
+        .eq('is_active', true)
+        .order('first_name')
+      return data ?? []
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['maintenance_logs', propertyId] }),
+    enabled: !!propertyId,
   })
 }
 
-const EMPTY_FORM = {
-  completed_date: format(new Date(), 'yyyy-MM-dd'),
-  category: 'General',
-  room_id: '',
-  description: '',
-  performed_by: '',
-  cost_cents: '',
-  next_reminder_date: '',
-  notes: '',
-}
+// ---------------------------------------------------------------------------
+// Priority chip
+// ---------------------------------------------------------------------------
 
-function LogModal({ open, onClose, log, rooms }) {
-  const upsert = useUpsertLog()
-  const { addToast } = useToast()
-  const [form, setForm] = useState(() =>
-    log
-      ? {
-          ...log,
-          cost_cents: log.cost_cents != null ? String(log.cost_cents / 100) : '',
-          room_id: log.room_id ?? '',
-          next_reminder_date: log.next_reminder_date ?? '',
-        }
-      : { ...EMPTY_FORM }
+function PriorityChip({ priority }) {
+  const c = PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.low
+  return (
+    <span className={cn(
+      'inline-flex items-center px-2.5 py-0.5 rounded-full font-body text-[12px] font-semibold capitalize border',
+      c.bg, c.text, c.border
+    )}>
+      {priority}
+    </span>
   )
-  const [errors, setErrors] = useState({})
+}
 
-  function validate() {
-    const e = {}
-    if (!form.description.trim()) e.description = 'Description is required'
-    if (!form.completed_date) e.completed_date = 'Date is required'
-    setErrors(e)
-    return Object.keys(e).length === 0
+function StatusChip({ status }) {
+  const colorMap = {
+    open:        'bg-warning-bg text-warning border-warning',
+    in_progress: 'bg-info-bg text-info border-info',
+    resolved:    'bg-success-bg text-success border-success',
+  }
+  return (
+    <span className={cn(
+      'inline-flex items-center px-2.5 py-0.5 rounded-full font-body text-[12px] font-semibold border',
+      colorMap[status] ?? 'bg-surface text-text-secondary border-border'
+    )}>
+      {STATUS_LABELS[status] ?? status}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Ticket Drawer
+// ---------------------------------------------------------------------------
+
+const EMPTY_TICKET = {
+  room_id: '', title: '', description: '', category: 'Other',
+  priority: 'medium', status: 'open', assigned_to: '', blocks_booking: false,
+}
+
+function TicketDrawer({ ticket, rooms, staff, onClose: _onClose, onSaved }) {
+  const { propertyId } = useProperty()
+  const { addToast } = useToast()
+  const isEdit = !!ticket?.id
+  const [form, setForm] = useState(() => ticket
+    ? {
+        room_id:       ticket.room_id ?? '',
+        title:         ticket.title ?? '',
+        description:   ticket.description ?? '',
+        category:      ticket.category ?? 'Other',
+        priority:      ticket.priority ?? 'medium',
+        status:        ticket.status ?? 'open',
+        assigned_to:   ticket.assigned_to ?? '',
+        blocks_booking: ticket.blocks_booking ?? false,
+      }
+    : EMPTY_TICKET
+  )
+  const [saving, setSaving] = useState(false)
+
+  function set(field, value) {
+    setForm(f => ({ ...f, [field]: value }))
   }
 
   async function handleSave() {
-    if (!validate()) return
+    if (!form.room_id) { addToast({ message: 'Please select a room', variant: 'error' }); return }
+    if (!form.title.trim()) { addToast({ message: 'Title is required', variant: 'error' }); return }
+
+    setSaving(true)
     const payload = {
-      ...form,
-      room_id: form.room_id || null,
-      cost_cents: form.cost_cents ? Math.round(Number(form.cost_cents) * 100) : null,
-      next_reminder_date: form.next_reminder_date || null,
+      property_id:    propertyId,
+      room_id:        form.room_id,
+      title:          form.title.trim(),
+      description:    form.description.trim() || null,
+      category:       form.category,
+      priority:       form.priority,
+      status:         form.status,
+      assigned_to:    form.assigned_to || null,
+      blocks_booking: form.blocks_booking,
+      ...(form.status === 'resolved' && !ticket?.resolved_at ? { resolved_at: new Date().toISOString() } : {}),
+      ...(form.status !== 'resolved' ? { resolved_at: null } : {}),
     }
-    if (log) payload.id = log.id
+
     try {
-      await upsert.mutateAsync(payload)
-      addToast({ message: log ? 'Log entry updated' : 'Log entry added', variant: 'success' })
-      onClose()
-    } catch {
-      addToast({ message: 'Failed to save log entry', variant: 'error' })
+      let error
+      if (isEdit) {
+        ;({ error } = await supabase.from('maintenance_tickets').update(payload).eq('id', ticket.id))
+      } else {
+        ;({ error } = await supabase.from('maintenance_tickets').insert(payload))
+      }
+      if (error) throw error
+      addToast({ message: isEdit ? 'Ticket updated' : 'Ticket created', variant: 'success' })
+      onSaved()
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to save ticket', variant: 'error' })
+    } finally {
+      setSaving(false)
     }
   }
 
-  const roomOptions = [
-    { value: '', label: 'Property-wide (no specific room)' },
-    ...rooms.map(r => ({ value: r.id, label: r.name })),
+  async function handleReopen() {
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('maintenance_tickets')
+        .update({ status: 'open', resolved_at: null })
+        .eq('id', ticket.id)
+      if (error) throw error
+      addToast({ message: 'Ticket reopened', variant: 'success' })
+      onSaved()
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to reopen ticket', variant: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const roomOptions = rooms.map(r => ({ value: r.id, label: r.name }))
+  const staffOptions = [
+    { value: '', label: 'Unassigned' },
+    ...staff.map(s => ({ value: s.id, label: `${s.first_name} ${s.last_name}${s.role ? ` — ${s.role}` : ''}` })),
   ]
+  const categoryOptions = CATEGORIES.map(c => ({ value: c, label: c }))
+  const statusOptions = STATUSES.map(s => ({ value: s, label: STATUS_LABELS[s] }))
 
   return (
-    <Modal open={open} onClose={onClose} title={log ? 'Edit Log Entry' : 'Add Log Entry'}>
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Date Completed"
-          type="date"
-          value={form.completed_date}
-          onChange={e => setForm(f => ({ ...f, completed_date: e.target.value }))}
-          error={errors.completed_date}
+    <div className="flex flex-col gap-5">
+      <Select
+        label="Room"
+        options={roomOptions}
+        value={form.room_id}
+        onValueChange={v => set('room_id', v)}
+        placeholder="Select a room"
+      />
+
+      <div className="flex flex-col gap-1">
+        <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+          Title <span className="text-danger">*</span>
+        </label>
+        <input
+          type="text"
+          value={form.title}
+          onChange={e => set('title', e.target.value)}
+          placeholder="What's the issue? e.g., Shower drain is slow."
+          className="h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
         />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+          Description
+        </label>
+        <textarea
+          value={form.description}
+          onChange={e => set('description', e.target.value)}
+          placeholder="Any extra details that will help whoever fixes it."
+          rows={3}
+          className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-none"
+        />
+      </div>
+
+      <Select
+        label="Category"
+        options={categoryOptions}
+        value={form.category}
+        onValueChange={v => set('category', v)}
+      />
+
+      {/* Priority pills */}
+      <div className="flex flex-col gap-2">
+        <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+          Priority
+        </label>
+        <div className="flex gap-2 flex-wrap">
+          {PRIORITIES.map(p => {
+            const c = PRIORITY_COLORS[p]
+            const selected = form.priority === p
+            return (
+              <button
+                key={p}
+                onClick={() => set('priority', p)}
+                className={cn(
+                  'px-3 py-1.5 rounded-[6px] font-body text-[13px] capitalize border transition-colors',
+                  selected ? cn(c.bg, c.text, c.border) : 'bg-surface border-border text-text-secondary hover:bg-border'
+                )}
+              >
+                {p}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {isEdit && (
         <Select
-          label="Category"
-          options={CATEGORIES.map(c => ({ value: c, label: c }))}
-          value={form.category}
-          onValueChange={v => setForm(f => ({ ...f, category: v }))}
+          label="Status"
+          options={statusOptions}
+          value={form.status}
+          onValueChange={v => set('status', v)}
         />
-        <Select
-          label="Room (optional)"
-          options={roomOptions}
-          value={form.room_id}
-          onValueChange={v => setForm(f => ({ ...f, room_id: v }))}
-        />
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Description *
-          </label>
-          <textarea
-            rows={3}
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="What was done?"
+      )}
+
+      <Select
+        label="Assigned To"
+        options={staffOptions}
+        value={form.assigned_to}
+        onValueChange={v => set('assigned_to', v)}
+      />
+
+      {/* Block booking toggle */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <Switch.Root
+            checked={form.blocks_booking}
+            onCheckedChange={v => set('blocks_booking', v)}
             className={cn(
-              'border-[1.5px] rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised resize-none focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2',
-              errors.description ? 'border-danger' : 'border-border'
+              'w-10 h-6 rounded-full transition-colors shrink-0',
+              form.blocks_booking ? 'bg-danger' : 'bg-border'
             )}
-          />
-          {errors.description && <span className="mt-1 text-danger text-[13px]">{errors.description}</span>}
-        </div>
-        <Input
-          label="Performed By (optional)"
-          value={form.performed_by}
-          onChange={e => setForm(f => ({ ...f, performed_by: e.target.value }))}
-          placeholder="Contractor name or 'Self'"
-        />
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Cost (optional, $)
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={form.cost_cents}
-              onChange={e => setForm(f => ({ ...f, cost_cents: e.target.value }))}
-              placeholder="0.00"
-              className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-            />
-          </div>
-        </div>
-        <Input
-          label="Next Reminder Date (optional)"
-          type="date"
-          value={form.next_reminder_date}
-          onChange={e => setForm(f => ({ ...f, next_reminder_date: e.target.value }))}
-        />
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Notes (optional)
-          </label>
-          <textarea
-            rows={2}
-            value={form.notes}
-            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-            placeholder="Any additional context..."
-            className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised resize-none focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-          />
-        </div>
-        <div className="flex gap-3 justify-end mt-2">
-          <Button variant="secondary" size="md" onClick={onClose} disabled={upsert.isPending}>Cancel</Button>
-          <Button variant="primary" size="md" loading={upsert.isPending} onClick={handleSave}>
-            {log ? 'Save Changes' : 'Add Entry'}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-function LogCard({ log, onEdit, onDelete }) {
-  const [expanded, setExpanded] = useState(false)
-  const colorClass = CATEGORY_COLORS[log.category] ?? CATEGORY_COLORS.Other
-
-  const hasReminder = !!log.next_reminder_date
-  const today = new Date()
-  const soonThreshold = addDays(today, 7)
-  const reminderDate = hasReminder ? parseISO(log.next_reminder_date) : null
-  const isReminderSoon = reminderDate && !isAfter(reminderDate, soonThreshold)
-  const isReminderPast = reminderDate && isBefore(reminderDate, today)
-
-  return (
-    <div className={cn(
-      'bg-surface border rounded-[8px] p-4 flex flex-col gap-3 transition-colors',
-      isReminderSoon ? 'border-warning' : 'border-border'
-    )}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <div className="flex items-center flex-wrap gap-2">
-            <span className="font-mono text-[13px] text-text-muted">{log.completed_date}</span>
-            <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-semibold border', colorClass)}>
-              {log.category}
-            </span>
-            {log.rooms?.name && (
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-body border border-border bg-surface-raised text-text-secondary">
-                {log.rooms.name}
-              </span>
-            )}
-          </div>
-          <p className="font-body text-[15px] text-text-primary">{log.description}</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {log.performed_by && (
-              <span className="font-body text-[13px] text-text-muted">
-                By: <span className="text-text-secondary">{log.performed_by}</span>
-              </span>
-            )}
-            {log.cost_cents != null && (
-              <span className="font-mono text-[13px] text-text-secondary">
-                Cost: ${(log.cost_cents / 100).toFixed(2)}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => onEdit(log)}
-            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-border transition-colors"
-            title="Edit"
           >
-            <PencilSimple size={14} />
-          </button>
-          <button
-            onClick={() => onDelete(log)}
-            className="p-1.5 rounded text-text-muted hover:text-danger hover:bg-danger-bg transition-colors"
-            title="Delete"
-          >
-            <Trash size={14} />
-          </button>
+            <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+          </Switch.Root>
+          <label className="font-body text-[14px] text-text-secondary">
+            Block this room from new bookings
+          </label>
         </div>
+        {form.blocks_booking && (
+          <p className="font-body text-[12px] text-danger flex items-start gap-1.5">
+            <WarningCircle size={14} className="mt-0.5 shrink-0" />
+            Guests won't be able to book this room until you turn this off.
+          </p>
+        )}
       </div>
 
-      {/* Reminder badge */}
-      {hasReminder && (
-        <div className={cn(
-          'flex items-center gap-2 px-3 py-2 rounded-[6px] text-[13px] font-body',
-          isReminderPast ? 'bg-danger-bg text-danger' : isReminderSoon ? 'bg-warning-bg text-warning' : 'bg-info-bg text-info'
-        )}>
-          <Bell size={14} className="shrink-0" />
-          <span>
-            {isReminderPast ? 'Reminder overdue: ' : 'Next reminder: '}
-            <span className="font-mono">{log.next_reminder_date}</span>
-          </span>
-        </div>
-      )}
+      <div className="pt-2 flex flex-col gap-3">
+        <Button variant="primary" size="md" loading={saving} onClick={handleSave} className="w-full justify-center">
+          {isEdit ? 'Save Changes' : 'Create Ticket'}
+        </Button>
 
-      {/* Expandable notes */}
-      {log.notes && (
-        <div>
+        {isEdit && ticket?.status === 'resolved' && (
           <button
-            onClick={() => setExpanded(e => !e)}
-            className="flex items-center gap-1 font-body text-[13px] text-text-muted hover:text-text-primary transition-colors"
+            onClick={handleReopen}
+            disabled={saving}
+            className="flex items-center justify-center gap-2 font-body text-[14px] text-info hover:underline"
           >
-            {expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
-            {expanded ? 'Hide notes' : 'Show notes'}
+            <ArrowCounterClockwise size={14} /> Reopen Ticket
           </button>
-          {expanded && (
-            <p className="mt-2 font-body text-[13px] text-text-secondary whitespace-pre-wrap">
-              {log.notes}
-            </p>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
 
-export default function Maintenance() {
-  const { data: logs = [], isLoading } = useMaintenanceLogs()
-  const { data: rooms = [] } = useRooms()
-  const deleteLog = useDeleteLog()
-  const { addToast } = useToast()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editLog, setEditLog] = useState(null)
-  const [filterCategory, setFilterCategory] = useState('All')
+// ---------------------------------------------------------------------------
+// Filter bar
+// ---------------------------------------------------------------------------
 
-  const today = new Date()
-  const soonThreshold = addDays(today, 7)
+function FilterBar({ filters, setFilters, rooms }) {
+  const roomOptions = [
+    { value: '', label: 'All Rooms' },
+    ...rooms.map(r => ({ value: r.id, label: r.name })),
+  ]
+  const categoryOptions = [
+    { value: 'all', label: 'All Categories' },
+    ...CATEGORIES.map(c => ({ value: c, label: c })),
+  ]
 
-  const upcomingReminders = useMemo(() =>
-    logs.filter(l => {
-      if (!l.next_reminder_date) return false
-      const d = parseISO(l.next_reminder_date)
-      return !isAfter(d, soonThreshold)
-    }).length,
-    [logs, soonThreshold]
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Status pills */}
+      <div className="flex gap-1">
+        {['all', ...STATUSES].map(s => (
+          <button
+            key={s}
+            onClick={() => setFilters(f => ({ ...f, status: s }))}
+            className={cn(
+              'px-3 py-1.5 rounded-full font-body text-[13px] border transition-colors',
+              filters.status === s
+                ? 'bg-text-primary text-white border-text-primary'
+                : 'bg-surface border-border text-text-secondary hover:bg-border'
+            )}
+          >
+            {s === 'all' ? 'All' : STATUS_LABELS[s]}
+          </button>
+        ))}
+      </div>
+
+      <Select
+        options={[{ value: 'all', label: 'All Priorities' }, ...PRIORITIES.map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))]}
+        value={filters.priority}
+        onValueChange={v => setFilters(f => ({ ...f, priority: v }))}
+      />
+
+      <Select
+        options={roomOptions}
+        value={filters.room_id}
+        onValueChange={v => setFilters(f => ({ ...f, room_id: v }))}
+      />
+
+      <Select
+        options={categoryOptions}
+        value={filters.category}
+        onValueChange={v => setFilters(f => ({ ...f, category: v }))}
+      />
+
+      <input
+        type="search"
+        placeholder="Search tickets…"
+        value={filters.search}
+        onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+        className="h-9 border border-border rounded-[6px] px-3 font-body text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 min-w-[180px]"
+      />
+    </div>
   )
+}
 
-  const categories = ['All', ...CATEGORIES]
-  const filtered = filterCategory === 'All'
-    ? logs
-    : logs.filter(l => l.category === filterCategory)
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
 
-  async function handleDelete(log) {
-    if (!confirm('Delete this log entry?')) return
-    try {
-      await deleteLog.mutateAsync(log.id)
-      addToast({ message: 'Entry deleted', variant: 'success' })
-    } catch {
-      addToast({ message: 'Failed to delete entry', variant: 'error' })
-    }
+const COLUMNS = [
+  {
+    key: 'priority',
+    label: 'Priority',
+    render: (val) => <PriorityChip priority={val} />,
+  },
+  {
+    key: 'title',
+    label: 'Issue',
+    render: (val, row) => (
+      <div>
+        <p className="font-body text-[14px] text-text-primary">{val}</p>
+        {row.rooms?.name && (
+          <p className="font-body text-[12px] text-text-muted">{row.rooms.name}</p>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: 'category',
+    label: 'Category',
+    render: (val) => <span className="font-body text-[14px] text-text-secondary">{val}</span>,
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    render: (val) => <StatusChip status={val} />,
+  },
+  {
+    key: 'assigned_to',
+    label: 'Assigned To',
+    render: (_, row) => {
+      const c = row.contacts
+      if (!c) return <span className="text-text-muted font-body text-[14px]">—</span>
+      return <span className="font-body text-[14px]">{c.first_name} {c.last_name}</span>
+    },
+  },
+  {
+    key: 'created_at',
+    label: 'Opened',
+    render: (val) => (
+      <span className="font-mono text-[13px] text-text-secondary">
+        {val ? format(parseISO(val), 'MMM d, yyyy') : '—'}
+      </span>
+    ),
+  },
+]
+
+export default function Maintenance() {
+  const queryClient = useQueryClient()
+
+  const [filters, setFilters] = useState({
+    status: 'all', priority: 'all', room_id: '', category: 'all', search: '',
+  })
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editingTicket, setEditingTicket] = useState(null)
+
+  const { data: tickets = [], isLoading } = useMaintenanceTickets(filters)
+  const { data: rooms = [] } = useRooms()
+  const { data: staff = [] } = useStaffContacts()
+
+  const filteredTickets = useMemo(() => {
+    if (!filters.search) return tickets
+    const q = filters.search.toLowerCase()
+    return tickets.filter(t =>
+      t.title?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)
+    )
+  }, [tickets, filters.search])
+
+  function openNew() {
+    setEditingTicket(null)
+    setDrawerOpen(true)
   }
 
-  function handleEdit(log) {
-    setEditLog(log)
-    setModalOpen(true)
+  function openEdit(ticket) {
+    setEditingTicket(ticket)
+    setDrawerOpen(true)
   }
 
-  function handleClose() {
-    setModalOpen(false)
-    setEditLog(null)
+  function handleSaved() {
+    setDrawerOpen(false)
+    queryClient.invalidateQueries({ queryKey: queryKeys.maintenance.all })
   }
+
+  const urgentCount = tickets.filter(t => t.priority === 'urgent' && t.status !== 'resolved').length
+  const openCount   = tickets.filter(t => t.status !== 'resolved').length
 
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="font-heading text-[32px] text-text-primary">Maintenance Log</h1>
-            {upcomingReminders > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-warning-bg text-warning border border-warning rounded-full font-body text-[12px] font-semibold">
-                <Bell size={12} />
-                {upcomingReminders} reminder{upcomingReminders > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <p className="font-body text-[14px] text-text-muted mt-0.5">
-            Chronological record of completed work. Add entries as tasks are done.
-          </p>
+        <div className="flex items-center gap-3">
+          <h1 className="font-heading text-[32px] text-text-primary">Maintenance</h1>
+          {openCount > 0 && (
+            <span className="font-body text-[13px] bg-warning-bg text-warning border border-warning px-2.5 py-0.5 rounded-full">
+              {openCount} open
+            </span>
+          )}
+          {urgentCount > 0 && (
+            <span className="font-body text-[13px] bg-danger-bg text-danger border border-danger px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <WarningCircle size={12} weight="fill" /> {urgentCount} urgent
+            </span>
+          )}
         </div>
-        <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
-          <Plus size={16} weight="bold" /> Add Entry
+        <Button variant="primary" size="md" onClick={openNew}>
+          <Plus size={16} weight="bold" /> New Ticket
         </Button>
       </div>
 
-      {/* Category filter */}
-      <div className="flex flex-wrap gap-2">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setFilterCategory(cat)}
-            className={cn(
-              'px-3 py-1.5 rounded-full font-body text-[13px] border transition-colors',
-              filterCategory === cat
-                ? 'bg-text-primary text-white border-text-primary'
-                : 'border-border text-text-secondary hover:bg-border hover:text-text-primary'
-            )}
-          >
-            {cat}
-          </button>
-        ))}
+      {/* Filter bar */}
+      <FilterBar filters={filters} setFilters={setFilters} rooms={rooms} />
+
+      {/* Ticket list */}
+      <div className="border border-border rounded-[8px] overflow-hidden">
+        <DataTable
+          columns={COLUMNS}
+          data={filteredTickets}
+          loading={isLoading}
+          onRowClick={openEdit}
+          emptyState={
+            <div className="flex flex-col items-center gap-3 py-10">
+              <p className="font-body text-[15px] text-text-muted">No maintenance tickets</p>
+              <Button variant="primary" size="sm" onClick={openNew}>
+                <Plus size={14} weight="bold" /> Log first issue
+              </Button>
+            </div>
+          }
+        />
       </div>
 
-      {/* Log entries */}
-      {isLoading ? (
-        <div className="flex flex-col gap-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="animate-pulse bg-border rounded-[8px] h-24" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-16">
-          <Wrench size={40} className="text-text-muted" />
-          <p className="font-body text-[16px] text-text-muted">
-            {filterCategory === 'All' ? 'No maintenance entries yet' : `No ${filterCategory} entries`}
-          </p>
-          <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
-            <Plus size={16} weight="bold" /> Add first entry
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {filtered.map(log => (
-            <LogCard
-              key={log.id}
-              log={log}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      <LogModal
-        open={modalOpen}
-        onClose={handleClose}
-        log={editLog}
-        rooms={rooms}
-      />
+      {/* Drawer */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={editingTicket ? 'Edit Ticket' : 'New Maintenance Ticket'}
+      >
+        <TicketDrawer
+          key={editingTicket?.id ?? 'new'}
+          ticket={editingTicket}
+          rooms={rooms}
+          staff={staff}
+          onClose={() => setDrawerOpen(false)}
+          onSaved={handleSaved}
+        />
+      </Drawer>
     </div>
   )
 }

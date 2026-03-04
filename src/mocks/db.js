@@ -45,6 +45,8 @@ export const MOCK_PROPERTY = {
   slug: 'sunrise-lodge',
   address: '123 Mountain View Rd, Asheville, NC 28801',
   timezone: 'America/New_York',
+  lat: 35.5951,
+  lon: -82.5515,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
@@ -230,4 +232,134 @@ export const MOCK_RESERVATIONS = [
     created_at: daysFromNow(-25) + 'T15:00:00Z',
     guests: { id: 'guest-003', first_name: 'Carol', last_name: 'Williams', email: 'carol.w@example.com', phone: '+1 828 555 0103' },
   },
+]
+
+// ---------------------------------------------------------------------------
+// Contacts
+// ---------------------------------------------------------------------------
+
+export const MOCK_CONTACTS = [
+  // Vendors
+  {
+    id: 'contact-001', property_id: PROPERTY_ID, type: 'vendor',
+    first_name: 'Jake', last_name: 'Rivers', company: 'Rivers Plumbing',
+    category: 'Plumbing', role: 'Licensed Plumber',
+    phone: '+1 828 555 0201', email: 'jake@riversplumbing.com',
+    notes: 'Available 24/7 for emergencies.', is_active: true,
+    created_at: '2024-02-01T00:00:00Z', updated_at: '2024-02-01T00:00:00Z',
+  },
+  {
+    id: 'contact-002', property_id: PROPERTY_ID, type: 'vendor',
+    first_name: 'Maria', last_name: 'Torres', company: 'Blue Ridge Cleaning',
+    category: 'Cleaning', role: 'Cleaning Supervisor',
+    phone: '+1 828 555 0202', email: 'maria@blueridgeclean.com',
+    notes: 'Turnover cleans on checkout days.', is_active: true,
+    created_at: '2024-02-01T00:00:00Z', updated_at: '2024-02-01T00:00:00Z',
+  },
+  {
+    id: 'contact-003', property_id: PROPERTY_ID, type: 'vendor',
+    first_name: 'Rex', last_name: 'Holloway', company: 'Summit Electric',
+    category: 'Electrical', role: 'Master Electrician',
+    phone: '+1 828 555 0203', email: null,
+    notes: null, is_active: true,
+    created_at: '2024-03-01T00:00:00Z', updated_at: '2024-03-01T00:00:00Z',
+  },
+  {
+    id: 'contact-004', property_id: PROPERTY_ID, type: 'vendor',
+    first_name: 'Paula', last_name: 'Green', company: 'Mountain HVAC Co.',
+    category: 'HVAC', role: 'HVAC Technician',
+    phone: '+1 828 555 0204', email: 'paula@mountainhvac.com',
+    notes: 'Annual service contract.', is_active: false,
+    created_at: '2024-01-01T00:00:00Z', updated_at: '2024-06-01T00:00:00Z',
+  },
+  // Staff
+  {
+    id: 'contact-005', property_id: PROPERTY_ID, type: 'staff',
+    first_name: 'Sam', last_name: 'Hill', company: null,
+    category: null, role: 'Head of Housekeeping', access_level: 'manager',
+    phone: '+1 828 555 0301', email: 'sam@sunriselodge.com',
+    notes: 'Responsible for turnover schedule.', is_active: true,
+    created_at: '2024-01-15T00:00:00Z', updated_at: '2024-01-15T00:00:00Z',
+  },
+  {
+    id: 'contact-006', property_id: PROPERTY_ID, type: 'staff',
+    first_name: 'Diane', last_name: 'Chen', company: null,
+    category: null, role: 'Guest Relations', access_level: 'staff',
+    phone: '+1 828 555 0302', email: 'diane@sunriselodge.com',
+    notes: null, is_active: true,
+    created_at: '2024-03-01T00:00:00Z', updated_at: '2024-03-01T00:00:00Z',
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Maintenance tickets
+// ---------------------------------------------------------------------------
+
+export const MOCK_MAINTENANCE_TICKETS = [
+  {
+    id: 'ticket-001', property_id: PROPERTY_ID, room_id: 'room-001',
+    title: 'Shower drain is slow', description: 'Drains very slowly — probably hair buildup.',
+    category: 'Plumbing', priority: 'high', status: 'open',
+    assigned_to: 'contact-001', blocks_booking: false, resolved_at: null,
+    created_at: daysFromNow(-3) + 'T09:00:00Z', updated_at: daysFromNow(-3) + 'T09:00:00Z',
+    rooms: { id: 'room-001', name: 'Cabin A' },
+    contacts: { id: 'contact-001', first_name: 'Jake', last_name: 'Rivers', role: 'Licensed Plumber' },
+  },
+  {
+    id: 'ticket-002', property_id: PROPERTY_ID, room_id: 'room-002',
+    title: 'HVAC not cooling properly', description: 'Cabin B AC is running but not reaching set temp.',
+    category: 'HVAC', priority: 'urgent', status: 'open',
+    assigned_to: null, blocks_booking: true, resolved_at: null,
+    created_at: daysFromNow(-1) + 'T14:00:00Z', updated_at: daysFromNow(-1) + 'T14:00:00Z',
+    rooms: { id: 'room-002', name: 'Cabin B' },
+    contacts: null,
+  },
+  {
+    id: 'ticket-003', property_id: PROPERTY_ID, room_id: 'room-003',
+    title: 'Deck light out', description: 'Front deck light bulb needs replacing.',
+    category: 'Electrical', priority: 'low', status: 'in_progress',
+    assigned_to: 'contact-006', blocks_booking: false, resolved_at: null,
+    created_at: daysFromNow(-7) + 'T11:00:00Z', updated_at: daysFromNow(-2) + 'T16:00:00Z',
+    rooms: { id: 'room-003', name: 'Mountain Suite' },
+    contacts: { id: 'contact-006', first_name: 'Diane', last_name: 'Chen', role: 'Guest Relations' },
+  },
+  {
+    id: 'ticket-004', property_id: PROPERTY_ID, room_id: 'room-001',
+    title: 'Refrigerator door seal worn', description: null,
+    category: 'Appliance', priority: 'medium', status: 'resolved',
+    assigned_to: null, blocks_booking: false, resolved_at: daysFromNow(-5) + 'T10:00:00Z',
+    created_at: daysFromNow(-10) + 'T08:00:00Z', updated_at: daysFromNow(-5) + 'T10:00:00Z',
+    rooms: { id: 'room-001', name: 'Cabin A' },
+    contacts: null,
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Payments (for Financial Insights / Dashboard earnings)
+// ---------------------------------------------------------------------------
+
+function monthsAgoDate(n) {
+  const d = new Date()
+  d.setMonth(d.getMonth() - n)
+  return d.toISOString().slice(0, 10)
+}
+
+export const MOCK_PAYMENTS = [
+  // This month
+  { id: 'pay-001', property_id: PROPERTY_ID, amount_cents: 55500, status: 'paid', type: 'charge', created_at: daysFromNow(-2) + 'T12:00:00Z' },
+  { id: 'pay-002', property_id: PROPERTY_ID, amount_cents: 43500, status: 'paid', type: 'charge', created_at: daysFromNow(-8) + 'T15:00:00Z' },
+  // Last month
+  { id: 'pay-003', property_id: PROPERTY_ID, amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T10:00:00Z' },
+  { id: 'pay-004', property_id: PROPERTY_ID, amount_cents: 74000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T14:00:00Z' },
+  // 2 months ago
+  { id: 'pay-005', property_id: PROPERTY_ID, amount_cents: 92500, status: 'paid', type: 'charge', created_at: monthsAgoDate(2) + 'T11:00:00Z' },
+  // 3 months ago
+  { id: 'pay-006', property_id: PROPERTY_ID, amount_cents: 43500, status: 'paid', type: 'charge', created_at: monthsAgoDate(3) + 'T09:00:00Z' },
+  { id: 'pay-007', property_id: PROPERTY_ID, amount_cents: 55500, status: 'paid', type: 'charge', created_at: monthsAgoDate(3) + 'T16:00:00Z' },
+  // 4 months ago
+  { id: 'pay-008', property_id: PROPERTY_ID, amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(4) + 'T13:00:00Z' },
+  // 5 months ago
+  { id: 'pay-009', property_id: PROPERTY_ID, amount_cents: 28000, status: 'paid', type: 'charge', created_at: monthsAgoDate(5) + 'T10:00:00Z' },
+  // 6 months ago
+  { id: 'pay-010', property_id: PROPERTY_ID, amount_cents: 196000, status: 'paid', type: 'charge', created_at: monthsAgoDate(6) + 'T11:00:00Z' },
 ]

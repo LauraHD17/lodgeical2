@@ -96,6 +96,7 @@ export default function Settings() {
   // Property tab state
   const [property, setProperty] = useState({
     name: '', slug: '', location: '', timezone: 'America/New_York', is_active: true,
+    lat: '', lon: '',
   })
 
   // Check-in/out tab state
@@ -116,6 +117,8 @@ export default function Settings() {
         location: settings.location ?? '',
         timezone: settings.timezone ?? 'America/New_York',
         is_active: settings.is_active ?? true,
+        lat: settings.lat ?? '',
+        lon: settings.lon ?? '',
       })
       setCheckinout({
         check_in_time: settings.check_in_time ?? '15:00',
@@ -193,13 +196,13 @@ export default function Settings() {
       <h1 className="font-heading text-[32px] text-text-primary">Settings</h1>
 
       <Tabs.Root defaultValue="property">
-        <Tabs.List className="flex gap-0 border-b border-border mb-6">
-          {['property', 'checkin', 'tax', 'team', 'ical', 'sync', 'widget'].map((tab) => (
+        <Tabs.List className="flex gap-0 border-b border-border mb-6 overflow-x-auto">
+          {['property', 'checkin', 'tax', 'emails', 'team', 'ical', 'sync'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
               className={cn(
-                'px-5 py-3 font-body text-[14px] font-medium text-text-secondary border-b-2 border-transparent',
+                'px-5 py-3 font-body text-[14px] font-medium text-text-secondary border-b-2 border-transparent whitespace-nowrap',
                 'transition-colors hover:text-text-primary',
                 'data-[state=active]:text-text-primary data-[state=active]:border-text-primary'
               )}
@@ -207,6 +210,7 @@ export default function Settings() {
               {tab === 'property' && 'Property'}
               {tab === 'checkin' && 'Check-in/out'}
               {tab === 'tax' && 'Tax & Policy'}
+              {tab === 'emails' && 'Email Templates'}
               {tab === 'team' && 'Team'}
               {tab === 'ical' && 'iCal Feeds'}
               {tab === 'sync' && 'Channel Sync'}
@@ -257,6 +261,38 @@ export default function Settings() {
                 Property is {property.is_active ? 'active' : 'inactive'}
               </label>
             </div>
+
+            <SectionHeader>Property Location</SectionHeader>
+            <p className="font-body text-[14px] text-text-secondary -mt-3">
+              Enter your property's approximate latitude and longitude so we can show you the local weather on your dashboard.{' '}
+              <a
+                href="https://maps.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-info hover:underline"
+              >
+                Find your coordinates
+              </a>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Latitude"
+                type="number"
+                step="any"
+                value={property.lat}
+                onChange={(e) => setProperty((p) => ({ ...p, lat: e.target.value }))}
+                placeholder="e.g. 35.5951"
+              />
+              <Input
+                label="Longitude"
+                type="number"
+                step="any"
+                value={property.lon}
+                onChange={(e) => setProperty((p) => ({ ...p, lon: e.target.value }))}
+                placeholder="e.g. -82.5515"
+              />
+            </div>
+
             <Button
               variant="primary"
               size="md"
@@ -366,6 +402,11 @@ export default function Settings() {
           </div>
         </Tabs.Content>
 
+        {/* Email Templates Tab */}
+        <Tabs.Content value="emails">
+          <EmailTemplatesTab />
+        </Tabs.Content>
+
         {/* iCal Feeds Tab */}
         <Tabs.Content value="ical">
           <ICalFeedsTab />
@@ -405,6 +446,197 @@ export default function Settings() {
           </div>
         </Tabs.Content>
       </Tabs.Root>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Email Templates tab
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_TYPES = [
+  { value: 'booking_confirmation',  label: 'Booking Confirmation' },
+  { value: 'cancellation_notice',   label: 'Cancellation Notice' },
+  { value: 'payment_failed',        label: 'Payment Failed' },
+  { value: 'check_in_reminder',     label: 'Check-in Reminder' },
+  { value: 'check_out_reminder',    label: 'Check-out Reminder' },
+]
+
+const VARIABLE_TAGS = [
+  '{{guest_first_name}}', '{{guest_last_name}}', '{{confirmation_number}}',
+  '{{check_in_date}}', '{{check_out_date}}', '{{check_in_time}}', '{{check_out_time}}',
+  '{{room_names}}', '{{num_nights}}', '{{total_due}}', '{{balance_due}}',
+  '{{property_name}}', '{{refund_amount}}',
+]
+
+function useEmailTemplate(propertyId, templateType) {
+  return useQuery({
+    queryKey: ['email-template', propertyId, templateType],
+    queryFn: async () => {
+      if (!propertyId || !templateType) return null
+      const { data } = await supabase
+        .from('email_templates')
+        .select('id, subject, body_html, is_active')
+        .eq('property_id', propertyId)
+        .eq('template_type', templateType)
+        .maybeSingle()
+      return data ?? null
+    },
+    enabled: !!propertyId && !!templateType,
+  })
+}
+
+function EmailTemplatesTab() {
+  const { propertyId } = useProperty()
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
+  const [activeType, setActiveType] = useState('booking_confirmation')
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  const { data: template, isLoading } = useEmailTemplate(propertyId, activeType)
+
+  // Populate editor when template or type changes
+  useEffect(() => {
+    setSubject(template?.subject ?? '')
+    setBody(template?.body_html ?? '')
+  }, [template, activeType])
+
+  function insertTag(tag) {
+    const el = document.getElementById('email-body-editor')
+    if (!el) { setBody(b => b + tag); return }
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    setBody(b => b.slice(0, start) + tag + b.slice(end))
+    requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = start + tag.length; el.focus() })
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const isBlank = !subject.trim() && !body.trim()
+      if (isBlank) {
+        // Blank save = revert to built-in default by removing the custom row
+        await supabase
+          .from('email_templates')
+          .delete()
+          .eq('property_id', propertyId)
+          .eq('template_type', activeType)
+        addToast({ message: 'Template cleared — built-in default will be used', variant: 'success' })
+      } else {
+        const payload = { property_id: propertyId, template_type: activeType, subject, body_html: body, is_active: true }
+        const { error } = await supabase.from('email_templates').upsert(payload, { onConflict: 'property_id,template_type' })
+        if (error) throw error
+        addToast({ message: 'Template saved', variant: 'success' })
+      }
+      queryClient.invalidateQueries({ queryKey: ['email-template', propertyId, activeType] })
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to save template', variant: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleReset() {
+    const { error } = await supabase
+      .from('email_templates')
+      .delete()
+      .eq('property_id', propertyId)
+      .eq('template_type', activeType)
+    setConfirmReset(false)
+    if (!error) {
+      addToast({ message: 'Template reset to default', variant: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['email-template', propertyId, activeType] })
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionHeader>Email Templates</SectionHeader>
+      <p className="font-body text-[14px] text-text-secondary -mt-3">
+        Customise the emails sent to guests. Use <span className="font-mono text-[13px] bg-border px-1 rounded">{'{{variable}}'}</span> tags to insert dynamic content.
+        Leave a template blank to use the built-in default.
+      </p>
+
+      {/* Type selector */}
+      <div className="flex flex-wrap gap-2">
+        {TEMPLATE_TYPES.map(t => (
+          <button
+            key={t.value}
+            onClick={() => setActiveType(t.value)}
+            className={cn(
+              'font-body text-[13px] px-4 py-2 rounded-full border transition-colors',
+              activeType === t.value
+                ? 'bg-text-primary text-white border-text-primary'
+                : 'border-border text-text-secondary hover:border-text-primary hover:text-text-primary'
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="animate-pulse flex flex-col gap-3"><div className="h-11 bg-border rounded" /><div className="h-48 bg-border rounded" /></div>
+      ) : (
+        <>
+          <Input
+            label="Subject line"
+            placeholder={`e.g. Booking Confirmed — {{confirmation_number}}`}
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+          />
+
+          {/* Variable tag buttons */}
+          <div className="flex flex-col gap-2">
+            <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+              Insert variable
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {VARIABLE_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => insertTag(tag)}
+                  className="font-mono text-[11px] px-2 py-1 bg-info-bg border border-info text-info rounded hover:bg-info hover:text-white transition-colors"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Body editor */}
+          <div className="flex flex-col gap-1">
+            <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+              Email body (HTML)
+            </label>
+            <textarea
+              id="email-body-editor"
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              rows={14}
+              placeholder="Enter HTML email body, or leave blank to use the built-in default template."
+              className="border-[1.5px] border-border rounded-[6px] px-3 py-2.5 font-mono text-[13px] text-text-primary bg-surface-raised resize-y focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button variant="primary" size="md" loading={saving} onClick={handleSave}>Save Template</Button>
+            {template && !confirmReset && (
+              <Button variant="secondary" size="md" onClick={() => setConfirmReset(true)}>Reset to Default</Button>
+            )}
+            {confirmReset && (
+              <div className="flex items-center gap-2">
+                <span className="font-body text-[13px] text-text-secondary">Reset to built-in default?</span>
+                <Button variant="danger" size="sm" onClick={handleReset}>Yes, reset</Button>
+                <Button variant="secondary" size="sm" onClick={() => setConfirmReset(false)}>Cancel</Button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

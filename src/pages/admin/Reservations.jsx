@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
-import { Plus, X, FunnelSimple, CalendarBlank } from '@phosphor-icons/react'
+import { Plus, X, FunnelSimple, CalendarBlank, Wrench } from '@phosphor-icons/react'
 
 import { useReservations } from '@/hooks/useReservations'
 import { DataTable } from '@/components/shared/DataTable'
@@ -12,9 +12,10 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
+import { BlockModal } from '@/components/reservations/BlockModal'
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
+  { value: 'all', label: 'All Statuses' },
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'pending', label: 'Pending' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -209,8 +210,9 @@ function ReservationDrawer({ reservation, onClose }) {
 
 export default function Reservations() {
   const [modalOpen, setModalOpen] = useState(false)
+  const [blockOpen, setBlockOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState(null)
-  const [filters, setFilters] = useState({ status: '', dateFrom: '', dateTo: '' })
+  const [filters, setFilters] = useState({ status: 'all', dateFrom: '', dateTo: '' })
   const [activeFilters, setActiveFilters] = useState({})
 
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useReservations(activeFilters)
@@ -221,25 +223,30 @@ export default function Reservations() {
 
   const applyFilters = useCallback(() => {
     const f = {}
-    if (filters.status) f.status = filters.status
+    if (filters.status && filters.status !== 'all') f.status = filters.status
     if (filters.dateFrom) f.dateFrom = filters.dateFrom
     if (filters.dateTo) f.dateTo = filters.dateTo
     setActiveFilters(f)
   }, [filters])
 
   const clearFilters = useCallback(() => {
-    setFilters({ status: '', dateFrom: '', dateTo: '' })
+    setFilters({ status: 'all', dateFrom: '', dateTo: '' })
     setActiveFilters({})
   }, [])
 
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="font-heading text-[32px] text-text-primary">Reservations</h1>
-        <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
-          <Plus size={16} weight="bold" /> New Reservation
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="md" onClick={() => setBlockOpen(true)}>
+            <Wrench size={15} /> Block Dates
+          </Button>
+          <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
+            <Plus size={16} weight="bold" /> New Reservation
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -331,6 +338,12 @@ export default function Reservations() {
       <ReservationModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+      />
+
+      {/* Block Dates Modal */}
+      <BlockModal
+        open={blockOpen}
+        onClose={() => setBlockOpen(false)}
       />
     </div>
   )
