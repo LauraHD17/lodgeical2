@@ -490,10 +490,21 @@ function EmailTemplatesTab() {
   async function handleSave() {
     setSaving(true)
     try {
-      const payload = { property_id: propertyId, template_type: activeType, subject, body_html: body, is_active: true }
-      const { error } = await supabase.from('email_templates').upsert(payload, { onConflict: 'property_id,template_type' })
-      if (error) throw error
-      addToast({ message: 'Template saved', variant: 'success' })
+      const isBlank = !subject.trim() && !body.trim()
+      if (isBlank) {
+        // Blank save = revert to built-in default by removing the custom row
+        await supabase
+          .from('email_templates')
+          .delete()
+          .eq('property_id', propertyId)
+          .eq('template_type', activeType)
+        addToast({ message: 'Template cleared — built-in default will be used', variant: 'success' })
+      } else {
+        const payload = { property_id: propertyId, template_type: activeType, subject, body_html: body, is_active: true }
+        const { error } = await supabase.from('email_templates').upsert(payload, { onConflict: 'property_id,template_type' })
+        if (error) throw error
+        addToast({ message: 'Template saved', variant: 'success' })
+      }
       queryClient.invalidateQueries({ queryKey: ['email-template', propertyId, activeType] })
     } catch (err) {
       addToast({ message: err?.message ?? 'Failed to save template', variant: 'error' })

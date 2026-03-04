@@ -59,14 +59,14 @@ export async function renderTemplate(
     .eq('is_active', true)
     .single()
 
-  if (tpl) {
+  if (tpl && tpl.subject.trim() && tpl.body_html.trim()) {
     return {
       subject: interpolate(tpl.subject, vars),
       html: interpolate(tpl.body_html, vars),
     }
   }
 
-  // Default templates
+  // No custom template, or custom template has blank fields — use built-in default
   return defaultTemplate(type, vars)
 }
 
