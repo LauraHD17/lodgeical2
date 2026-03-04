@@ -15,8 +15,8 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning,
   WarningCircle, Plus, ArrowRight,
-  CalendarBlank, Door, Users, Tag, CreditCard, ChatCircle,
-  TrendUp, Wrench, AddressBook, ChartBar, Gear, CalendarDots,
+  CalendarBlank, Door, Tag, CreditCard, ChatCircle,
+  TrendUp, Wrench, ChartBar, Gear, CalendarDots,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -230,14 +230,12 @@ const NAV_TILES = [
   { path: '/reservations', label: 'Reservations',   icon: CalendarBlank },
   { path: '/calendar',     label: 'Calendar',        icon: CalendarDots  },
   { path: '/rooms',        label: 'Rooms',           icon: Door          },
-  { path: '/guests',       label: 'Guests',          icon: Users         },
   { path: '/rates',        label: 'Rates',           icon: Tag           },
   { path: '/payments',     label: 'Payments',        icon: CreditCard    },
   { path: '/messaging',    label: 'Messaging',       icon: ChatCircle    },
   { path: '/financials',   label: 'Financials',      icon: TrendUp       },
   { path: '/reports',      label: 'Reports',         icon: ChartBar      },
   { path: '/maintenance',  label: 'Maintenance',     icon: Wrench        },
-  { path: '/contacts',     label: 'Admin Contacts',  icon: AddressBook   },
   { path: '/settings',     label: 'Settings',        icon: Gear          },
 ]
 
