@@ -9,6 +9,7 @@ import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight } from '@phosphor-
 
 import { useGuests, useUpdateGuest } from '@/hooks/useGuests'
 import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '@/config/queryKeys'
 import { DataTable } from '@/components/shared/DataTable'
 import { StatusChip } from '@/components/shared/StatusChip'
 import { Button } from '@/components/ui/Button'
@@ -169,7 +170,7 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
   })
 
   const { data: guestReservations = [], isLoading } = useQuery({
-    queryKey: ['guest-reservations', guest.id],
+    queryKey: queryKeys.guests.reservations(guest.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reservations')
@@ -380,7 +381,6 @@ export default function Guests() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedGuest, setSelectedGuest] = useState(null)
   const [mergeOpen, setMergeOpen] = useState(false)
-  const { addToast } = useToast()
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)

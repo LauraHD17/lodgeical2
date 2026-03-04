@@ -33,7 +33,6 @@ const STORAGE_BUCKET = 'room-photos'
 // ─── Photo hooks ─────────────────────────────────────────────────────────────
 
 function useRoomPhotos(roomId) {
-  const { propertyId } = useProperty()
   return useQuery({
     queryKey: ['room-photos', roomId],
     queryFn: async () => {
@@ -88,7 +87,7 @@ function useDeletePhoto() {
 function useReorderPhotos() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ photos, roomId }) => {
+    mutationFn: async ({ photos }) => {
       const updates = photos.map((p, i) => ({ id: p.id, sort_order: i }))
       for (const u of updates) {
         await supabase.from('room_photos').update({ sort_order: u.sort_order }).eq('id', u.id)

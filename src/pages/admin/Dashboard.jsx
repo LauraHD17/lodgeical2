@@ -24,7 +24,7 @@ import { useReservations } from '@/hooks/useReservations'
 import { FolderCard } from '@/components/shared/FolderCard'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { Button } from '@/components/ui/Button'
-import { cn } from '@/lib/utils'
+import { cn, dollars } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
 // Greeting
@@ -192,11 +192,6 @@ function usePaymentsSummary() {
 // ---------------------------------------------------------------------------
 // Folder panel helpers
 // ---------------------------------------------------------------------------
-
-function dollars(cents) {
-  if (!cents) return '$0'
-  return '$' + (cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })
-}
 
 function PanelSkeleton() {
   return (
