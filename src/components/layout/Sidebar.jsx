@@ -19,6 +19,7 @@ import {
   Gear,
   UploadSimple,
   SignOut,
+  ArrowSquareOut,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/auth/useAuth'
@@ -90,6 +91,37 @@ export function Sidebar({ onClose }) {
             )
           })}
         </ul>
+
+        {/* Quick Links — preview guest-facing pages */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <p className="px-3 mb-1.5 font-body text-[11px] uppercase tracking-[0.08em] font-semibold text-text-muted">
+            Quick Links
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            <li>
+              <a
+                href="/widget"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[6px] font-body text-[15px] text-text-secondary hover:bg-border hover:text-text-primary transition-colors duration-100"
+              >
+                <span>Booking Widget</span>
+                <ArrowSquareOut size={14} className="shrink-0 text-text-muted" />
+              </a>
+            </li>
+            <li>
+              <a
+                href="/guest-portal"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[6px] font-body text-[15px] text-text-secondary hover:bg-border hover:text-text-primary transition-colors duration-100"
+              >
+                <span>Guest Portal</span>
+                <ArrowSquareOut size={14} className="shrink-0 text-text-muted" />
+              </a>
+            </li>
+          </ul>
+        </div>
       </nav>
 
       {/* Sign out */}

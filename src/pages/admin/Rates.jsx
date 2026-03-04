@@ -15,6 +15,7 @@ const STRIPE_PCT_FEE = 0.029        // 2.9% of transaction
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { useRooms, useUpdateRoom } from '@/hooks/useRooms'
+import { useProperty } from '@/lib/property/useProperty'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -64,23 +65,112 @@ function useSettingsPricing() {
 // Base rate row (inline editable)
 // ---------------------------------------------------------------------------
 
-function RateRow({ room }) {
-  const updateRoom = useUpdateRoom()
-  const { addToast } = useToast()
+// Stripe processing fee: 2.9% + $0.30
+const STRIPE_RATE = 0.029
+const STRIPE_FIXED = 30 // cents
+
+function usePropertySettings() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['property-settings-rates', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return null
+      const { data, error } = await supabase
+        .from('properties')
+        .select('tax_rate, cleaning_fee_cents')
+        .eq('id', propertyId)
+        .single()
+      if (error) return null
+      return data
+    },
+    enabled: !!propertyId,
+  })
+}
+
+function InlineEdit({ value, onSave, prefix, type = 'number', min = 0, step }) {
   const [editing, setEditing] = useState(false)
   const [rateValue, setRateValue] = useState(((room.base_rate_cents ?? 0) / 100).toFixed(2))
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
     setSaving(true)
+    await onSave(draft)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') {
+      setDraft(String(value))
+      setEditing(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => { setDraft(String(value)); setEditing(true) }}
+        className="flex items-center gap-2 group"
+        title="Click to edit"
+      >
+        <span className="font-mono text-[15px] text-text-primary">
+          {prefix}{value}
+        </span>
+        <PencilSimple
+          size={14}
+          className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
+        />
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {prefix && <span className="font-mono text-[15px] text-text-muted">{prefix}</span>}
+      <input
+        type={type}
+        min={min}
+        step={step}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={handleKeyDown}
+        autoFocus
+        className={cn(
+          'w-24 h-9 border-[1.5px] border-info rounded-[6px] px-2 font-mono text-[15px] text-text-primary bg-surface-raised',
+          'focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1'
+        )}
+      />
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="text-success hover:opacity-80 transition-opacity"
+        title="Save"
+      >
+        <Check size={18} weight="bold" />
+      </button>
+      <button
+        onClick={() => { setDraft(String(value)); setEditing(false) }}
+        className="text-text-muted hover:text-danger transition-colors"
+        title="Cancel"
+      >
+        <X size={18} weight="bold" />
+      </button>
+    </div>
+  )
+}
+
+function RateRow({ room }) {
+  const updateRoom = useUpdateRoom()
+  const { addToast } = useToast()
+
+  async function saveRate(val) {
     try {
       await updateRoom.mutateAsync({ id: room.id, base_rate_cents: Math.round(Number(rateValue) * 100) })
       addToast({ message: `Base rate updated for ${room.name}`, variant: 'success' })
       setEditing(false)
     } catch {
       addToast({ message: 'Failed to update rate', variant: 'error' })
-    } finally {
-      setSaving(false)
     }
   }
 

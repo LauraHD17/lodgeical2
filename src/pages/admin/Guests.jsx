@@ -1,9 +1,11 @@
 // src/pages/admin/Guests.jsx
-// Guests management page.
+// Guests management page with search, guest drawer, and merge-guest flow.
+// Merge: Step 1 — search for secondary guest. Step 2 — confirm primary wins all data.
+// Merge is executed via supabase edge function 'merge-guests'.
 
 import { useState, useEffect, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
-import { MagnifyingGlass, X, UserCircle } from '@phosphor-icons/react'
+import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight } from '@phosphor-icons/react'
 
 import { useGuests, useUpdateGuest } from '@/hooks/useGuests'
 import { useReservations } from '@/hooks/useReservations'
@@ -11,9 +13,152 @@ import { DataTable } from '@/components/shared/DataTable'
 import { StatusChip } from '@/components/shared/StatusChip'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/useToast'
+import { supabase } from '@/lib/supabaseClient'
 
-function GuestDrawer({ guest, onClose }) {
+// ─── Merge Guest Modal ────────────────────────────────────────────────────────
+
+function MergeModal({ primaryGuest, onClose, onMerged }) {
+  const [step, setStep] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [secondaryGuest, setSecondaryGuest] = useState(null)
+  const [merging, setMerging] = useState(false)
+  const { addToast } = useToast()
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const { data: searchResults = [] } = useGuests(debouncedSearch)
+  const filteredResults = searchResults.filter(g => g.id !== primaryGuest.id)
+
+  async function handleMerge() {
+    if (!secondaryGuest) return
+    setMerging(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Session expired. Please log in again.')
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const res = await fetch(`${supabaseUrl}/functions/v1/merge-guests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          primary_guest_id: primaryGuest.id,
+          secondary_guest_id: secondaryGuest.id,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Merge failed')
+      addToast({
+        message: `Merged successfully — ${json.reservations_updated ?? 0} reservation(s) updated`,
+        variant: 'success',
+      })
+      onMerged()
+    } catch (err) {
+      addToast({ message: err.message ?? 'Merge failed', variant: 'error' })
+    } finally {
+      setMerging(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Merge Guests">
+      {step === 1 && (
+        <div className="flex flex-col gap-4">
+          <p className="font-body text-[14px] text-text-secondary">
+            Search for the <strong>duplicate guest</strong> to merge into{' '}
+            <strong>{primaryGuest.first_name} {primaryGuest.last_name}</strong>.
+            All reservations will be moved to the primary guest. The duplicate will be deleted.
+          </p>
+          <div className="relative">
+            <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+              className="h-11 w-full border-[1.5px] border-border rounded-[6px] pl-9 pr-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            />
+          </div>
+          {debouncedSearch && filteredResults.length === 0 && (
+            <p className="font-body text-[14px] text-text-muted">No matching guests found.</p>
+          )}
+          {filteredResults.length > 0 && (
+            <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+              {filteredResults.map(g => (
+                <button
+                  key={g.id}
+                  onClick={() => { setSecondaryGuest(g); setStep(2) }}
+                  className="flex items-center justify-between px-3 py-2.5 rounded-[6px] hover:bg-border text-left transition-colors"
+                >
+                  <span className="font-body text-[14px] text-text-primary">
+                    {g.first_name} {g.last_name}
+                  </span>
+                  <span className="font-body text-[13px] text-text-muted">{g.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button variant="secondary" size="md" onClick={onClose}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && secondaryGuest && (
+        <div className="flex flex-col gap-5">
+          <p className="font-body text-[14px] text-text-secondary">
+            Confirm the merge. This <strong>cannot be undone</strong>.
+          </p>
+
+          <div className="flex items-center gap-4 bg-surface-raised border border-border rounded-[8px] p-4">
+            <div className="flex-1 text-center">
+              <p className="font-body text-[11px] uppercase tracking-wider text-text-muted mb-1">Keep (Primary)</p>
+              <p className="font-body text-[15px] font-semibold text-text-primary">
+                {primaryGuest.first_name} {primaryGuest.last_name}
+              </p>
+              <p className="font-body text-[13px] text-text-muted">{primaryGuest.email}</p>
+            </div>
+            <ArrowRight size={20} className="text-text-muted shrink-0" />
+            <div className="flex-1 text-center">
+              <p className="font-body text-[11px] uppercase tracking-wider text-text-muted mb-1">Delete (Duplicate)</p>
+              <p className="font-body text-[15px] font-semibold text-danger">
+                {secondaryGuest.first_name} {secondaryGuest.last_name}
+              </p>
+              <p className="font-body text-[13px] text-text-muted">{secondaryGuest.email}</p>
+            </div>
+          </div>
+
+          <p className="font-body text-[13px] text-text-muted">
+            All reservations from <strong>{secondaryGuest.email}</strong> will move to{' '}
+            <strong>{primaryGuest.email}</strong>. The duplicate guest record will be permanently deleted.
+          </p>
+
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" size="md" onClick={() => setStep(1)} disabled={merging}>
+              Back
+            </Button>
+            <Button variant="primary" size="md" loading={merging} onClick={handleMerge}>
+              Confirm Merge
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+// ─── Guest Drawer ─────────────────────────────────────────────────────────────
+
+function GuestDrawer({ guest, onClose, onMergeStart }) {
   const { data, isLoading } = useReservations()
   const { addToast } = useToast()
   const updateGuest = useUpdateGuest()
@@ -166,11 +311,27 @@ function GuestDrawer({ guest, onClose }) {
               </div>
             )}
           </div>
+
+          {/* Merge */}
+          <div className="pt-2 border-t border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onMergeStart}
+            >
+              <GitMerge size={14} /> Merge with another guest
+            </Button>
+            <p className="mt-1 font-body text-[12px] text-text-muted">
+              Use this to combine duplicate guest profiles.
+            </p>
+          </div>
         </div>
       </div>
     </>
   )
 }
+
+// ─── Column definitions ────────────────────────────────────────────────────────
 
 const COLUMNS = [
   {
@@ -204,17 +365,27 @@ const COLUMNS = [
   },
 ]
 
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Guests() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedGuest, setSelectedGuest] = useState(null)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const { addToast } = useToast()
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(timer)
   }, [search])
 
-  const { data: guests = [], isLoading } = useGuests(debouncedSearch)
+  const { data: guests = [], isLoading, refetch } = useGuests(debouncedSearch)
+
+  function handleMerged() {
+    setMergeOpen(false)
+    setSelectedGuest(null)
+    refetch()
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -262,10 +433,20 @@ export default function Guests() {
       </div>
 
       {/* Guest Drawer */}
-      {selectedGuest && (
+      {selectedGuest && !mergeOpen && (
         <GuestDrawer
           guest={selectedGuest}
           onClose={() => setSelectedGuest(null)}
+          onMergeStart={() => setMergeOpen(true)}
+        />
+      )}
+
+      {/* Merge Modal */}
+      {mergeOpen && selectedGuest && (
+        <MergeModal
+          primaryGuest={selectedGuest}
+          onClose={() => setMergeOpen(false)}
+          onMerged={handleMerged}
         />
       )}
     </div>
