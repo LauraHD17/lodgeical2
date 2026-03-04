@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
 import * as Switch from '@radix-ui/react-switch'
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Check, ArrowsClockwise, Link, CalendarPlus } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'

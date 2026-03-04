@@ -167,6 +167,7 @@ export default function Financials() {
   const { data, isLoading } = useFinancialData()
   const now = new Date()
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const months12 = useMemo(() => {
     return eachMonthOfInterval({
       start: startOfMonth(subMonths(now, 11)),
@@ -175,6 +176,7 @@ export default function Financials() {
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build chart data — 12 months
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const chartData = useMemo(() => {
     if (!data?.payments) return []
     return months12.map(month => {
@@ -195,6 +197,7 @@ export default function Financials() {
   }, [data, months12])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derived metrics
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const metrics = useMemo(() => {
     if (!data) return null
 

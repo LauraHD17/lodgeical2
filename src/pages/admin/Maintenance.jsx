@@ -142,7 +142,7 @@ const EMPTY_TICKET = {
   priority: 'medium', status: 'open', assigned_to: '', blocks_booking: false,
 }
 
-function TicketDrawer({ ticket, rooms, staff, onClose, onSaved }) {
+function TicketDrawer({ ticket, rooms, staff, onClose: _onClose, onSaved }) {
   const { propertyId } = useProperty()
   const { addToast } = useToast()
   const isEdit = !!ticket?.id
@@ -471,7 +471,6 @@ const COLUMNS = [
 
 export default function Maintenance() {
   const queryClient = useQueryClient()
-  const { propertyId } = useProperty()
 
   const [filters, setFilters] = useState({
     status: 'all', priority: 'all', room_id: '', category: 'all', search: '',

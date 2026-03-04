@@ -176,14 +176,14 @@ const EMPTY_STAFF = {
   phone: '', email: '', notes: '', is_active: true,
 }
 
-function ContactDrawer({ contact, type, onClose, onSaved }) {
+function ContactDrawer({ contact, type, onClose: _onClose, onSaved }) {
   const { propertyId } = useProperty()
   const { addToast } = useToast()
   const isEdit = !!contact?.id
 
   const [form, setForm] = useState(() => {
     if (contact) {
-      const { id, property_id, type: _t, created_at, updated_at, ...rest } = contact
+      const { id: _id, property_id: _property_id, type: _t, created_at: _created_at, updated_at: _updated_at, ...rest } = contact
       return rest
     }
     return type === 'vendor' ? EMPTY_VENDOR : EMPTY_STAFF
@@ -353,7 +353,6 @@ function ContactDrawer({ contact, type, onClose, onSaved }) {
 
 function VendorTab() {
   const queryClient = useQueryClient()
-  const { propertyId } = useProperty()
   const [search, setSearch] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState(null)

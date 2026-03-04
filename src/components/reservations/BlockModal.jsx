@@ -3,7 +3,7 @@
 // These appear on the calendar as blocked dates, distinct from guest reservations.
 // Innkeeper controls whether the block prevents guest check-in / check-out on boundary dates.
 
-import { useState } from 'react'
+import { useState, createElement } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import * as Switch from '@radix-ui/react-switch'
 import { Wrench, HouseSimple } from '@phosphor-icons/react'
@@ -100,7 +100,7 @@ export function BlockModal({ open, onClose }) {
         <div className="flex flex-col gap-2">
           <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Block Type</label>
           <div className="grid grid-cols-2 gap-3">
-            {BLOCK_TYPES.map(({ value, label, icon: Icon, description }) => (
+            {BLOCK_TYPES.map(({ value, label, icon, description }) => (
               <button
                 key={value}
                 onClick={() => setBlockType(value)}
@@ -110,7 +110,7 @@ export function BlockModal({ open, onClose }) {
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <Icon size={18} className={blockType === value ? 'text-text-primary' : 'text-text-muted'} />
+                  {createElement(icon, { size: 18, className: blockType === value ? 'text-text-primary' : 'text-text-muted' })}
                   <span className="font-body font-semibold text-[14px] text-text-primary">{label}</span>
                 </div>
                 <span className="font-body text-[12px] text-text-muted">{description}</span>

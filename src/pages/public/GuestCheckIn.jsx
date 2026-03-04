@@ -3,7 +3,7 @@
 // URL: /check-in?c=CONFIRMATION_NUMBER
 // Steps: Lookup → Review → Policies → Done
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
@@ -130,7 +130,6 @@ function StepLookup({ prefillConfirmation, onFound }) {
 
 function StepReview({ data, onNext }) {
   const { reservation, rooms, paymentSummary } = data
-  const guest = reservation.guests
   const nights = reservation.check_in && reservation.check_out
     ? differenceInCalendarDays(parseISO(reservation.check_out), parseISO(reservation.check_in))
     : 0
@@ -201,7 +200,7 @@ function StepReview({ data, onNext }) {
         </div>
         <div className="flex justify-between font-body text-[14px] text-text-secondary">
           <span>Paid</span>
-          <span className="font-mono text-success">${(paymentSummary?.paidCents / 100 ?? 0).toFixed(2)}</span>
+          <span className="font-mono text-success">${((paymentSummary?.paidCents ?? 0) / 100).toFixed(2)}</span>
         </div>
         {paymentSummary?.balanceCents > 0 && (
           <div className="flex justify-between font-body font-semibold text-[15px] text-text-primary border-t border-border pt-2 mt-1">
