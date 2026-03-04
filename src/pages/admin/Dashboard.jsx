@@ -16,7 +16,7 @@ import {
   Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning,
   WarningCircle, Plus, ArrowRight,
   CalendarBlank, Door, Tag, CreditCard, ChatCircle,
-  TrendUp, Wrench, ChartBar, Gear, CalendarDots,
+  TrendUp, Wrench, Gear, CalendarDots,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -233,8 +233,7 @@ const NAV_TILES = [
   { path: '/rates',        label: 'Rates',           icon: Tag           },
   { path: '/payments',     label: 'Payments',        icon: CreditCard    },
   { path: '/messaging',    label: 'Messaging',       icon: ChatCircle    },
-  { path: '/financials',   label: 'Financials',      icon: TrendUp       },
-  { path: '/reports',      label: 'Reports',         icon: ChartBar      },
+  { path: '/reports',      label: 'Reports',         icon: TrendUp       },
   { path: '/maintenance',  label: 'Maintenance',     icon: Wrench        },
   { path: '/settings',     label: 'Settings',        icon: Gear          },
 ]
@@ -466,9 +465,6 @@ export default function Dashboard() {
 
       {/* KPI stat cards */}
       <KpiRow reservations={allReservations} loading={isLoading} />
-
-      {/* Quick-nav tile grid */}
-      <QuickNavGrid />
 
       {/* 14-day room calendar */}
       <RoomCalendar

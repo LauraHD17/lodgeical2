@@ -36,7 +36,7 @@ const ICON_MAP = {
   Guests:           Users,
   Rates:            Tag,
   Payments:         CurrencyDollar,
-  Financials:       TrendUp,
+  'Reports & Financials': TrendUp,
   Maintenance:      Wrench,
   'Admin Contacts': AddressBook,
   Contacts:         AddressBook,
@@ -103,7 +103,7 @@ export function Sidebar({ onClose }) {
           <ul className="flex flex-col gap-0.5">
             <li>
               <a
-                href="/widget"
+                href={`/widget?slug=${encodeURIComponent(property?.slug ?? 'sunrise-lodge')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[6px] font-body text-[15px] text-text-secondary hover:bg-border hover:text-text-primary transition-colors duration-100"
