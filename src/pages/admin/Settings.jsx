@@ -197,7 +197,7 @@ export default function Settings() {
 
       <Tabs.Root defaultValue="property">
         <Tabs.List className="flex gap-0 border-b border-border mb-6 overflow-x-auto">
-          {['property', 'checkin', 'tax', 'emails', 'team', 'ical', 'sync'].map((tab) => (
+          {['property', 'checkin', 'tax', 'emails', 'team', 'ical', 'sync', 'widget'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}

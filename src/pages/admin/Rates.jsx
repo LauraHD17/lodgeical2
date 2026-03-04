@@ -45,12 +45,22 @@ function useSettingsPricing() {
     queryKey: ['settings-pricing', propertyId],
     queryFn: async () => {
       if (!propertyId) return null
-      const { data } = await supabase
-        .from('settings')
-        .select('tax_rate, pass_through_stripe_fee')
-        .eq('property_id', propertyId)
-        .single()
-      return data
+      const [settingsRes, propRes] = await Promise.all([
+        supabase
+          .from('settings')
+          .select('tax_rate, pass_through_stripe_fee')
+          .eq('property_id', propertyId)
+          .single(),
+        supabase
+          .from('properties')
+          .select('cleaning_fee_cents')
+          .eq('id', propertyId)
+          .single(),
+      ])
+      return {
+        ...(settingsRes.data ?? {}),
+        cleaning_fee_cents: propRes.data?.cleaning_fee_cents ?? 0,
+      }
     },
     enabled: !!propertyId,
   })
@@ -265,8 +275,9 @@ function PricingCalculator({ rooms, overrides, settings }) {
   const [checkOut, setCheckOut] = useState('')
 
   const room = rooms.find(r => r.id === roomId)
-  const taxRate = Number(settings?.tax_rate ?? 0)
-  const passThrough = settings?.pass_through_stripe_fee ?? false
+  const taxRate      = Number(settings?.tax_rate ?? 0)
+  const passThrough  = settings?.pass_through_stripe_fee ?? false
+  const cleaningFee  = Number(settings?.cleaning_fee_cents ?? 0)
 
   const breakdown = (() => {
     if (!room || !checkIn || !checkOut || checkIn >= checkOut) return null
@@ -283,13 +294,14 @@ function PricingCalculator({ rooms, overrides, settings }) {
       return { date: dateStr, cents: best.rate_cents, label: best.label }
     })
 
-    const subtotal = lines.reduce((s, l) => s + l.cents, 0)
+    const nightsSubtotal = lines.reduce((s, l) => s + l.cents, 0)
+    const subtotal = nightsSubtotal + cleaningFee          // cleaning fee added before tax
     const tax = Math.round(subtotal * taxRate / 100)
     const preFee = subtotal + tax
     let fee = 0, total = preFee
     if (passThrough) { const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)); fee = gross - preFee; total = gross }
 
-    return { lines, subtotal, tax, fee, total }
+    return { lines, nightsSubtotal, cleaningFee, subtotal, tax, fee, total }
   })()
 
   return (
@@ -324,9 +336,21 @@ function PricingCalculator({ rooms, overrides, settings }) {
           </div>
           <div className="bg-surface px-4 py-3 flex flex-col gap-2">
             <div className="flex justify-between font-body text-[14px] text-text-secondary">
-              <span>Subtotal ({breakdown.lines.length} night{breakdown.lines.length !== 1 ? 's' : ''})</span>
-              <span className="font-mono">${(breakdown.subtotal / 100).toFixed(2)}</span>
+              <span>Nightly subtotal ({breakdown.lines.length} night{breakdown.lines.length !== 1 ? 's' : ''})</span>
+              <span className="font-mono">${(breakdown.nightsSubtotal / 100).toFixed(2)}</span>
             </div>
+            {breakdown.cleaningFee > 0 && (
+              <div className="flex justify-between font-body text-[14px] text-text-secondary">
+                <span>Cleaning fee (one-time)</span>
+                <span className="font-mono">${(breakdown.cleaningFee / 100).toFixed(2)}</span>
+              </div>
+            )}
+            {(taxRate > 0 || breakdown.cleaningFee > 0) && (
+              <div className="flex justify-between font-body text-[13px] text-text-muted">
+                <span>Pre-tax subtotal</span>
+                <span className="font-mono">${(breakdown.subtotal / 100).toFixed(2)}</span>
+              </div>
+            )}
             {taxRate > 0 && (
               <div className="flex justify-between font-body text-[14px] text-text-secondary">
                 <span>Tax ({taxRate}%)</span>
