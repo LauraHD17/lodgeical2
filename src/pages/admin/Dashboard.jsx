@@ -246,13 +246,13 @@ function QuickNavGrid() {
     <div>
       <h2 className="font-heading text-[18px] text-text-primary mb-3">Navigate</h2>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-        {NAV_TILES.map(({ path, label, icon: Icon }) => (
+        {NAV_TILES.map(({ path, label, icon }) => (
           <Link
             key={path}
             to={path}
             className="flex flex-col items-center gap-2 py-4 px-2 rounded-[8px] border border-border bg-surface-raised hover:border-info hover:bg-info-bg transition-colors text-center group"
           >
-            <Icon size={22} weight="light" className="text-text-secondary group-hover:text-info transition-colors" />
+            {createElement(icon, { size: 22, weight: 'light', className: 'text-text-secondary group-hover:text-info transition-colors' })}
             <span className="font-body text-[12px] text-text-secondary group-hover:text-text-primary transition-colors leading-tight">{label}</span>
           </Link>
         ))}

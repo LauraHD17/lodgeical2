@@ -6,6 +6,7 @@ import { NavLink } from 'react-router-dom'
 import {
   SquaresFour,
   CalendarBlank,
+  CalendarDots,
   Door,
   Users,
   Tag,
@@ -28,20 +29,22 @@ import { NAV_ITEMS } from '@/config/routes'
 import { hasPermission } from '@/lib/auth/permissions'
 
 const ICON_MAP = {
-  Dashboard:   SquaresFour,
-  Reservations: CalendarBlank,
-  Rooms:       Door,
-  Guests:      Users,
-  Rates:       Tag,
-  Payments:    CurrencyDollar,
-  Financials:  TrendUp,
-  Maintenance: Wrench,
-  Contacts:    AddressBook,
-  Messaging:   ChatText,
-  Documents:   Files,
-  Reports:     ChartBar,
-  Settings:    Gear,
-  Import:      UploadSimple,
+  Dashboard:        SquaresFour,
+  Reservations:     CalendarBlank,
+  Calendar:         CalendarDots,
+  Rooms:            Door,
+  Guests:           Users,
+  Rates:            Tag,
+  Payments:         CurrencyDollar,
+  Financials:       TrendUp,
+  Maintenance:      Wrench,
+  'Admin Contacts': AddressBook,
+  Contacts:         AddressBook,
+  Messaging:        ChatText,
+  Documents:        Files,
+  Reports:          ChartBar,
+  Settings:         Gear,
+  Import:           UploadSimple,
 }
 
 export function Sidebar({ onClose }) {

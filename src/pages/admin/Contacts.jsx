@@ -1,20 +1,18 @@
 // src/pages/admin/Contacts.jsx
-// Vendors and Staff contact directory.
-// Vendors tab: cards in a 3-col responsive grid.
-// Staff tab: simple table view.
+// Admin Contacts — important vendor / service provider information for staff.
+// Examples: plumber, insurance contact, alarm company, internet provider.
+// Staff management lives in Settings > Team.
 
 import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import * as Tabs from '@radix-ui/react-tabs'
 import * as Switch from '@radix-ui/react-switch'
 import {
-  Plus, Phone, EnvelopeSimple, UserCircle,
+  Plus, Phone, EnvelopeSimple, UserCircle, Copy, Check,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { queryKeys } from '@/config/queryKeys'
-import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -26,29 +24,50 @@ import { cn } from '@/lib/utils'
 // Constants
 // ---------------------------------------------------------------------------
 
-const VENDOR_CATEGORIES = ['Cleaning','Plumbing','Electrical','HVAC','Landscaping','Pest Control','Internet','Other']
-const ACCESS_LEVELS = [
-  { value: 'owner',   label: 'Owner',   desc: 'Full access including billing and team management' },
-  { value: 'manager', label: 'Manager', desc: 'Can manage reservations, rooms, guests, and payments' },
-  { value: 'staff',   label: 'Staff',   desc: 'Can view reservations and manage guests and maintenance' },
+const VENDOR_CATEGORIES = [
+  'Emergency Contact',
+  'Plumbing',
+  'Electrical',
+  'HVAC',
+  'Insurance',
+  'Alarm / Security',
+  'Internet / Cable',
+  'Cleaning',
+  'Landscaping',
+  'Pest Control',
+  'Other',
 ]
 
+const CATEGORY_COLORS = {
+  'Emergency Contact': 'bg-danger-bg text-danger',
+  'Plumbing':          'bg-info-bg text-info',
+  'Electrical':        'bg-warning-bg text-warning',
+  'HVAC':              'bg-danger-bg text-danger',
+  'Insurance':         'bg-success-bg text-success',
+  'Alarm / Security':  'bg-warning-bg text-warning',
+  'Internet / Cable':  'bg-info-bg text-info',
+  'Cleaning':          'bg-success-bg text-success',
+  'Landscaping':       'bg-success-bg text-success',
+  'Pest Control':      'bg-warning-bg text-warning',
+  'Other':             'bg-surface text-text-secondary',
+}
+
 // ---------------------------------------------------------------------------
-// Hooks
+// Hook
 // ---------------------------------------------------------------------------
 
-function useContacts(type) {
+function useContacts() {
   const { propertyId } = useProperty()
   return useQuery({
-    queryKey: queryKeys.contacts.list(propertyId, type),
+    queryKey: queryKeys.contacts.list(propertyId, 'vendor'),
     queryFn: async () => {
       if (!propertyId) return []
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
         .eq('property_id', propertyId)
-        .eq('type', type)
-        .order('first_name')
+        .eq('type', 'vendor')
+        .order('category')
       if (error) throw error
       return data ?? []
     },
@@ -57,29 +76,25 @@ function useContacts(type) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared form fields
+// Copy button
 // ---------------------------------------------------------------------------
 
-function FormField({ label, required, children }) {
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false)
+  async function handleCopy(e) {
+    e.stopPropagation()
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
   return (
-    <div className="flex flex-col gap-1">
-      <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
-        {label}{required && <span className="text-danger ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  )
-}
-
-function TextInput({ value, onChange, placeholder, type = 'text' }) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className="h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-    />
+    <button
+      onClick={handleCopy}
+      className="p-1 rounded text-text-muted hover:text-text-primary transition-colors"
+      title="Copy"
+    >
+      {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+    </button>
   )
 }
 
@@ -87,24 +102,12 @@ function TextInput({ value, onChange, placeholder, type = 'text' }) {
 // Vendor card
 // ---------------------------------------------------------------------------
 
-const CATEGORY_COLORS = {
-  Cleaning:     'bg-success-bg text-success',
-  Plumbing:     'bg-info-bg text-info',
-  Electrical:   'bg-warning-bg text-warning',
-  HVAC:         'bg-danger-bg text-danger',
-  Landscaping:  'bg-success-bg text-success',
-  'Pest Control': 'bg-warning-bg text-warning',
-  Internet:     'bg-info-bg text-info',
-  Other:        'bg-surface text-text-secondary',
-}
-
 function VendorCard({ contact, onEdit }) {
   const catColor = CATEGORY_COLORS[contact.category] ?? CATEGORY_COLORS.Other
   return (
     <div
       className={cn(
-        'bg-surface-raised border border-border rounded-[8px] p-5 flex flex-col gap-3 cursor-pointer',
-        'hover:shadow-md transition-shadow',
+        'bg-surface-raised border border-border rounded-[8px] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow',
         !contact.is_active && 'opacity-60'
       )}
       onClick={() => onEdit(contact)}
@@ -136,194 +139,151 @@ function VendorCard({ contact, onEdit }) {
         )}
       </div>
 
-      <div className="flex items-center gap-4 pt-1 border-t border-border">
+      <div className="flex items-center gap-3 pt-1 border-t border-border flex-wrap">
         {contact.phone && (
-          <a
-            href={`tel:${contact.phone}`}
-            onClick={e => e.stopPropagation()}
-            className="flex items-center gap-1.5 font-body text-[13px] text-info hover:underline"
-          >
-            <Phone size={13} /> {contact.phone}
-          </a>
+          <div className="flex items-center gap-1">
+            <a
+              href={`tel:${contact.phone}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1.5 font-body text-[13px] text-info hover:underline"
+            >
+              <Phone size={13} /> {contact.phone}
+            </a>
+            <CopyButton text={contact.phone} />
+          </div>
         )}
         {contact.email && (
-          <a
-            href={`mailto:${contact.email}`}
-            onClick={e => e.stopPropagation()}
-            className="flex items-center gap-1.5 font-body text-[13px] text-info hover:underline truncate"
-          >
-            <EnvelopeSimple size={13} /> {contact.email}
-          </a>
+          <div className="flex items-center gap-1 min-w-0">
+            <a
+              href={`mailto:${contact.email}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1.5 font-body text-[13px] text-info hover:underline truncate"
+            >
+              <EnvelopeSimple size={13} /> {contact.email}
+            </a>
+            <CopyButton text={contact.email} />
+          </div>
         )}
         {!contact.phone && !contact.email && (
           <span className="font-body text-[13px] text-text-muted">No contact info</span>
         )}
       </div>
+
+      {contact.notes && (
+        <p className="font-body text-[12px] text-text-muted border-t border-border pt-2 line-clamp-2">
+          {contact.notes}
+        </p>
+      )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Contact Drawer
+// Contact drawer form
 // ---------------------------------------------------------------------------
 
-const EMPTY_VENDOR = {
+const EMPTY_FORM = {
   first_name: '', last_name: '', company: '', category: 'Other',
   role: '', phone: '', email: '', notes: '', is_active: true,
 }
-const EMPTY_STAFF = {
-  first_name: '', last_name: '', role: '', access_level: 'staff',
-  phone: '', email: '', notes: '', is_active: true,
-}
 
-function ContactDrawer({ contact, type, onClose: _onClose, onSaved }) {
+function ContactDrawer({ contact, onClose, onSaved }) {
   const { propertyId } = useProperty()
-  const { addToast } = useToast()
+  const { toast } = useToast()
   const isEdit = !!contact?.id
 
   const [form, setForm] = useState(() => {
     if (contact) {
-      const { id: _id, property_id: _property_id, type: _t, created_at: _created_at, updated_at: _updated_at, ...rest } = contact
+      const { id: _id, property_id: _pid, type: _t, created_at: _ca, updated_at: _ua, ...rest } = contact
       return rest
     }
-    return type === 'vendor' ? EMPTY_VENDOR : EMPTY_STAFF
+    return EMPTY_FORM
   })
   const [saving, setSaving] = useState(false)
 
-  function set(field, value) {
-    setForm(f => ({ ...f, [field]: value }))
-  }
+  function set(field, value) { setForm(f => ({ ...f, [field]: value })) }
 
   async function handleSave() {
-    if (!form.first_name.trim()) {
-      addToast({ message: 'First name is required', variant: 'error' })
-      return
-    }
-    if (!form.last_name.trim()) {
-      addToast({ message: 'Last name is required', variant: 'error' })
-      return
-    }
+    if (!form.first_name.trim()) { toast({ title: 'First name required', variant: 'error' }); return }
+    if (!form.last_name.trim())  { toast({ title: 'Last name required',  variant: 'error' }); return }
 
     setSaving(true)
     const payload = {
       property_id: propertyId,
-      type,
-      first_name:    form.first_name.trim(),
-      last_name:     form.last_name.trim(),
-      company:       form.company?.trim() || null,
-      category:      type === 'vendor' ? form.category : null,
-      role:          form.role?.trim() || null,
-      access_level:  type === 'staff' ? form.access_level : null,
-      phone:         form.phone?.trim() || null,
-      email:         form.email?.trim() || null,
-      notes:         form.notes?.trim() || null,
-      is_active:     form.is_active,
+      type:        'vendor',
+      first_name:  form.first_name.trim(),
+      last_name:   form.last_name.trim(),
+      company:     form.company?.trim() || null,
+      category:    form.category,
+      role:        form.role?.trim() || null,
+      phone:       form.phone?.trim() || null,
+      email:       form.email?.trim() || null,
+      notes:       form.notes?.trim() || null,
+      is_active:   form.is_active,
     }
 
-    try {
-      let error
-      if (isEdit) {
-        ;({ error } = await supabase.from('contacts').update(payload).eq('id', contact.id))
-      } else {
-        ;({ error } = await supabase.from('contacts').insert(payload))
-      }
-      if (error) throw error
-      addToast({ message: isEdit ? 'Contact updated' : 'Contact added', variant: 'success' })
-      onSaved()
-    } catch (err) {
-      addToast({ message: err?.message ?? 'Failed to save contact', variant: 'error' })
-    } finally {
-      setSaving(false)
+    let error
+    if (isEdit) {
+      ;({ error } = await supabase.from('contacts').update(payload).eq('id', contact.id))
+    } else {
+      ;({ error } = await supabase.from('contacts').insert(payload))
     }
+    setSaving(false)
+    if (error) { toast({ title: 'Save failed', description: error.message, variant: 'error' }); return }
+    toast({ title: isEdit ? 'Contact updated' : 'Contact added' })
+    onSaved()
   }
-
-  const categoryOptions = VENDOR_CATEGORIES.map(c => ({ value: c, label: c }))
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Name row */}
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="First Name" required>
-          <TextInput value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" />
-        </FormField>
-        <FormField label="Last Name" required>
-          <TextInput value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" />
-        </FormField>
+        <label className="flex flex-col gap-1">
+          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">First name *</span>
+          <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Last name *</span>
+          <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" />
+        </label>
       </div>
 
-      {type === 'vendor' && (
-        <FormField label="Company">
-          <TextInput value={form.company ?? ''} onChange={e => set('company', e.target.value)} placeholder="e.g. Blue Ridge Cleaning" />
-        </FormField>
-      )}
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Company</span>
+        <Input value={form.company ?? ''} onChange={e => set('company', e.target.value)} placeholder="e.g. Blue Ridge Plumbing" />
+      </label>
 
-      {type === 'vendor' && (
-        <Select
-          label="Category"
-          options={categoryOptions}
-          value={form.category}
-          onValueChange={v => set('category', v)}
-        />
-      )}
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Category</span>
+        <Select value={form.category} onValueChange={v => set('category', v)}>
+          {VENDOR_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
+        </Select>
+      </label>
 
-      <FormField label={type === 'vendor' ? 'Role / Specialty' : 'Role / Title'}>
-        <TextInput
-          value={form.role ?? ''}
-          onChange={e => set('role', e.target.value)}
-          placeholder={type === 'vendor' ? 'e.g. Licensed Electrician' : 'e.g. Head of Housekeeping'}
-        />
-      </FormField>
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Role / Specialty</span>
+        <Input value={form.role ?? ''} onChange={e => set('role', e.target.value)} placeholder="e.g. Licensed Electrician" />
+      </label>
 
-      {type === 'staff' && (
-        <div className="flex flex-col gap-2">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
-            Access Level
-          </label>
-          <div className="flex flex-col gap-2">
-            {ACCESS_LEVELS.map(lvl => (
-              <label
-                key={lvl.value}
-                className={cn(
-                  'flex items-start gap-3 p-3 rounded-[6px] border cursor-pointer transition-colors',
-                  form.access_level === lvl.value
-                    ? 'bg-info-bg border-info'
-                    : 'bg-surface border-border hover:bg-border'
-                )}
-              >
-                <input
-                  type="radio"
-                  name="access_level"
-                  value={lvl.value}
-                  checked={form.access_level === lvl.value}
-                  onChange={() => set('access_level', lvl.value)}
-                  className="mt-0.5 accent-info"
-                />
-                <div>
-                  <p className="font-body text-[14px] font-semibold text-text-primary">{lvl.label}</p>
-                  <p className="font-body text-[12px] text-text-secondary">{lvl.desc}</p>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Phone</span>
+        <Input type="tel" value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} placeholder="+1 800 555 0100" />
+      </label>
 
-      <FormField label="Phone">
-        <TextInput value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} placeholder="+1 800 555 0100" type="tel" />
-      </FormField>
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Email</span>
+        <Input type="email" value={form.email ?? ''} onChange={e => set('email', e.target.value)} placeholder="contact@example.com" />
+      </label>
 
-      <FormField label="Email">
-        <TextInput value={form.email ?? ''} onChange={e => set('email', e.target.value)} placeholder="contact@example.com" type="email" />
-      </FormField>
-
-      <FormField label="Notes">
+      <label className="flex flex-col gap-1">
+        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Notes</span>
         <textarea
           value={form.notes ?? ''}
           onChange={e => set('notes', e.target.value)}
           rows={3}
-          className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-none"
+          placeholder="Account numbers, hours, special instructions…"
+          className="rounded-[6px] border border-border bg-surface px-3 py-2 font-body text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info resize-none"
         />
-      </FormField>
+      </label>
 
       <div className="flex items-center gap-3">
         <Switch.Root
@@ -333,230 +293,18 @@ function ContactDrawer({ contact, type, onClose: _onClose, onSaved }) {
         >
           <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
         </Switch.Root>
-        <label className="font-body text-[14px] text-text-secondary">
+        <span className="font-body text-[14px] text-text-secondary">
           {form.is_active ? 'Active' : 'Inactive'}
-        </label>
+        </span>
       </div>
 
-      <div className="pt-2">
-        <Button variant="primary" size="md" loading={saving} onClick={handleSave} className="w-full justify-center">
-          {isEdit ? 'Save Changes' : type === 'vendor' ? 'Add Vendor' : 'Add Staff Member'}
+      <div className="pt-2 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" disabled={saving} onClick={handleSave}>
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add contact'}
         </Button>
       </div>
     </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Vendor Tab
-// ---------------------------------------------------------------------------
-
-function VendorTab() {
-  const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-
-  const { data: vendors = [], isLoading } = useContacts('vendor')
-
-  const active   = useMemo(() => vendors.filter(v => v.is_active), [vendors])
-  const inactive = useMemo(() => vendors.filter(v => !v.is_active), [vendors])
-  const displayed = useMemo(() => {
-    const all = [...active, ...inactive]
-    if (!search) return all
-    const q = search.toLowerCase()
-    return all.filter(v =>
-      `${v.first_name} ${v.last_name} ${v.company ?? ''} ${v.category ?? ''} ${v.notes ?? ''}`.toLowerCase().includes(q)
-    )
-  }, [active, inactive, search])
-
-  function openEdit(contact) { setEditing(contact); setDrawerOpen(true) }
-  function openNew() { setEditing(null); setDrawerOpen(true) }
-
-  function handleSaved() {
-    setDrawerOpen(false)
-    queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all })
-  }
-
-  return (
-    <>
-      <div className="flex items-center gap-3 mb-5">
-        <input
-          type="search"
-          placeholder="Search vendors…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="h-9 border border-border rounded-[6px] px-3 font-body text-[14px] bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 flex-1 max-w-xs"
-        />
-        <Button variant="primary" size="sm" onClick={openNew}>
-          <Plus size={14} weight="bold" /> Add Vendor
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => (
-            <div key={i} className="animate-pulse bg-border rounded-[8px] h-36" />
-          ))}
-        </div>
-      ) : displayed.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-12">
-          <UserCircle size={40} className="text-text-muted" weight="light" />
-          <p className="font-body text-[15px] text-text-muted">
-            {search ? 'No vendors match your search' : 'No vendors yet'}
-          </p>
-          {!search && (
-            <Button variant="primary" size="sm" onClick={openNew}>
-              <Plus size={14} weight="bold" /> Add first vendor
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayed.map(v => (
-            <VendorCard key={v.id} contact={v} onEdit={openEdit} />
-          ))}
-        </div>
-      )}
-
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={editing ? 'Edit Vendor' : 'Add Vendor'}
-      >
-        <ContactDrawer
-          key={editing?.id ?? 'new-vendor'}
-          contact={editing}
-          type="vendor"
-          onClose={() => setDrawerOpen(false)}
-          onSaved={handleSaved}
-        />
-      </Drawer>
-    </>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Staff Tab
-// ---------------------------------------------------------------------------
-
-const STAFF_COLUMNS = [
-  {
-    key: 'name',
-    label: 'Name',
-    render: (_, row) => (
-      <span className="font-body text-[14px] text-text-primary">
-        {row.first_name} {row.last_name}
-      </span>
-    ),
-  },
-  {
-    key: 'role',
-    label: 'Role',
-    render: (val) => <span className="font-body text-[14px] text-text-secondary">{val ?? '—'}</span>,
-  },
-  {
-    key: 'access_level',
-    label: 'Access',
-    render: (val) => (
-      <span className="font-body text-[14px] capitalize text-text-secondary">{val ?? '—'}</span>
-    ),
-  },
-  {
-    key: 'phone',
-    label: 'Phone',
-    render: (val) => val
-      ? <a href={`tel:${val}`} className="font-mono text-[13px] text-info hover:underline" onClick={e => e.stopPropagation()}>{val}</a>
-      : <span className="text-text-muted font-body text-[14px]">—</span>,
-  },
-  {
-    key: 'is_active',
-    label: 'Status',
-    render: (val) => (
-      <span className={cn(
-        'font-body text-[12px] px-2.5 py-0.5 rounded-full border',
-        val ? 'bg-success-bg text-success border-success' : 'bg-border text-text-muted border-border'
-      )}>
-        {val ? 'Active' : 'Inactive'}
-      </span>
-    ),
-  },
-]
-
-function StaffTab() {
-  const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-
-  const { data: staff = [], isLoading } = useContacts('staff')
-
-  const displayed = useMemo(() => {
-    if (!search) return staff
-    const q = search.toLowerCase()
-    return staff.filter(s =>
-      `${s.first_name} ${s.last_name} ${s.role ?? ''}`.toLowerCase().includes(q)
-    )
-  }, [staff, search])
-
-  function openEdit(contact) { setEditing(contact); setDrawerOpen(true) }
-  function openNew() { setEditing(null); setDrawerOpen(true) }
-
-  function handleSaved() {
-    setDrawerOpen(false)
-    queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all })
-  }
-
-  return (
-    <>
-      <div className="flex items-center gap-3 mb-5">
-        <input
-          type="search"
-          placeholder="Search staff…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="h-9 border border-border rounded-[6px] px-3 font-body text-[14px] bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 flex-1 max-w-xs"
-        />
-        <Button variant="primary" size="sm" onClick={openNew}>
-          <Plus size={14} weight="bold" /> Add Staff Member
-        </Button>
-      </div>
-
-      <div className="border border-border rounded-[8px] overflow-hidden">
-        <DataTable
-          columns={STAFF_COLUMNS}
-          data={displayed}
-          loading={isLoading}
-          onRowClick={openEdit}
-          emptyState={
-            <div className="flex flex-col items-center gap-3 py-10">
-              <p className="font-body text-[15px] text-text-muted">
-                {search ? 'No staff match your search' : 'No staff members yet'}
-              </p>
-              {!search && (
-                <Button variant="primary" size="sm" onClick={openNew}>
-                  <Plus size={14} weight="bold" /> Add first staff member
-                </Button>
-              )}
-            </div>
-          }
-        />
-      </div>
-
-      <Drawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={editing ? 'Edit Staff Member' : 'Add Staff Member'}
-      >
-        <ContactDrawer
-          key={editing?.id ?? 'new-staff'}
-          contact={editing}
-          type="staff"
-          onClose={() => setDrawerOpen(false)}
-          onSaved={handleSaved}
-        />
-      </Drawer>
-    </>
   )
 }
 
@@ -565,43 +313,149 @@ function StaffTab() {
 // ---------------------------------------------------------------------------
 
 export default function Contacts() {
-  const { data: vendors = [] } = useContacts('vendor')
-  const { data: staff = [] }   = useContacts('staff')
+  const queryClient = useQueryClient()
+  const { data: contacts = [], isLoading } = useContacts()
+
+  const [search, setSearch] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+
+  const displayed = useMemo(() => {
+    let list = contacts.filter(c => c.is_active)
+    if (filterCategory) list = list.filter(c => c.category === filterCategory)
+    if (search) {
+      const q = search.toLowerCase()
+      list = list.filter(c =>
+        `${c.first_name} ${c.last_name} ${c.company ?? ''} ${c.category ?? ''} ${c.notes ?? ''}`.toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [contacts, search, filterCategory])
+
+  function openEdit(contact) { setEditing(contact); setDrawerOpen(true) }
+  function openNew() { setEditing(null); setDrawerOpen(true) }
+
+  function handleSaved() {
+    setDrawerOpen(false)
+    queryClient.invalidateQueries({ queryKey: queryKeys.contacts.all })
+  }
+
+  // Group by category for the grid
+  const grouped = useMemo(() => {
+    const map = {}
+    for (const c of displayed) {
+      const cat = c.category ?? 'Other'
+      ;(map[cat] ??= []).push(c)
+    }
+    return Object.entries(map).sort(([a], [b]) => {
+      const ai = VENDOR_CATEGORIES.indexOf(a)
+      const bi = VENDOR_CATEGORIES.indexOf(b)
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+    })
+  }, [displayed])
+
+  const inactiveCount = contacts.filter(c => !c.is_active).length
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-[32px] text-text-primary">Contacts</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-[32px] text-text-primary">Admin Contacts</h1>
+          <p className="font-body text-[14px] text-text-secondary mt-1">
+            Service providers, emergency contacts, and key vendors.
+          </p>
+        </div>
+        <Button variant="primary" size="md" onClick={openNew}>
+          <Plus size={16} weight="bold" /> Add contact
+        </Button>
+      </div>
 
-      <Tabs.Root defaultValue="vendors">
-        <Tabs.List className="flex gap-0 border-b border-border mb-6">
-          {[
-            { value: 'vendors', label: 'Vendors', count: vendors.filter(v => v.is_active).length },
-            { value: 'staff',   label: 'Staff',   count: staff.filter(s => s.is_active).length },
-          ].map(tab => (
-            <Tabs.Trigger
-              key={tab.value}
-              value={tab.value}
-              className={cn(
-                'flex items-center gap-2 px-5 py-3 font-body text-[14px] font-medium text-text-secondary',
-                'border-b-2 border-transparent transition-colors hover:text-text-primary',
-                'data-[state=active]:text-text-primary data-[state=active]:border-text-primary'
-              )}
-            >
-              {tab.label}
-              <span className="font-mono text-[12px] bg-border text-text-secondary px-1.5 py-0.5 rounded-full">
-                {tab.count}
-              </span>
-            </Tabs.Trigger>
+      {/* Search + filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          type="search"
+          placeholder="Search contacts…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="h-9 border border-border rounded-[6px] px-3 font-body text-[14px] bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info flex-1 max-w-xs"
+        />
+        <Select value={filterCategory} onValueChange={setFilterCategory} className="w-52">
+          <Select.Option value="">All categories</Select.Option>
+          {VENDOR_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
+        </Select>
+        {(search || filterCategory) && (
+          <button
+            onClick={() => { setSearch(''); setFilterCategory('') }}
+            className="font-body text-[13px] text-text-muted hover:text-text-primary underline"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="animate-pulse bg-border rounded-[8px] h-36" />
           ))}
-        </Tabs.List>
+        </div>
+      ) : displayed.length === 0 && contacts.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16">
+          <UserCircle size={40} className="text-text-muted" weight="light" />
+          <p className="font-body text-[15px] text-text-muted">No contacts yet</p>
+          <p className="font-body text-[13px] text-text-muted max-w-xs text-center">
+            Add your plumber, insurance agent, alarm company, and other important contacts your staff may need.
+          </p>
+          <Button variant="primary" size="sm" onClick={openNew}>
+            <Plus size={14} weight="bold" /> Add first contact
+          </Button>
+        </div>
+      ) : displayed.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-16">
+          <p className="font-body text-[15px] text-text-muted">No contacts match your filters.</p>
+          <button onClick={() => { setSearch(''); setFilterCategory('') }} className="font-body text-[13px] text-info underline">
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-8">
+          {(filterCategory || search) ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {displayed.map(c => <VendorCard key={c.id} contact={c} onEdit={openEdit} />)}
+            </div>
+          ) : (
+            grouped.map(([category, cats]) => (
+              <div key={category}>
+                <h2 className="font-heading text-[16px] text-text-primary mb-3 flex items-center gap-2">
+                  <span className={cn('w-2 h-2 rounded-full', (CATEGORY_COLORS[category] ?? '').split(' ')[0])} />
+                  {category}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {cats.map(c => <VendorCard key={c.id} contact={c} onEdit={openEdit} />)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
-        <Tabs.Content value="vendors">
-          <VendorTab />
-        </Tabs.Content>
-        <Tabs.Content value="staff">
-          <StaffTab />
-        </Tabs.Content>
-      </Tabs.Root>
+      {inactiveCount > 0 && (
+        <p className="font-body text-[13px] text-text-muted">
+          {inactiveCount} inactive contact{inactiveCount !== 1 ? 's' : ''} hidden.{' '}
+          <button onClick={() => { /* show inactive */ }} className="underline">Show all</button>
+        </p>
+      )}
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'Edit contact' : 'Add contact'}>
+        <ContactDrawer
+          key={editing?.id ?? 'new'}
+          contact={editing}
+          onClose={() => setDrawerOpen(false)}
+          onSaved={handleSaved}
+        />
+      </Drawer>
     </div>
   )
 }
