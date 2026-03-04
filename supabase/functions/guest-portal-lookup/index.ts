@@ -67,10 +67,10 @@ serve(async (req) => {
     return GENERIC_NOT_FOUND
   }
 
-  // Fetch check_in_time / check_out_time / min_stay_nights from settings (not properties)
+  // Fetch settings fields used on the guest-facing check-in / policies screen
   const { data: settings } = await supabase
     .from('settings')
-    .select('check_in_time, check_out_time, min_stay_nights')
+    .select('check_in_time, check_out_time, min_stay_nights, cancellation_policy, house_rules')
     .eq('property_id', reservation.property_id)
     .single()
 
@@ -79,9 +79,11 @@ serve(async (req) => {
     ...reservation,
     properties: {
       ...(reservation.properties as Record<string, unknown> ?? {}),
-      check_in_time: settings?.check_in_time ?? null,
-      check_out_time: settings?.check_out_time ?? null,
-      min_stay_nights: settings?.min_stay_nights ?? null,
+      check_in_time:       settings?.check_in_time       ?? null,
+      check_out_time:      settings?.check_out_time      ?? null,
+      min_stay_nights:     settings?.min_stay_nights     ?? null,
+      cancellation_policy: settings?.cancellation_policy ?? null,
+      house_rules:         settings?.house_rules         ?? null,
     },
   }
 

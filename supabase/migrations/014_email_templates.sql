@@ -32,3 +32,13 @@ CREATE TABLE IF NOT EXISTS email_templates (
 
 CREATE INDEX IF NOT EXISTS email_templates_property_type_idx
   ON email_templates (property_id, template_type);
+
+ALTER TABLE email_templates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff can manage their property's email templates"
+  ON email_templates FOR ALL TO authenticated
+  USING (
+    property_id IN (
+      SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
+    )
+  );

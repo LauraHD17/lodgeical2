@@ -30,9 +30,17 @@ export interface TemplateVars {
   [key: string]: string | undefined
 }
 
-/** Replace all {{variable}} tags in a string with values from vars. */
+/** Escape special HTML characters to prevent injection when inserting user-controlled values. */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+}
+
+/** Replace all {{variable}} tags in a string with HTML-escaped values from vars. */
 function interpolate(template: string, vars: TemplateVars): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`)
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const val = vars[key]
+    return val !== undefined ? escapeHtml(String(val)) : `{{${key}}}`
+  })
 }
 
 /** Fetch the property's custom template (if any) then render it.

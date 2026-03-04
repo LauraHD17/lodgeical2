@@ -182,8 +182,12 @@ export async function sendCheckInReminder(
   reservation: Reservation,
   supabase: SupabaseClient
 ): Promise<void> {
+  if (!reservation.property_id) {
+    console.error('[email] sendCheckInReminder called without a property_id — skipping')
+    return
+  }
   const vars = await buildVars(supabase, guest, reservation)
-  const { subject, html } = await renderTemplate(supabase, reservation.property_id!, 'check_in_reminder', vars)
+  const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'check_in_reminder', vars)
   await sendEmail(guest.email, subject, html)
 }
 
@@ -193,7 +197,11 @@ export async function sendCheckOutReminder(
   reservation: Reservation,
   supabase: SupabaseClient
 ): Promise<void> {
+  if (!reservation.property_id) {
+    console.error('[email] sendCheckOutReminder called without a property_id — skipping')
+    return
+  }
   const vars = await buildVars(supabase, guest, reservation)
-  const { subject, html } = await renderTemplate(supabase, reservation.property_id!, 'check_out_reminder', vars)
+  const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'check_out_reminder', vars)
   await sendEmail(guest.email, subject, html)
 }

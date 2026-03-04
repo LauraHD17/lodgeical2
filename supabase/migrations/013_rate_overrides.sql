@@ -22,3 +22,13 @@ CREATE INDEX IF NOT EXISTS rate_overrides_room_dates_idx
 
 CREATE INDEX IF NOT EXISTS rate_overrides_property_idx
   ON rate_overrides (property_id);
+
+ALTER TABLE rate_overrides ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Staff can manage their property's rate overrides"
+  ON rate_overrides FOR ALL TO authenticated
+  USING (
+    property_id IN (
+      SELECT property_id FROM user_property_access WHERE user_id = auth.uid()
+    )
+  );

@@ -22,6 +22,8 @@ const BLOCK_TYPES = [
   { value: 'owner_block', label: 'Owner Block', icon: HouseSimple, description: 'Owner stay, personal use, family visit' },
 ]
 
+const BLOCK_EMAIL = 'blocked@lodge-ical.internal'
+
 export function BlockModal({ open, onClose }) {
   const { propertyId } = useProperty()
   const { data: rooms = [] } = useRooms()
@@ -49,7 +51,6 @@ export function BlockModal({ open, onClose }) {
     setSaving(true)
     try {
       // Create a system guest for blocks if needed (reuses the ical-import pattern)
-      const BLOCK_EMAIL = `blocked@lodge-ical.internal`
       const { data: guest } = await supabase
         .from('guests')
         .upsert({ property_id: propertyId, email: BLOCK_EMAIL, first_name: 'Blocked', last_name: 'Date', phone: null }, { onConflict: 'property_id,email' })
@@ -74,7 +75,7 @@ export function BlockModal({ open, onClose }) {
         affects_checkin: affectsCheckin,
         affects_checkout: affectsCheckout,
         notes: notes || `${label} block`,
-        confirmation_number: `BLK${Date.now().toString(36).toUpperCase().slice(-4)}`,
+        confirmation_number: `BLK${crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`,
       })
       if (error) throw error
 

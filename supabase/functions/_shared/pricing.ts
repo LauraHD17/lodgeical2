@@ -120,11 +120,13 @@ export async function calculatePricing(
   const preFeeCents = subtotalCents + taxCents
 
   // Stripe fee pass-through: solve for gross so net = preFeeCents
-  // gross = (preFeeCents + 0.30 * 100) / (1 - 0.029)
+  // gross = (preFeeCents + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)
+  const STRIPE_FIXED_FEE_CENTS = 30   // $0.30 fixed per transaction
+  const STRIPE_PCT_FEE = 0.029        // 2.9% of transaction
   let stripeFeePassthroughCents = 0
   let totalCents = preFeeCents
   if (passThroughFees) {
-    const grossCents = Math.ceil((preFeeCents + 30) / (1 - 0.029))
+    const grossCents = Math.ceil((preFeeCents + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE))
     stripeFeePassthroughCents = grossCents - preFeeCents
     totalCents = grossCents
   }

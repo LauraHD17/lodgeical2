@@ -8,6 +8,10 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import { format, parseISO, eachDayOfInterval } from 'date-fns'
 import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag } from '@phosphor-icons/react'
 
+// Stripe standard processing fee constants — keep in sync with _shared/pricing.ts
+const STRIPE_FIXED_FEE_CENTS = 30   // $0.30 fixed per transaction
+const STRIPE_PCT_FEE = 0.029        // 2.9% of transaction
+
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { useRooms, useUpdateRoom } from '@/hooks/useRooms'
@@ -221,7 +225,7 @@ function PricingCalculator({ rooms, overrides, settings }) {
     const tax = Math.round(subtotal * taxRate / 100)
     const preFee = subtotal + tax
     let fee = 0, total = preFee
-    if (passThrough) { const gross = Math.ceil((preFee + 30) / (1 - 0.029)); fee = gross - preFee; total = gross }
+    if (passThrough) { const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)); fee = gross - preFee; total = gross }
 
     return { lines, subtotal, tax, fee, total }
   })()
@@ -302,6 +306,7 @@ function OverrideList({ overrides, rooms, propertyId }) {
   const queryClient = useQueryClient()
   const [editTarget, setEditTarget] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const roomMap = Object.fromEntries(rooms.map(r => [r.id, r.name]))
 
   const deleteMutation = useMutation({
@@ -357,10 +362,18 @@ function OverrideList({ overrides, rooms, propertyId }) {
                   </td>
                   <td className="px-4 py-3 font-mono text-[15px] text-text-primary">${(ov.rate_cents / 100).toFixed(2)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => setEditTarget(ov)} className="text-info hover:opacity-70" title="Edit"><PencilSimple size={15} /></button>
-                      <button onClick={() => { if (confirm('Remove this override?')) deleteMutation.mutate(ov.id) }} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
-                    </div>
+                    {confirmDeleteId === ov.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-body text-[12px] text-danger">Remove?</span>
+                        <button onClick={() => { deleteMutation.mutate(ov.id); setConfirmDeleteId(null) }} className="font-body text-[12px] text-danger font-semibold hover:opacity-70">Yes</button>
+                        <button onClick={() => setConfirmDeleteId(null)} className="font-body text-[12px] text-text-muted hover:opacity-70">No</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setEditTarget(ov)} className="text-info hover:opacity-70" title="Edit"><PencilSimple size={15} /></button>
+                        <button onClick={() => setConfirmDeleteId(ov.id)} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

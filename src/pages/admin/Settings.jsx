@@ -433,7 +433,7 @@ function EmailTemplatesTab() {
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
-  const bodyRef = useState(null)
+  const [confirmReset, setConfirmReset] = useState(false)
 
   const { data: template, isLoading } = useEmailTemplate(propertyId, activeType)
 
@@ -468,12 +468,12 @@ function EmailTemplatesTab() {
   }
 
   async function handleReset() {
-    if (!confirm('Reset this template to the built-in default?')) return
     const { error } = await supabase
       .from('email_templates')
       .delete()
       .eq('property_id', propertyId)
       .eq('template_type', activeType)
+    setConfirmReset(false)
     if (!error) {
       addToast({ message: 'Template reset to default', variant: 'success' })
       queryClient.invalidateQueries({ queryKey: ['email-template', propertyId, activeType] })
@@ -552,8 +552,15 @@ function EmailTemplatesTab() {
 
           <div className="flex items-center gap-3">
             <Button variant="primary" size="md" loading={saving} onClick={handleSave}>Save Template</Button>
-            {template && (
-              <Button variant="secondary" size="md" onClick={handleReset}>Reset to Default</Button>
+            {template && !confirmReset && (
+              <Button variant="secondary" size="md" onClick={() => setConfirmReset(true)}>Reset to Default</Button>
+            )}
+            {confirmReset && (
+              <div className="flex items-center gap-2">
+                <span className="font-body text-[13px] text-text-secondary">Reset to built-in default?</span>
+                <Button variant="danger" size="sm" onClick={handleReset}>Yes, reset</Button>
+                <Button variant="secondary" size="sm" onClick={() => setConfirmReset(false)}>Cancel</Button>
+              </div>
             )}
           </div>
         </>

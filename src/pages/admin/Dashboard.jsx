@@ -84,6 +84,26 @@ function WeatherWidget() {
   )
 }
 
+/** Arrival / departure counts — reused in both mobile wallet and desktop glance. */
+function TodayArrivalsStats({ arrivals, departures, loading, compact = false }) {
+  return (
+    <div className={`grid grid-cols-2 gap-3`}>
+      <div className="bg-success-bg rounded-[8px] p-4">
+        <p className={`font-body text-[12px] uppercase tracking-wider font-semibold text-success`}>Check-ins</p>
+        <p className={`font-mono ${compact ? 'text-[36px]' : 'text-[32px]'} text-success leading-none`}>
+          {loading ? '—' : arrivals}
+        </p>
+      </div>
+      <div className="bg-warning-bg rounded-[8px] p-4">
+        <p className={`font-body text-[12px] uppercase tracking-wider font-semibold text-warning`}>Check-outs</p>
+        <p className={`font-mono ${compact ? 'text-[36px]' : 'text-[32px]'} text-warning leading-none`}>
+          {loading ? '—' : departures}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 const COLUMNS = [
   {
     key: 'confirmation_number',
@@ -197,16 +217,7 @@ export default function Dashboard() {
       content: (
         <div className="flex flex-col gap-4">
           <WeatherWidget />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-success-bg rounded-[8px] p-4">
-              <p className="font-body text-[12px] uppercase tracking-wider font-semibold text-success">Check-ins</p>
-              <p className="font-mono text-[36px] text-success leading-none">{isLoading ? '—' : todayArrivals}</p>
-            </div>
-            <div className="bg-warning-bg rounded-[8px] p-4">
-              <p className="font-body text-[12px] uppercase tracking-wider font-semibold text-warning">Check-outs</p>
-              <p className="font-mono text-[36px] text-warning leading-none">{isLoading ? '—' : todayDepartures}</p>
-            </div>
-          </div>
+          <TodayArrivalsStats arrivals={todayArrivals} departures={todayDepartures} loading={isLoading} compact />
         </div>
       ),
     },
@@ -293,14 +304,7 @@ export default function Dashboard() {
         <h2 className="font-heading text-[22px] text-text-primary mb-4">Today at a Glance</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <WeatherWidget />
-          <div className="bg-surface border border-border rounded-[8px] p-4 flex flex-col gap-1">
-            <p className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Check-ins Today</p>
-            <p className="font-mono text-[32px] text-success leading-none">{isLoading ? '—' : todayArrivals}</p>
-          </div>
-          <div className="bg-surface border border-border rounded-[8px] p-4 flex flex-col gap-1">
-            <p className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Check-outs Today</p>
-            <p className="font-mono text-[32px] text-warning leading-none">{isLoading ? '—' : todayDepartures}</p>
-          </div>
+          <TodayArrivalsStats arrivals={todayArrivals} departures={todayDepartures} loading={isLoading} />
         </div>
       </div>
 

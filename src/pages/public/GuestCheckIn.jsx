@@ -259,15 +259,16 @@ function StepPolicies({ data, onNext }) {
           <p className="font-body text-[13px] font-semibold text-text-secondary uppercase tracking-wider mb-0.5">Cancellation Policy</p>
           <p className="font-body text-[14px] text-text-primary capitalize">{prop?.cancellation_policy ?? 'See your reservation confirmation for details.'}</p>
         </div>
-        <div>
-          <p className="font-body text-[13px] font-semibold text-text-secondary uppercase tracking-wider mb-0.5">General</p>
-          <ul className="font-body text-[14px] text-text-primary space-y-1 list-disc list-inside">
-            <li>No smoking on premises</li>
-            <li>Pets by prior arrangement only</li>
-            <li>Please treat the property with care</li>
-            <li>Report any damage immediately</li>
-          </ul>
-        </div>
+        {prop?.house_rules && (
+          <div>
+            <p className="font-body text-[13px] font-semibold text-text-secondary uppercase tracking-wider mb-0.5">House Rules</p>
+            <ul className="font-body text-[14px] text-text-primary space-y-1 list-disc list-inside">
+              {prop.house_rules.split('\n').map((rule, i) => rule.trim() && (
+                <li key={i}>{rule.trim()}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <label className="flex items-start gap-3 cursor-pointer">
