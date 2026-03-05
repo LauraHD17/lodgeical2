@@ -6,7 +6,7 @@
 import { useState, useCallback } from 'react'
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag, CaretDown, CaretUp, Users, Moon } from '@phosphor-icons/react'
+import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag, CaretDown, CaretUp } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -291,15 +291,13 @@ function OverrideModal({ open, onClose, rooms, existing, propertyId }) {
 const STRIPE_FIXED_FEE_CENTS = 30
 const STRIPE_PCT_FEE = 0.029
 
-// Per-room pricing calculator — no dates needed, just nights count
+// Per-room pricing calculator — single night preview with optional fees + misc
 function RoomCalculator({ room, settings }) {
-  const [nights, setNights]             = useState('3')
-  const [numGuests, setNumGuests]       = useState(String(room.max_guests ?? 1))
-  const [includePetFee, setIncludePetFee]         = useState(false)
+  const [includePetFee, setIncludePetFee]           = useState(false)
   const [includeCleaningFee, setIncludeCleaningFee] = useState(true)
-  const [discountDollars, setDiscountDollars]       = useState('')
+  const [miscLabel, setMiscLabel]                   = useState('')
+  const [miscAmount, setMiscAmount]                 = useState('')
 
-  const nightsNum      = Math.max(1, parseInt(nights, 10) || 1)
   const taxRate        = Number(settings?.tax_rate ?? 0)
   const taxLabel       = settings?.tax_label || 'Tax'
   const passThrough    = settings?.pass_through_stripe_fee ?? false
@@ -309,22 +307,20 @@ function RoomCalculator({ room, settings }) {
   const roomAllowsPets = room?.allows_pets ?? false
 
   const breakdown = (() => {
-    const nightsCents    = (room.base_rate_cents ?? 0) * nightsNum
-    const cleaningFee    = includeCleaningFee ? cleaningFeeCents : 0
-    const petFee         = roomAllowsPets && includePetFee && petFeeRate > 0
-      ? (petFeeType === 'per_night' ? petFeeRate * nightsNum : petFeeRate)
-      : 0
-    const discountCents  = discountDollars !== '' ? Math.round(Number(discountDollars) * 100) : 0
-    const subtotal       = Math.max(0, nightsCents + cleaningFee + petFee - discountCents)
-    const tax            = Math.round(subtotal * taxRate / 100)
-    const preFee         = subtotal + tax
+    const baseNight   = room.base_rate_cents ?? 0
+    const cleaningFee = includeCleaningFee ? cleaningFeeCents : 0
+    const petFee      = roomAllowsPets && includePetFee && petFeeRate > 0 ? petFeeRate : 0
+    const miscCents   = miscAmount !== '' ? Math.round(Number(miscAmount) * 100) : 0
+    const subtotal    = baseNight + cleaningFee + petFee + miscCents
+    const tax         = Math.round(subtotal * taxRate / 100)
+    const preFee      = subtotal + tax
     let fee = 0, total = preFee
     if (passThrough) {
       const gross = Math.ceil((preFee + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE))
       fee = gross - preFee
       total = gross
     }
-    return { nightsCents, cleaningFee, petFee, discountCents, subtotal, tax, fee, total }
+    return { baseNight, cleaningFee, petFee, miscCents, subtotal, tax, fee, total }
   })()
 
   const fmt = cents => `$${(Math.abs(cents) / 100).toFixed(2)}`
@@ -334,32 +330,7 @@ function RoomCalculator({ room, settings }) {
       <div className="flex items-center gap-2">
         <Calculator size={15} className="text-text-secondary" />
         <span className="font-body font-semibold text-[13px] text-text-primary">Pricing Preview</span>
-        <span className="font-body text-[12px] text-text-muted">for {room.name}</span>
-      </div>
-
-      {/* Inputs row */}
-      <div className="flex flex-wrap gap-3">
-        {/* Nights */}
-        <div className="flex flex-col gap-1">
-          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary flex items-center gap-1"><Moon size={11} /> Nights</label>
-          <input type="number" min={1} value={nights} onChange={e => setNights(e.target.value)}
-            className="h-10 w-20 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1" />
-        </div>
-        {/* Guests */}
-        <div className="flex flex-col gap-1">
-          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary flex items-center gap-1"><Users size={11} /> Guests</label>
-          <input type="number" min={1} max={room.max_guests ?? 99} value={numGuests} onChange={e => setNumGuests(e.target.value)}
-            className="h-10 w-20 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1" />
-        </div>
-        {/* Discount */}
-        <div className="flex flex-col gap-1">
-          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Discount</label>
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[14px] text-text-muted">$</span>
-            <input type="number" min={0} step={0.01} value={discountDollars} onChange={e => setDiscountDollars(e.target.value)} placeholder="0.00"
-              className="h-10 w-28 border-[1.5px] border-border rounded-[6px] pl-6 pr-2 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 placeholder:text-text-muted" />
-          </div>
-        </div>
+        <span className="font-body text-[12px] text-text-muted">for {room.name} · 1 night</span>
       </div>
 
       {/* Fee toggles */}
@@ -378,12 +349,43 @@ function RoomCalculator({ room, settings }) {
         )}
       </div>
 
+      {/* Misc fee row */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-col gap-1">
+          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+            Misc fee label <span className="normal-case font-normal text-text-muted">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={miscLabel}
+            onChange={e => setMiscLabel(e.target.value)}
+            placeholder="e.g. Pool heating"
+            className="h-10 w-44 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 placeholder:text-text-muted"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Amount ($)</label>
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[14px] text-text-muted">$</span>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={miscAmount}
+              onChange={e => setMiscAmount(e.target.value)}
+              placeholder="0.00"
+              className="h-10 w-28 border-[1.5px] border-border rounded-[6px] pl-6 pr-2 font-mono text-[14px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-1 placeholder:text-text-muted"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Breakdown */}
       <div className="border border-border rounded-[6px] overflow-hidden text-[13px]">
         <div className="bg-surface-raised divide-y divide-border">
           <div className="flex justify-between px-4 py-2">
-            <span className="font-body text-text-secondary">{fmt(room.base_rate_cents ?? 0)} × {nightsNum} night{nightsNum !== 1 ? 's' : ''}</span>
-            <span className="font-mono text-text-primary">{fmt(breakdown.nightsCents)}</span>
+            <span className="font-body text-text-secondary">Base rate (1 night)</span>
+            <span className="font-mono text-text-primary">{fmt(breakdown.baseNight)}</span>
           </div>
           {breakdown.cleaningFee > 0 && (
             <div className="flex justify-between px-4 py-2">
@@ -397,10 +399,10 @@ function RoomCalculator({ room, settings }) {
               <span className="font-mono text-text-primary">{fmt(breakdown.petFee)}</span>
             </div>
           )}
-          {breakdown.discountCents > 0 && (
+          {breakdown.miscCents > 0 && (
             <div className="flex justify-between px-4 py-2">
-              <span className="font-body text-success">Discount</span>
-              <span className="font-mono text-success">−{fmt(breakdown.discountCents)}</span>
+              <span className="font-body text-text-secondary">{miscLabel || 'Misc fee'}</span>
+              <span className="font-mono text-text-primary">{fmt(breakdown.miscCents)}</span>
             </div>
           )}
           {taxRate > 0 && (

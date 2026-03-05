@@ -1,6 +1,6 @@
 // src/pages/admin/Dashboard.jsx
-// Dashboard with wallet-style folder stack for today's stats,
-// 14-day room calendar, and new-reservation quick-action.
+// Dashboard: greeting + weather, TODAY/TOMORROW toggle,
+// expandable magazine-grid stat cards, 14-day room calendar.
 
 import { useState, useMemo, createElement } from 'react'
 import { Link } from 'react-router-dom'
@@ -11,7 +11,8 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import {
   Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning,
-  WarningCircle, Plus, ArrowRight, Bell, UserCircle,
+  WarningCircle, Plus, ArrowRight, Bell, UserCircle, CaretDown, CaretUp,
+  Door, CurrencyDollar,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -32,17 +33,8 @@ function greeting() {
   return 'Good evening'
 }
 
-/** Returns true if hex color is perceptually light */
-function isLightColor(hex) {
-  const h = hex.replace('#', '')
-  const r = parseInt(h.slice(0, 2), 16)
-  const g = parseInt(h.slice(2, 4), 16)
-  const b = parseInt(h.slice(4, 6), 16)
-  return (0.299 * r + 0.587 * g + 0.114 * b) > 140
-}
-
 // ---------------------------------------------------------------------------
-// Weather Strip
+// Weather
 // ---------------------------------------------------------------------------
 
 function wmoToIcon(code) {
@@ -123,7 +115,6 @@ function useCalendarReservations() {
   const { propertyId } = useProperty()
   const today = startOfDay(new Date())
   const end   = addDays(today, 14)
-
   return useQuery({
     queryKey: ['calendar-reservations', propertyId, format(today, 'yyyy-MM-dd')],
     queryFn: async () => {
@@ -162,7 +153,6 @@ function usePaymentsSummary() {
   const { propertyId } = useProperty()
   const now = new Date()
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
-
   return useQuery({
     queryKey: ['dashboard-payments', propertyId, monthStart],
     queryFn: async () => {
@@ -191,7 +181,6 @@ function usePaymentsSummary() {
 function useModifiedReservations() {
   const { propertyId } = useProperty()
   const since = format(subDays(new Date(), 7), 'yyyy-MM-dd')
-
   return useQuery({
     queryKey: ['modified-reservations', propertyId, since],
     queryFn: async () => {
@@ -213,231 +202,402 @@ function useModifiedReservations() {
 }
 
 // ---------------------------------------------------------------------------
-// Folder stack
+// Shared card shell — left accent bar + collapsible body
 // ---------------------------------------------------------------------------
 
-const FOLDERS = [
-  { id: 'occupancy', label: 'OCCUPANCY',       bg: '#4B2A8A', fg: '#EDE5FF', badgeBg: '#7B5ABF' },
-  { id: 'revenue',   label: 'MONTHLY REVENUE',  bg: '#C8D42A', fg: '#2D3000', badgeBg: '#A0AA1A' },
-  { id: 'modified',  label: 'GUEST MODIFIED',   bg: '#E85028', fg: '#FFFFFF', badgeBg: '#BF3A1A' },
-  { id: 'departing', label: 'DEPARTING',        bg: '#A8C4DC', fg: '#1A3A52', badgeBg: '#7AA0BC' },
-  { id: 'arriving',  label: 'ARRIVING',         bg: '#D2E8A4', fg: '#1A4A1A', badgeBg: '#A2C87A' },
-]
-
-function GuestList({ reservations, rooms, emptyMessage }) {
-  if (!reservations.length) {
-    return <p className="font-body text-[14px] opacity-60">{emptyMessage}</p>
-  }
-  return (
-    <ul className="flex flex-col gap-2.5">
-      {reservations.slice(0, 5).map(r => {
-        const guest = r.guests ?? {}
-        const roomName = rooms.find(rm => (r.room_ids ?? []).includes(rm.id))?.name ?? '—'
-        return (
-          <li key={r.id} className="flex items-center gap-2.5">
-            <UserCircle size={16} className="shrink-0 opacity-50" />
-            <span className="font-body text-[14px] font-semibold">
-              {guest.first_name} {guest.last_name}
-            </span>
-            <span className="font-body text-[13px] opacity-60">· {roomName}</span>
-          </li>
-        )
-      })}
-      {reservations.length > 5 && (
-        <li className="font-body text-[12px] opacity-50">+{reservations.length - 5} more</li>
-      )}
-    </ul>
-  )
+const ACCENT = {
+  arriving:  '#D2E8A4',
+  departing: '#A8C4DC',
+  modified:  '#E85028',
+  occupancy: '#5C2D6E',   // deep plum
+  revenue:   '#C8D42A',
 }
 
-function ModifiedList({ reservations, rooms }) {
-  if (!reservations.length) {
-    return <p className="font-body text-[14px] opacity-80">No recent guest modifications.</p>
-  }
+function StatCard({ id, label, count, icon: Icon, children, loading, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const accent = ACCENT[id] ?? '#888'
+  const hasDetail = !!children
+
   return (
-    <ul className="flex flex-col gap-3">
-      {reservations.slice(0, 5).map(r => {
-        const guest = r.guests ?? {}
-        const roomName = rooms.find(rm => (r.room_ids ?? []).includes(rm.id))?.name ?? '—'
-        const ago = r.updated_at
-          ? formatDistanceToNow(new Date(r.updated_at), { addSuffix: true })
-          : ''
-        return (
-          <li key={r.id} className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <Bell size={13} weight="fill" className="shrink-0 opacity-90" />
-              <span className="font-body text-[14px] font-semibold">
-                {guest.first_name} {guest.last_name}
-              </span>
-              <span className="font-body text-[12px] opacity-70">· {roomName}</span>
-            </div>
-            <span className="font-body text-[12px] opacity-70 pl-5">
-              {r.confirmation_number} · modified {ago}
+    <div className="bg-surface-raised border border-border rounded-[12px] overflow-hidden flex">
+      {/* Colored left accent bar */}
+      <div className="w-[5px] shrink-0" style={{ background: accent }} />
+
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Header row — always visible */}
+        <button
+          onClick={() => hasDetail && setOpen(o => !o)}
+          className={cn(
+            'flex items-center gap-3 px-5 py-4 w-full text-left transition-colors',
+            hasDetail ? 'hover:bg-black/[0.025] cursor-pointer' : 'cursor-default',
+          )}
+        >
+          {/* Label chip */}
+          <span
+            className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.08em]"
+            style={{ background: accent + '35', color: '#1a1a1a' }}
+          >
+            {label}
+          </span>
+
+          {/* Count / primary stat */}
+          {count != null && (
+            <span className="font-mono text-[26px] font-bold text-text-primary leading-none">
+              {count}
             </span>
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
+          )}
 
-function FolderStack({ dayView, calReservations, rooms, payments, modifiedReservations, loading }) {
-  const [activeId, setActiveId] = useState('arriving')
+          <span className="flex-1" />
 
-  const today   = startOfDay(new Date())
-  const viewDate = dayView === 'today' ? today : addDays(today, 1)
-  const dateStr  = format(viewDate, 'yyyy-MM-dd')
-  const todayStr = format(today, 'yyyy-MM-dd')
+          {/* Optional icon */}
+          {Icon && !hasDetail && <Icon size={16} className="text-text-muted" />}
 
-  const arrivals  = calReservations.filter(r => r.check_in  === dateStr)
-  const departures = calReservations.filter(r => r.check_out === dateStr)
+          {/* Expand caret */}
+          {hasDetail && (
+            open
+              ? <CaretUp size={13} className="text-text-muted shrink-0" />
+              : <CaretDown size={13} className="text-text-muted shrink-0" />
+          )}
+        </button>
 
-  const inHouseToday = calReservations.filter(r =>
-    r.check_in <= todayStr && r.check_out > todayStr
-  )
-  const occupancyPct = rooms.length > 0
-    ? Math.round((inHouseToday.length / rooms.length) * 100)
-    : 0
-
-  const badges = {
-    arriving:  arrivals.length,
-    departing: departures.length,
-    modified:  modifiedReservations.length,
-    revenue:   null,
-    occupancy: null,
-  }
-
-  const content = {
-    arriving: (
-      <div>
-        <p className="font-mono text-[32px] font-bold leading-none mb-4">{arrivals.length}</p>
-        <GuestList
-          reservations={arrivals}
-          rooms={rooms}
-          emptyMessage={`No arrivals ${dayView === 'today' ? 'today' : 'tomorrow'}.`}
-        />
-      </div>
-    ),
-    departing: (
-      <div>
-        <p className="font-mono text-[32px] font-bold leading-none mb-4">{departures.length}</p>
-        <GuestList
-          reservations={departures}
-          rooms={rooms}
-          emptyMessage={`No departures ${dayView === 'today' ? 'today' : 'tomorrow'}.`}
-        />
-      </div>
-    ),
-    modified: (
-      <div>
-        {modifiedReservations.length > 0 && (
-          <div className="flex items-center gap-2 mb-3">
-            <Bell size={16} weight="fill" />
-            <span className="font-body text-[13px] font-semibold">
-              {modifiedReservations.length} recent modification{modifiedReservations.length !== 1 ? 's' : ''}
-            </span>
+        {/* Skeleton while loading */}
+        {loading && (
+          <div className="px-5 pb-5">
+            <div className="animate-pulse bg-border h-12 rounded-[6px]" />
           </div>
         )}
-        <ModifiedList reservations={modifiedReservations} rooms={rooms} />
-      </div>
-    ),
-    revenue: (
-      <div>
-        <p className="font-body text-[12px] uppercase tracking-wider opacity-60 mb-1">This Month</p>
-        <p className="font-mono text-[36px] font-bold leading-none">{dollars(payments?.thisMonth ?? 0)}</p>
-        <p className="font-body text-[13px] opacity-60 mt-3">
-          YTD: <span className="font-mono font-semibold">{dollars(payments?.ytd ?? 0)}</span>
-        </p>
-      </div>
-    ),
-    occupancy: (
-      <div>
-        <p className="font-body text-[12px] uppercase tracking-wider opacity-60 mb-1">Current Occupancy</p>
-        <p className="font-mono text-[48px] font-bold leading-none">{occupancyPct}%</p>
-        <p className="font-body text-[13px] opacity-60 mt-3">
-          {inHouseToday.length} of {rooms.length} room{rooms.length !== 1 ? 's' : ''} occupied
-        </p>
-      </div>
-    ),
-  }
 
-  const activeDef    = FOLDERS.find(f => f.id === activeId)
-  const inactiveFolders = FOLDERS.filter(f => f.id !== activeId)
-  const lightActive  = isLightColor(activeDef.bg)
-  const contentColor = lightActive ? '#1a2a1a' : activeDef.fg
-
-  return (
-    <div className="flex flex-col gap-0">
-      {/* Active folder — macOS shape: small tab top-left, full-width body */}
-      <div>
-        <div className="flex items-end">
-          {/* Tab nub */}
-          <div
-            className="px-3 py-2 rounded-t-[8px] flex items-center gap-2 shrink-0"
-            style={{ backgroundColor: activeDef.bg, color: contentColor }}
-          >
-            <span className="font-body font-bold text-[11px] uppercase tracking-[0.12em]">
-              {activeDef.label}
-            </span>
-            {badges[activeId] != null && badges[activeId] > 0 && (
-              <span
-                className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-mono font-bold"
-                style={{ backgroundColor: activeDef.badgeBg, color: activeDef.fg }}
-              >
-                {badges[activeId]}
-              </span>
-            )}
+        {/* Expandable detail */}
+        {!loading && open && children && (
+          <div className="px-5 pb-5 border-t border-border/50">
+            {children}
           </div>
-          {/* Bridge line to right */}
-          <div className="flex-1 h-[2px]" style={{ backgroundColor: activeDef.bg }} />
-        </div>
-        {/* Folder body */}
-        <div
-          className="rounded-b-[12px] rounded-tr-[12px] p-6 min-h-[160px]"
-          style={{ backgroundColor: activeDef.bg, color: contentColor }}
-        >
-          {loading ? (
-            <div className="animate-pulse bg-white/20 h-24 rounded-[6px]" />
-          ) : (
-            content[activeId]
-          )}
-        </div>
-      </div>
-
-      {/* Inactive folder strips */}
-      <div className="flex flex-col gap-1.5 mt-2">
-        {inactiveFolders.map(folder => {
-          const badge = badges[folder.id]
-          const light = isLightColor(folder.bg)
-          return (
-            <button
-              key={folder.id}
-              onClick={() => setActiveId(folder.id)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-[8px] text-left transition-all hover:opacity-90 active:scale-[0.998] focus:outline-none"
-              style={{ backgroundColor: folder.bg, color: light ? '#1a2a1a' : folder.fg }}
-            >
-              <span className="font-body font-bold text-[12px] uppercase tracking-[0.10em] flex-1">
-                {folder.label}
-              </span>
-              {badge != null && badge > 0 && (
-                <span
-                  className="inline-flex items-center justify-center min-w-[20px] h-5 rounded-full px-1.5 text-[10px] font-mono font-bold"
-                  style={{ backgroundColor: folder.badgeBg, color: folder.fg }}
-                >
-                  {badge}
-                </span>
-              )}
-              <ArrowRight size={13} className="opacity-40 shrink-0" />
-            </button>
-          )
-        })}
+        )}
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Room Calendar — 14-day horizontal Gantt-style table
+// Guest row — shared by arriving + departing
+// ---------------------------------------------------------------------------
+
+function GuestRow({ reservation, rooms }) {
+  const g = reservation.guests ?? {}
+  const roomName = rooms.find(r => (reservation.room_ids ?? []).includes(r.id))?.name ?? '—'
+  return (
+    <li className="flex items-center gap-2.5 py-2 border-b border-border/40 last:border-b-0">
+      <UserCircle size={15} className="text-text-muted shrink-0" />
+      <span className="font-body text-[14px] font-medium text-text-primary">
+        {g.first_name} {g.last_name}
+      </span>
+      <span className="font-body text-[13px] text-text-muted shrink-0">· {roomName}</span>
+    </li>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Individual cards
+// ---------------------------------------------------------------------------
+
+function ArrivingCard({ reservations, rooms, dayView, loading }) {
+  const empty = dayView === 'today' ? 'No arrivals today.' : 'No arrivals tomorrow.'
+  return (
+    <StatCard id="arriving" label="Arriving" count={reservations.length} loading={loading} defaultOpen>
+      {reservations.length === 0
+        ? <p className="font-body text-[13px] text-text-muted pt-3">{empty}</p>
+        : (
+          <ul className="mt-1">
+            {reservations.map(r => <GuestRow key={r.id} reservation={r} rooms={rooms} />)}
+          </ul>
+        )
+      }
+    </StatCard>
+  )
+}
+
+function DepartingCard({ reservations, rooms, dayView, loading }) {
+  const empty = dayView === 'today' ? 'No departures today.' : 'No departures tomorrow.'
+  return (
+    <StatCard id="departing" label="Departing" count={reservations.length} loading={loading} defaultOpen>
+      {reservations.length === 0
+        ? <p className="font-body text-[13px] text-text-muted pt-3">{empty}</p>
+        : (
+          <ul className="mt-1">
+            {reservations.map(r => <GuestRow key={r.id} reservation={r} rooms={rooms} />)}
+          </ul>
+        )
+      }
+    </StatCard>
+  )
+}
+
+function ModifiedCard({ reservations, rooms, loading }) {
+  return (
+    <StatCard
+      id="modified"
+      label="Guest Modified"
+      count={reservations.length}
+      loading={loading}
+      defaultOpen={reservations.length > 0}
+    >
+      {reservations.length === 0
+        ? <p className="font-body text-[13px] text-text-muted pt-3">No recent guest modifications.</p>
+        : (
+          <ul className="mt-1">
+            {reservations.map(r => {
+              const g = r.guests ?? {}
+              const roomName = rooms.find(rm => (r.room_ids ?? []).includes(rm.id))?.name ?? '—'
+              const ago = r.updated_at
+                ? formatDistanceToNow(new Date(r.updated_at), { addSuffix: true })
+                : ''
+              return (
+                <li key={r.id} className="flex flex-col gap-0.5 py-2.5 border-b border-border/40 last:border-b-0">
+                  <div className="flex items-center gap-2">
+                    <Bell size={13} weight="fill" className="text-danger shrink-0" />
+                    <span className="font-body text-[14px] font-semibold text-text-primary">
+                      {g.first_name} {g.last_name}
+                    </span>
+                    <span className="font-body text-[12px] text-text-muted">· {roomName}</span>
+                  </div>
+                  <span className="font-body text-[12px] text-text-muted pl-5">
+                    {r.confirmation_number} · modified {ago}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )
+      }
+    </StatCard>
+  )
+}
+
+function OccupancyCard({ pct, inHouse, total, rooms, calReservations, loading }) {
+  const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd')
+
+  // Which rooms are occupied right now
+  const occupiedRoomIds = new Set(
+    calReservations
+      .filter(r => r.check_in <= todayStr && r.check_out > todayStr)
+      .flatMap(r => r.room_ids ?? [])
+  )
+
+  return (
+    <StatCard id="occupancy" label="Occupancy" loading={loading} defaultOpen={false}>
+      {/* Always-visible primary stat in the header slot — override via children */}
+      <div className="flex items-baseline gap-2 -mt-1 pb-1">
+        <span className="font-mono text-[40px] font-bold text-text-primary leading-none">{pct}%</span>
+        <span className="font-body text-[13px] text-text-muted">{inHouse}/{total} rooms</span>
+      </div>
+      {/* Expandable room breakdown */}
+      {rooms.length > 0 && (
+        <ul className="mt-2">
+          {rooms.map(room => {
+            const occupied = occupiedRoomIds.has(room.id)
+            return (
+              <li key={room.id} className="flex items-center gap-2.5 py-1.5 border-b border-border/40 last:border-b-0">
+                <Door size={13} className={occupied ? 'text-danger' : 'text-success'} weight="bold" />
+                <span className="font-body text-[13px] text-text-primary">{room.name}</span>
+                <span className={cn(
+                  'ml-auto font-body text-[11px] font-semibold uppercase tracking-wide',
+                  occupied ? 'text-danger' : 'text-success'
+                )}>
+                  {occupied ? 'Occupied' : 'Available'}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </StatCard>
+  )
+}
+
+function RevenueCard({ thisMonth, ytd, loading }) {
+  return (
+    <StatCard id="revenue" label="Monthly Revenue" icon={CurrencyDollar} loading={loading} defaultOpen={false}>
+      <div className="flex items-baseline gap-2 -mt-1 pb-1">
+        <span className="font-mono text-[32px] font-bold text-text-primary leading-none">{dollars(thisMonth)}</span>
+      </div>
+      <p className="font-body text-[13px] text-text-muted mt-1">
+        YTD: <span className="font-mono font-semibold text-text-secondary">{dollars(ytd)}</span>
+      </p>
+    </StatCard>
+  )
+}
+
+// OccupancyCard and RevenueCard show their primary stat always (not inside the expand panel).
+// Wrap them to put the big number in the header instead of the children.
+
+function OccupancyCardWrapper({ pct, inHouse, total, rooms, calReservations, loading }) {
+  const [open, setOpen] = useState(false)
+  const accent = ACCENT.occupancy
+  const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd')
+
+  const occupiedRoomIds = new Set(
+    calReservations
+      .filter(r => r.check_in <= todayStr && r.check_out > todayStr)
+      .flatMap(r => r.room_ids ?? [])
+  )
+
+  return (
+    <div className="bg-surface-raised border border-border rounded-[12px] overflow-hidden flex">
+      <div className="w-[5px] shrink-0" style={{ background: accent }} />
+      <div className="flex flex-col flex-1 min-w-0">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-start gap-3 px-5 pt-4 pb-4 w-full text-left hover:bg-black/[0.025] transition-colors"
+        >
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.08em] self-start"
+              style={{ background: accent + '35', color: '#1a1a1a' }}>
+              Occupancy
+            </span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="font-mono text-[36px] font-bold text-text-primary leading-none">{pct}%</span>
+              <span className="font-body text-[12px] text-text-muted">{inHouse}/{total}</span>
+            </div>
+          </div>
+          {open ? <CaretUp size={13} className="text-text-muted shrink-0 mt-1" />
+                : <CaretDown size={13} className="text-text-muted shrink-0 mt-1" />}
+        </button>
+
+        {loading && <div className="px-5 pb-4"><div className="animate-pulse bg-border h-8 rounded-[6px]" /></div>}
+
+        {!loading && open && (
+          <div className="px-5 pb-4 border-t border-border/50">
+            <ul className="mt-2">
+              {rooms.map(room => {
+                const occupied = occupiedRoomIds.has(room.id)
+                return (
+                  <li key={room.id} className="flex items-center gap-2.5 py-1.5 border-b border-border/40 last:border-b-0">
+                    <Door size={13} className={occupied ? 'text-danger' : 'text-success'} weight="bold" />
+                    <span className="font-body text-[13px] text-text-primary">{room.name}</span>
+                    <span className={cn(
+                      'ml-auto font-body text-[11px] font-semibold uppercase tracking-wide',
+                      occupied ? 'text-danger' : 'text-success'
+                    )}>
+                      {occupied ? 'Occupied' : 'Available'}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RevenueCardWrapper({ thisMonth, ytd, loading }) {
+  const [open, setOpen] = useState(false)
+  const accent = ACCENT.revenue
+
+  return (
+    <div className="bg-surface-raised border border-border rounded-[12px] overflow-hidden flex">
+      <div className="w-[5px] shrink-0" style={{ background: accent }} />
+      <div className="flex flex-col flex-1 min-w-0">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-start gap-3 px-5 pt-4 pb-4 w-full text-left hover:bg-black/[0.025] transition-colors"
+        >
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.08em] self-start"
+              style={{ background: accent + '35', color: '#1a1a1a' }}>
+              Monthly Revenue
+            </span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="font-mono text-[32px] font-bold text-text-primary leading-none">{dollars(thisMonth)}</span>
+            </div>
+          </div>
+          {open ? <CaretUp size={13} className="text-text-muted shrink-0 mt-1" />
+                : <CaretDown size={13} className="text-text-muted shrink-0 mt-1" />}
+        </button>
+
+        {loading && <div className="px-5 pb-4"><div className="animate-pulse bg-border h-8 rounded-[6px]" /></div>}
+
+        {!loading && open && (
+          <div className="px-5 pb-4 border-t border-border/50">
+            <p className="font-body text-[13px] text-text-muted mt-3">
+              Year to date: <span className="font-mono font-semibold text-text-secondary">{dollars(ytd)}</span>
+            </p>
+            <Link to="/reports" className="inline-flex items-center gap-1 mt-3 font-body text-[13px] text-info hover:underline">
+              View full report <ArrowRight size={12} />
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DayCards — magazine grid layout
+// ---------------------------------------------------------------------------
+
+function DayCards({ dayView, calReservations, rooms, payments, modifiedReservations, loading }) {
+  const today    = startOfDay(new Date())
+  const viewDate = dayView === 'today' ? today : addDays(today, 1)
+  const dateStr  = format(viewDate, 'yyyy-MM-dd')
+  const todayStr = format(today, 'yyyy-MM-dd')
+
+  const arrivals   = calReservations.filter(r => r.check_in  === dateStr)
+  const departures = calReservations.filter(r => r.check_out === dateStr)
+
+  const inHouseToday = calReservations.filter(
+    r => r.check_in <= todayStr && r.check_out > todayStr
+  )
+  const occupancyPct = rooms.length > 0
+    ? Math.round((inHouseToday.length / rooms.length) * 100)
+    : 0
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Row 1: Arrivals + Departures */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <ArrivingCard
+          reservations={arrivals}
+          rooms={rooms}
+          dayView={dayView}
+          loading={loading}
+        />
+        <DepartingCard
+          reservations={departures}
+          rooms={rooms}
+          dayView={dayView}
+          loading={loading}
+        />
+      </div>
+
+      {/* Row 2: Guest Modified + Occupancy + Revenue */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <ModifiedCard
+          reservations={modifiedReservations}
+          rooms={rooms}
+          loading={loading}
+        />
+        <OccupancyCardWrapper
+          pct={occupancyPct}
+          inHouse={inHouseToday.length}
+          total={rooms.length}
+          rooms={rooms}
+          calReservations={calReservations}
+          loading={loading}
+        />
+        <RevenueCardWrapper
+          thisMonth={payments?.thisMonth ?? 0}
+          ytd={payments?.ytd ?? 0}
+          loading={loading}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Room Calendar — 14-day horizontal Gantt
 // ---------------------------------------------------------------------------
 
 function RoomCalendar({ rooms, reservations, maintenanceTickets }) {
@@ -537,8 +697,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
         let span = 1
         const co = startOfDay(parseISO(res.check_out))
         while (i + span < days.length) {
-          const next = startOfDay(days[i + span])
-          if (next >= co) break
+          if (startOfDay(days[i + span]) >= co) break
           span++
         }
         result.push({ type: 'reservation', reservation: res, span })
@@ -560,11 +719,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
           <span className="font-body text-[13px] text-text-primary font-medium truncate">{room.name}</span>
           {openTickets.length > 0 && (
             <span title={`${openTickets.length} open maintenance issue${openTickets.length !== 1 ? 's' : ''}`}>
-              <WarningCircle
-                size={13}
-                weight="fill"
-                className={hasUrgent ? 'text-danger' : 'text-warning'}
-              />
+              <WarningCircle size={13} weight="fill" className={hasUrgent ? 'text-danger' : 'text-warning'} />
             </span>
           )}
         </div>
@@ -573,17 +728,12 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
       {spans.map((span, idx) => {
         if (span.type === 'maintenance') {
           return (
-            <td
-              key={idx}
-              colSpan={span.span}
-              className="py-1 px-1"
-              style={{ background: 'repeating-linear-gradient(135deg, #D4D4D4 0px, #D4D4D4 2px, #F4F4F4 2px, #F4F4F4 9px)' }}
-            >
+            <td key={idx} colSpan={span.span} className="py-1 px-1"
+              style={{ background: 'repeating-linear-gradient(135deg,#D4D4D4 0px,#D4D4D4 2px,#F4F4F4 2px,#F4F4F4 9px)' }}>
               <span className="font-body text-[11px] text-text-muted">Maintenance</span>
             </td>
           )
         }
-
         if (span.type === 'reservation') {
           const r = span.reservation
           const isPending = r.status === 'pending'
@@ -602,12 +752,8 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
             </td>
           )
         }
-
         return (
-          <td
-            key={idx}
-            className={cn('py-1 px-0.5 h-10', isToday(span.day) && 'bg-info-bg/30')}
-          />
+          <td key={idx} className={cn('py-1 px-0.5 h-10', isToday(span.day) && 'bg-info-bg/30')} />
         )
       })}
     </tr>
@@ -615,53 +761,56 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
 }
 
 // ---------------------------------------------------------------------------
-// Main page export
+// Main export
 // ---------------------------------------------------------------------------
 
 export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false)
   const [dayView, setDayView]     = useState('today')
 
-  const { data: rooms = [] }                   = useRoomsForCalendar()
+  const { data: rooms = [] }               = useRoomsForCalendar()
   const { data: calReservations = [],
-          isLoading: calLoading }               = useCalendarReservations()
-  const { data: maintenanceTickets = [] }       = useOpenMaintenanceTickets()
-  const { data: payments }                      = usePaymentsSummary()
-  const { data: modifiedReservations = [] }     = useModifiedReservations()
+          isLoading: calLoading }           = useCalendarReservations()
+  const { data: maintenanceTickets = [] }   = useOpenMaintenanceTickets()
+  const { data: payments }                  = usePaymentsSummary()
+  const { data: modifiedReservations = [] } = useModifiedReservations()
 
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="font-heading text-[32px] text-text-primary">{greeting()}</h1>
           <WeatherStrip />
         </div>
-        <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
-          <Plus size={16} weight="bold" /> New Reservation
-        </Button>
+
+        <div className="flex items-center gap-3 shrink-0">
+          {/* TODAY / TOMORROW toggle */}
+          <div className="flex items-center gap-0 bg-surface-raised border border-border rounded-[8px] p-1">
+            {['today', 'tomorrow'].map(d => (
+              <button
+                key={d}
+                onClick={() => setDayView(d)}
+                className={cn(
+                  'px-4 py-1.5 rounded-[6px] font-body font-semibold text-[12px] uppercase tracking-[0.08em] transition-all',
+                  dayView === d
+                    ? 'bg-text-primary text-white shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+
+          <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
+            <Plus size={16} weight="bold" /> New Reservation
+          </Button>
+        </div>
       </div>
 
-      {/* TODAY / TOMORROW toggle */}
-      <div className="flex items-center gap-0 bg-surface-raised border border-border rounded-[8px] p-1 self-start">
-        {['today', 'tomorrow'].map(d => (
-          <button
-            key={d}
-            onClick={() => setDayView(d)}
-            className={cn(
-              'px-5 py-2 rounded-[6px] font-body font-semibold text-[13px] uppercase tracking-[0.08em] transition-all',
-              dayView === d
-                ? 'bg-text-primary text-white shadow-sm'
-                : 'text-text-secondary hover:text-text-primary'
-            )}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
-
-      {/* Wallet folder stack */}
-      <FolderStack
+      {/* Magazine grid stat cards */}
+      <DayCards
         dayView={dayView}
         calReservations={calReservations}
         rooms={rooms}

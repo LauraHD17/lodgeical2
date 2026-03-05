@@ -1,30 +1,31 @@
 // src/pages/admin/Rooms.jsx
-// Rooms management with photo upload (up to 10 photos per room, 4-photo carousel preview).
+// Rooms management — inline expandable cards with drag-to-reorder.
+// Drag handle reorders rooms (persisted via sort_order); order reflects in calendar.
 
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, PencilSimple, X, Images, Trash, ArrowLeft, ArrowRight } from '@phosphor-icons/react'
+import {
+  Plus, X, Images, Trash, ArrowLeft, ArrowRight,
+  CaretDown, CaretUp, DotsSixVertical, Check,
+} from '@phosphor-icons/react'
 import * as Switch from '@radix-ui/react-switch'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useRooms, useCreateRoom, useUpdateRoom } from '@/hooks/useRooms'
 import { useProperty } from '@/lib/property/useProperty'
-import { FolderCard } from '@/components/shared/FolderCard'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { StatusChip } from '@/components/shared/StatusChip'
-import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
 
 const ROOM_TYPES = [
   { value: 'standard', label: 'Standard' },
-  { value: 'suite', label: 'Suite' },
-  { value: 'cabin', label: 'Cabin' },
-  { value: 'villa', label: 'Villa' },
-  { value: 'studio', label: 'Studio' },
-  { value: 'other', label: 'Other' },
+  { value: 'suite',    label: 'Suite' },
+  { value: 'cabin',   label: 'Cabin' },
+  { value: 'villa',   label: 'Villa' },
+  { value: 'studio',  label: 'Studio' },
+  { value: 'other',   label: 'Other' },
 ]
 
 const MAX_PHOTOS = 10
@@ -141,7 +142,7 @@ function PhotoCarousel({ photos }) {
   )
 }
 
-// ─── Photo manager section in edit modal ─────────────────────────────────────
+// ─── Photo manager section ────────────────────────────────────────────────────
 
 function PhotoManager({ room }) {
   const { data: photos = [] } = useRoomPhotos(room?.id)
@@ -264,35 +265,51 @@ function PhotoManager({ room }) {
   )
 }
 
-// ─── Add/Edit Room Modal ──────────────────────────────────────────────────────
+// ─── Form helpers ─────────────────────────────────────────────────────────────
 
-function AddRoomModal({ open, onClose, roomToEdit }) {
+function initForm(room) {
+  if (!room) {
+    return {
+      name: '', type: 'standard', max_guests: '2',
+      base_rate_cents: '0', description: '',
+      allows_pets: false, cleaning_fee_dollars: '', pet_fee_dollars: '',
+    }
+  }
+  return {
+    name: room.name ?? '',
+    type: room.type ?? 'standard',
+    max_guests: String(room.max_guests ?? 2),
+    base_rate_cents: String(room.base_rate_cents ?? 0),
+    description: room.description ?? '',
+    allows_pets: room.allows_pets ?? false,
+    cleaning_fee_dollars: room.cleaning_fee_cents != null ? (room.cleaning_fee_cents / 100).toFixed(2) : '',
+    pet_fee_dollars: room.pet_fee_cents != null ? (room.pet_fee_cents / 100).toFixed(2) : '',
+  }
+}
+
+// ─── RoomRow — collapsed header + expandable inline form ──────────────────────
+
+function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
+  const [open, setOpen] = useState(!!isNew)
+  const [form, setForm] = useState(() => initForm(room))
+  const [errors, setErrors] = useState({})
   const createRoom = useCreateRoom()
   const updateRoom = useUpdateRoom()
   const { addToast } = useToast()
-  const isEdit = !!roomToEdit
+  const { data: photos = [] } = useRoomPhotos(room?.id)
 
-  const [form, setForm] = useState(() =>
-    roomToEdit
-      ? {
-          name: roomToEdit.name ?? '',
-          type: roomToEdit.type ?? 'standard',
-          max_guests: String(roomToEdit.max_guests ?? 2),
-          base_rate_cents: String(roomToEdit.base_rate_cents ?? 0),
-          description: roomToEdit.description ?? '',
-          allows_pets: roomToEdit.allows_pets ?? false,
-          cleaning_fee_dollars: roomToEdit.cleaning_fee_cents != null ? (roomToEdit.cleaning_fee_cents / 100).toFixed(2) : '',
-          pet_fee_dollars: roomToEdit.pet_fee_cents != null ? (roomToEdit.pet_fee_cents / 100).toFixed(2) : '',
-        }
-      : { name: '', type: 'standard', max_guests: '2', base_rate_cents: '0', description: '', allows_pets: false, cleaning_fee_dollars: '', pet_fee_dollars: '' }
-  )
-  const [errors, setErrors] = useState({})
+  // Keep form in sync if room prop changes (e.g., after save)
+  useEffect(() => {
+    if (room && !open) setForm(initForm(room))
+  }, [room, open])
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   function validate() {
     const e = {}
     if (!form.name.trim()) e.name = 'Room name required'
     if (!form.max_guests || Number(form.max_guests) < 1) e.max_guests = 'Must be at least 1'
-    if (!form.base_rate_cents || Number(form.base_rate_cents) < 0) e.base_rate_cents = 'Invalid rate'
+    if (form.base_rate_cents === '' || Number(form.base_rate_cents) < 0) e.base_rate_cents = 'Invalid rate'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -310,114 +327,141 @@ function AddRoomModal({ open, onClose, roomToEdit }) {
       pet_fee_cents: form.pet_fee_dollars === '' ? null : Math.round(Number(form.pet_fee_dollars) * 100),
     }
     try {
-      if (isEdit) {
-        await updateRoom.mutateAsync({ id: roomToEdit.id, ...payload })
-        addToast({ message: 'Room updated successfully', variant: 'success' })
-      } else {
+      if (isNew) {
         await createRoom.mutateAsync(payload)
-        addToast({ message: 'Room created successfully', variant: 'success' })
+        addToast({ message: 'Room created', variant: 'success' })
+        onSaved?.()
+      } else {
+        await updateRoom.mutateAsync({ id: room.id, ...payload })
+        addToast({ message: 'Room updated', variant: 'success' })
+        setOpen(false)
       }
-      onClose()
     } catch (err) {
       addToast({ message: err?.message ?? 'Failed to save room', variant: 'error' })
     }
   }
 
-  const loading = createRoom.isPending || updateRoom.isPending
+  async function handleToggleActive() {
+    try {
+      await updateRoom.mutateAsync({ id: room.id, is_active: !room.is_active })
+      addToast({ message: `${room.name} is now ${!room.is_active ? 'active' : 'inactive'}`, variant: 'success' })
+    } catch {
+      addToast({ message: 'Failed to update room status', variant: 'error' })
+    }
+  }
+
+  function handleCancel() {
+    if (isNew) {
+      onCancel?.()
+    } else {
+      setForm(initForm(room))
+      setErrors({})
+      setOpen(false)
+    }
+  }
+
+  const saving = createRoom.isPending || updateRoom.isPending
+  const isActive = isNew ? true : room.is_active !== false
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={isEdit ? 'Edit Room' : 'Add Room'}
+    <div
+      className={cn(
+        'border border-border rounded-[10px] overflow-hidden bg-surface-raised transition-shadow',
+        dragHandlers?.isDragging && 'opacity-50 ring-2 ring-info shadow-lg'
+      )}
+      onDragOver={dragHandlers?.onDragOver}
+      onDrop={dragHandlers?.onDrop}
     >
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Room Name"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          error={errors.name}
-        />
-        <Select
-          label="Room Type"
-          options={ROOM_TYPES}
-          value={form.type}
-          onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}
-        />
-        <Input
-          label="Max Guests"
-          type="number"
-          min={1}
-          value={form.max_guests}
-          onChange={(e) => setForm((f) => ({ ...f, max_guests: e.target.value }))}
-          error={errors.max_guests}
-        />
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Base Rate ($/night)
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={(Number(form.base_rate_cents) / 100).toFixed(2)}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  base_rate_cents: String(Math.round(Number(e.target.value) * 100)),
-                }))
-              }
-              className={cn(
-                'h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full',
-                'focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2',
-                errors.base_rate_cents && 'border-danger'
-              )}
-            />
+      {/* Collapsed header row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        {/* Drag handle — only for existing rooms */}
+        {!isNew && (
+          <div
+            draggable
+            onDragStart={dragHandlers?.onDragStart}
+            className="cursor-grab active:cursor-grabbing text-text-muted hover:text-text-secondary shrink-0 touch-none"
+            title="Drag to reorder"
+          >
+            <DotsSixVertical size={18} />
           </div>
-          {errors.base_rate_cents && (
-            <span className="mt-1 text-danger text-[13px]">{errors.base_rate_cents}</span>
+        )}
+
+        {/* Room name + meta */}
+        <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+          <span className="font-body font-semibold text-[15px] text-text-primary truncate">
+            {isNew ? 'New Room' : (room.name || 'Untitled')}
+          </span>
+          {!isNew && (
+            <>
+              <span className="font-mono text-[13px] text-text-secondary">
+                ${((room.base_rate_cents ?? 0) / 100).toFixed(2)}/night
+              </span>
+              <span className="font-body text-[12px] text-text-secondary capitalize text-text-muted">
+                {room.type ?? 'room'} · max {room.max_guests ?? 2}
+              </span>
+              {/* photo count */}
+              {photos.length > 0 && (
+                <span className="font-body text-[11px] text-text-muted">
+                  {photos.length} photo{photos.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </>
           )}
         </div>
-        <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-            Description
-          </label>
-          <textarea
-            rows={3}
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised resize-none focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+
+        {/* Status badge + active toggle (existing rooms only) */}
+        {!isNew && !open && (
+          <span
+            className={cn(
+              'text-[11px] font-semibold font-body px-2 py-0.5 rounded-full shrink-0',
+              isActive ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
+            )}
+          >
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
+        )}
+
+        {/* Expand / collapse toggle */}
+        <button
+          onClick={() => !isNew && setOpen(o => !o)}
+          className="shrink-0 text-text-muted hover:text-text-primary transition-colors"
+          title={open ? 'Collapse' : 'Expand to edit'}
+        >
+          {open ? <CaretUp size={16} /> : <CaretDown size={16} />}
+        </button>
+      </div>
+
+      {/* Expanded form */}
+      {open && (
+        <div className="border-t border-border px-5 py-5 flex flex-col gap-4">
+          <Input
+            label="Room Name"
+            value={form.name}
+            onChange={e => set('name', e.target.value)}
+            error={errors.name}
           />
-        </div>
 
-        {/* Pet-friendly toggle */}
-        <div className="flex items-center justify-between p-3 border border-border rounded-[6px] bg-surface">
-          <div>
-            <p className="font-body font-semibold text-[14px] text-text-primary">Pet-friendly room</p>
-            <p className="font-body text-[12px] text-text-muted mt-0.5">Shown to guests on the booking widget</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select
+              label="Room Type"
+              options={ROOM_TYPES}
+              value={form.type}
+              onValueChange={v => set('type', v)}
+            />
+            <Input
+              label="Max Guests"
+              type="number"
+              min={1}
+              value={form.max_guests}
+              onChange={e => set('max_guests', e.target.value)}
+              error={errors.max_guests}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <Switch.Root
-              checked={form.allows_pets}
-              onCheckedChange={(v) => setForm((f) => ({ ...f, allows_pets: v }))}
-              className={cn('w-10 h-6 rounded-full transition-colors', form.allows_pets ? 'bg-success' : 'bg-border')}
-            >
-              <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
-            </Switch.Root>
-            <span className="font-body text-[13px] text-text-secondary">{form.allows_pets ? 'Yes' : 'No'}</span>
-          </div>
-        </div>
 
-        {/* Per-room fee overrides */}
-        <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
-          <p className="font-body font-semibold text-[13px] text-text-secondary uppercase tracking-[0.06em]">
-            Fee Overrides <span className="normal-case font-normal text-text-muted">(leave blank to use property default)</span>
-          </p>
+          {/* Base rate */}
           <div className="flex flex-col">
             <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-              Cleaning Fee ($)
+              Base Rate ($/night)
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
@@ -425,17 +469,59 @@ function AddRoomModal({ open, onClose, roomToEdit }) {
                 type="number"
                 min={0}
                 step={0.01}
-                value={form.cleaning_fee_dollars}
-                onChange={(e) => setForm((f) => ({ ...f, cleaning_fee_dollars: e.target.value }))}
-                placeholder="Use property default"
-                className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 placeholder:text-text-muted"
+                value={(Number(form.base_rate_cents) / 100).toFixed(2)}
+                onChange={e => set('base_rate_cents', String(Math.round(Number(e.target.value) * 100)))}
+                className={cn(
+                  'h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full',
+                  'focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2',
+                  errors.base_rate_cents && 'border-danger'
+                )}
               />
             </div>
+            {errors.base_rate_cents && (
+              <span className="mt-1 text-danger text-[13px]">{errors.base_rate_cents}</span>
+            )}
           </div>
-          {form.allows_pets && (
+
+          {/* Description */}
+          <div className="flex flex-col">
+            <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+              className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised resize-none focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            />
+          </div>
+
+          {/* Pet-friendly toggle */}
+          <div className="flex items-center justify-between p-3 border border-border rounded-[6px] bg-surface">
+            <div>
+              <p className="font-body font-semibold text-[14px] text-text-primary">Pet-friendly room</p>
+              <p className="font-body text-[12px] text-text-muted mt-0.5">Shown to guests on the booking widget</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch.Root
+                checked={form.allows_pets}
+                onCheckedChange={v => set('allows_pets', v)}
+                className={cn('w-10 h-6 rounded-full transition-colors', form.allows_pets ? 'bg-success' : 'bg-border')}
+              >
+                <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+              </Switch.Root>
+              <span className="font-body text-[13px] text-text-secondary">{form.allows_pets ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+
+          {/* Fee overrides */}
+          <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
+            <p className="font-body font-semibold text-[13px] text-text-secondary uppercase tracking-[0.06em]">
+              Fee Overrides <span className="normal-case font-normal text-text-muted">(leave blank to use property default)</span>
+            </p>
             <div className="flex flex-col">
               <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
-                Pet Fee ($)
+                Cleaning Fee ($)
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
@@ -443,29 +529,70 @@ function AddRoomModal({ open, onClose, roomToEdit }) {
                   type="number"
                   min={0}
                   step={0.01}
-                  value={form.pet_fee_dollars}
-                  onChange={(e) => setForm((f) => ({ ...f, pet_fee_dollars: e.target.value }))}
+                  value={form.cleaning_fee_dollars}
+                  onChange={e => set('cleaning_fee_dollars', e.target.value)}
                   placeholder="Use property default"
                   className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 placeholder:text-text-muted"
                 />
               </div>
             </div>
+            {form.allows_pets && (
+              <div className="flex flex-col">
+                <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                  Pet Fee ($)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.pet_fee_dollars}
+                    onChange={e => set('pet_fee_dollars', e.target.value)}
+                    placeholder="Use property default"
+                    className="h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 placeholder:text-text-muted"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Active toggle (edit mode only) */}
+          {!isNew && (
+            <div className="flex items-center justify-between p-3 border border-border rounded-[6px] bg-surface">
+              <div>
+                <p className="font-body font-semibold text-[14px] text-text-primary">Room status</p>
+                <p className="font-body text-[12px] text-text-muted mt-0.5">Inactive rooms won't appear in the booking widget</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch.Root
+                  checked={isActive}
+                  onCheckedChange={handleToggleActive}
+                  className={cn('w-10 h-6 rounded-full transition-colors', isActive ? 'bg-success' : 'bg-border')}
+                >
+                  <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+                </Switch.Root>
+                <span className="font-body text-[13px] text-text-secondary">{isActive ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Photos — only shown when editing an existing room */}
-        {isEdit && <PhotoManager room={roomToEdit} />}
+          {/* Photos — existing rooms only */}
+          {!isNew && room?.id && <PhotoManager room={room} />}
 
-        <div className="flex gap-3 justify-end mt-2">
-          <Button variant="secondary" size="md" onClick={onClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="md" loading={loading} onClick={handleSave}>
-            {isEdit ? 'Save Changes' : 'Add Room'}
-          </Button>
+          {/* Action buttons */}
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="secondary" size="md" onClick={handleCancel} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="md" loading={saving} onClick={handleSave}>
+              <Check size={15} weight="bold" />
+              {isNew ? 'Add Room' : 'Save Changes'}
+            </Button>
+          </div>
         </div>
-      </div>
-    </Modal>
+      )}
+    </div>
   )
 }
 
@@ -475,18 +602,29 @@ export default function Rooms() {
   const { data: rooms = [], isLoading } = useRooms()
   const updateRoom = useUpdateRoom()
   const { addToast } = useToast()
-  const [addOpen, setAddOpen] = useState(false)
-  const [editRoom, setEditRoom] = useState(null)
 
-  async function toggleActive(room) {
+  const [localRooms, setLocalRooms] = useState([])
+  const [dragIdx, setDragIdx] = useState(null)
+  const [addingNew, setAddingNew] = useState(false)
+
+  // Sync localRooms when query data changes (initial load, after mutations)
+  useEffect(() => {
+    setLocalRooms(rooms)
+  }, [rooms])
+
+  async function handleDrop(targetIdx) {
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); return }
+    const reordered = [...localRooms]
+    const [moved] = reordered.splice(dragIdx, 1)
+    reordered.splice(targetIdx, 0, moved)
+    setLocalRooms(reordered)
+    setDragIdx(null)
     try {
-      await updateRoom.mutateAsync({ id: room.id, is_active: !room.is_active })
-      addToast({
-        message: `${room.name} is now ${!room.is_active ? 'active' : 'inactive'}`,
-        variant: 'success',
-      })
+      for (let i = 0; i < reordered.length; i++) {
+        await updateRoom.mutateAsync({ id: reordered[i].id, sort_order: i })
+      }
     } catch {
-      addToast({ message: 'Failed to update room status', variant: 'error' })
+      addToast({ message: 'Failed to save room order', variant: 'error' })
     }
   }
 
@@ -494,118 +632,64 @@ export default function Rooms() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Rooms</h1>
-        <Button variant="primary" size="md" onClick={() => setAddOpen(true)}>
+        <div>
+          <h1 className="font-heading text-[32px] text-text-primary">Rooms</h1>
+          {localRooms.length > 1 && (
+            <p className="font-body text-[13px] text-text-muted mt-0.5">
+              Drag <DotsSixVertical size={12} className="inline" /> to reorder — order reflects in the calendar.
+            </p>
+          )}
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => setAddingNew(true)}
+          disabled={addingNew}
+        >
           <Plus size={16} weight="bold" /> Add Room
         </Button>
       </div>
 
-      {/* Room Grid */}
+      {/* Room list */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse bg-border rounded-[8px] h-48" />
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="animate-pulse bg-border rounded-[10px] h-14" />
           ))}
         </div>
-      ) : rooms.length === 0 ? (
+      ) : localRooms.length === 0 && !addingNew ? (
         <div className="flex flex-col items-center gap-4 py-16">
           <p className="font-body text-[16px] text-text-muted">No rooms yet</p>
-          <Button variant="primary" size="md" onClick={() => setAddOpen(true)}>
+          <Button variant="primary" size="md" onClick={() => setAddingNew(true)}>
             <Plus size={16} weight="bold" /> Add first room
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {rooms.map((room) => (
-            <RoomCard
+        <div className="flex flex-col gap-2">
+          {localRooms.map((room, idx) => (
+            <RoomRow
               key={room.id}
               room={room}
-              onEdit={() => setEditRoom(room)}
-              onToggleActive={() => toggleActive(room)}
+              dragHandlers={{
+                onDragStart: () => setDragIdx(idx),
+                onDragOver:  e => e.preventDefault(),
+                onDrop:      () => handleDrop(idx),
+                isDragging:  dragIdx === idx,
+              }}
             />
           ))}
+
+          {addingNew && (
+            <RoomRow
+              key="new"
+              room={null}
+              isNew
+              onSaved={() => setAddingNew(false)}
+              onCancel={() => setAddingNew(false)}
+            />
+          )}
         </div>
       )}
-
-      {/* Add/Edit Modal */}
-      <AddRoomModal
-        open={addOpen || !!editRoom}
-        onClose={() => { setAddOpen(false); setEditRoom(null) }}
-        roomToEdit={editRoom}
-      />
     </div>
-  )
-}
-
-function RoomCard({ room, onEdit, onToggleActive }) {
-  const { data: photos = [] } = useRoomPhotos(room.id)
-
-  return (
-    <FolderCard
-      tabLabel={room.name}
-      color={room.is_active !== false ? 'primary' : 'warning'}
-    >
-      <div className="flex flex-col gap-2">
-        {/* Photos carousel */}
-        {photos.length > 0 && <PhotoCarousel photos={photos} />}
-
-        <div className="flex items-center justify-between">
-          <span className="font-body text-[13px] text-text-secondary capitalize">
-            {room.type ?? 'Room'}
-          </span>
-          <span
-            className={cn(
-              'text-[11px] font-semibold font-body px-2 py-0.5 rounded-full',
-              room.is_active !== false
-                ? 'bg-success-bg text-success'
-                : 'bg-warning-bg text-warning'
-            )}
-          >
-            {room.is_active !== false ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-
-        <p className="font-mono text-[14px] text-text-primary">
-          ${((room.base_rate_cents ?? 0) / 100).toFixed(2)}/night
-        </p>
-
-        <p className="font-body text-[13px] text-text-muted">
-          Max {room.max_guests ?? 2} guests
-        </p>
-
-        {room.allows_pets && (
-          <span className="inline-flex items-center gap-1 font-body text-[11px] font-semibold text-success bg-success-bg border border-success rounded-full px-2 py-0.5 self-start">
-            Pet-friendly
-          </span>
-        )}
-
-        {room.description && (
-          <p className="font-body text-[13px] text-text-secondary line-clamp-2">
-            {room.description}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-2">
-            <Switch.Root
-              checked={room.is_active !== false}
-              onCheckedChange={onToggleActive}
-              className={cn(
-                'w-10 h-6 rounded-full transition-colors',
-                room.is_active !== false ? 'bg-success' : 'bg-border'
-              )}
-            >
-              <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
-            </Switch.Root>
-            <span className="font-body text-[13px] text-text-secondary">
-              {room.is_active !== false ? 'Active' : 'Inactive'}
-            </span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onEdit}>
-            <PencilSimple size={14} /> Edit
-          </Button>
-        </div>
-      </div>
-    </FolderCard>
   )
 }
