@@ -13,6 +13,7 @@ import { ToastProvider } from '@/components/ui/ToastProvider'
 import { RouteGuard } from '@/components/auth/RouteGuard'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { PageLoader } from '@/components/shared/PageLoader'
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { ROUTES } from '@/config/routes'
 
 // Admin pages (lazy-loaded)
@@ -86,6 +87,7 @@ export default function App() {
         <AuthProvider>
           <PropertyProvider>
             <ToastProvider>
+              <ErrorBoundary>
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {ROUTES.map((route) => {
@@ -103,6 +105,7 @@ export default function App() {
                   <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
               </Suspense>
+              </ErrorBoundary>
             </ToastProvider>
           </PropertyProvider>
         </AuthProvider>

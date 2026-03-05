@@ -2,7 +2,7 @@
 // Multi-step modal for creating / editing reservations.
 // Steps: 1=Dates, 2=Rooms, 3=Guest, 4=Fees, 5=Review
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/style.css'
 import { format, differenceInCalendarDays, isWithinInterval, parseISO } from 'date-fns'
@@ -580,6 +580,9 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   const [emailDebounced, setEmailDebounced] = useState('')
   const [conflict, setConflict] = useState(null)
   const [submitError, setSubmitError] = useState(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [checkingConflicts, setCheckingConflicts] = useState(false)
+  const [earlyConflict, setEarlyConflict] = useState(null)
   const [feesData, setFeesData] = useState({
     cleaningFeeWaived: false,
     cleaningFeeWaiveReason: '',
@@ -594,8 +597,41 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   const updateReservation = useUpdateReservation()
   const { addToast } = useToast()
 
+  const { propertyId } = useProperty()
   const isEditMode = !!reservationToEdit
   const isLoading = createReservation.isPending || updateReservation.isPending
+
+  // Early conflict check — runs when advancing from step 2 to step 3
+  const checkConflictsEarly = useCallback(async () => {
+    if (!checkIn || !checkOut || selectedRoomIds.length === 0 || !propertyId) return true
+    setCheckingConflicts(true)
+    setEarlyConflict(null)
+    try {
+      const ciStr = format(checkIn, 'yyyy-MM-dd')
+      const coStr = format(checkOut, 'yyyy-MM-dd')
+      const { data } = await supabase
+        .from('reservations')
+        .select('id, room_ids, check_in, check_out')
+        .eq('property_id', propertyId)
+        .neq('status', 'cancelled')
+        .lt('check_in', coStr)
+        .gt('check_out', ciStr)
+      const conflicting = (data ?? []).filter((r) => {
+        if (isEditMode && r.id === reservationToEdit.id) return false
+        return (r.room_ids ?? []).some((rid) => selectedRoomIds.includes(rid))
+      })
+      if (conflicting.length > 0) {
+        setEarlyConflict(conflicting.map((r) => r.id))
+        return false
+      }
+      return true
+    } catch {
+      // If check fails, allow advancing — the server will catch it on submit
+      return true
+    } finally {
+      setCheckingConflicts(false)
+    }
+  }, [checkIn, checkOut, selectedRoomIds, propertyId, isEditMode, reservationToEdit])
 
   const form = useForm({
     resolver: zodResolver(guestSchema),
@@ -610,7 +646,6 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   })
 
   // Track email for debounced guest lookup
-  // eslint-disable-next-line react-hooks/incompatible-library
   const emailWatch = form.watch('email')
 
   useEffect(() => {
@@ -622,8 +657,8 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
 
   useEffect(() => {
     if (reservationToEdit) {
-      setCheckIn(reservationToEdit.check_in ? new Date(reservationToEdit.check_in) : null)
-      setCheckOut(reservationToEdit.check_out ? new Date(reservationToEdit.check_out) : null)
+      setCheckIn(reservationToEdit.check_in ? parseISO(reservationToEdit.check_in) : null)
+      setCheckOut(reservationToEdit.check_out ? parseISO(reservationToEdit.check_out) : null)
       setSelectedRoomIds(reservationToEdit.room_ids ?? [])
       const g = reservationToEdit.guests ?? {}
       form.reset({
@@ -649,8 +684,20 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
     form.reset()
   }
 
+  const isDirty = step > 1 || checkIn !== null || selectedRoomIds.length > 0
+
   function handleClose() {
     if (isLoading) return
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+      return
+    }
+    resetModal()
+    onClose()
+  }
+
+  function confirmDiscard() {
+    setShowDiscardConfirm(false)
     resetModal()
     onClose()
   }
@@ -676,10 +723,15 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   }
 
   async function handleNext() {
+    if (step === 2) {
+      const ok = await checkConflictsEarly()
+      if (!ok) return // conflict found — stay on step 2
+    }
     if (step === 3) {
       const valid = await form.trigger(['email', 'first_name', 'last_name', 'num_guests'])
       if (!valid) return
     }
+    setEarlyConflict(null)
     setStep((s) => Math.min(s + 1, 5))
   }
 
@@ -747,11 +799,21 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
       )}
 
       {step === 2 && (
-        <Step2Rooms
-          rooms={rooms}
-          selectedRoomIds={selectedRoomIds}
-          onToggle={toggleRoom}
-        />
+        <>
+          <Step2Rooms
+            rooms={rooms}
+            selectedRoomIds={selectedRoomIds}
+            onToggle={toggleRoom}
+          />
+          {earlyConflict && (
+            <div className="mt-4">
+              <ConflictBanner conflictingIds={earlyConflict} />
+              <p className="font-body text-[13px] text-danger mt-2">
+                Please change your dates or room selection to resolve the conflict before continuing.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {step === 3 && (
@@ -793,7 +855,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
         <Button
           variant="secondary"
           size="md"
-          onClick={() => setStep((s) => Math.max(s - 1, 1))}
+          onClick={() => { setEarlyConflict(null); setStep((s) => Math.max(s - 1, 1)) }}
           disabled={step === 1 || isLoading}
         >
           <ArrowLeft size={16} /> Back
@@ -804,12 +866,33 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
             variant="primary"
             size="md"
             onClick={handleNext}
-            disabled={!canAdvance() || isLoading}
+            disabled={!canAdvance() || isLoading || checkingConflicts}
+            loading={checkingConflicts}
           >
             Next <ArrowRight size={16} />
           </Button>
         )}
       </div>
+
+      {/* Discard changes confirmation */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+          <div className="bg-surface-raised rounded-[12px] border border-border shadow-xl p-6 max-w-sm mx-4">
+            <h4 className="font-body font-semibold text-[16px] text-text-primary mb-2">Discard changes?</h4>
+            <p className="font-body text-[14px] text-text-secondary mb-6">
+              You have unsaved reservation data. Are you sure you want to close?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" size="sm" onClick={() => setShowDiscardConfirm(false)}>
+                Keep editing
+              </Button>
+              <Button variant="destructive" size="sm" onClick={confirmDiscard}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }

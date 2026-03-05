@@ -6,10 +6,7 @@ import { z } from 'zod'
 import { differenceInCalendarDays, format } from 'date-fns'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-
-function formatCents(cents) {
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 export function GuestStep({ room, checkIn, checkOut, onNext, onBack }) {
   const nights = differenceInCalendarDays(

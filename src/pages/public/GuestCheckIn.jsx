@@ -84,8 +84,9 @@ function StepLookup({ prefillConfirmation, onFound }) {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Confirmation Number</label>
+          <label htmlFor="checkin-confirmation" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Confirmation Number</label>
           <input
+            id="checkin-confirmation"
             value={confirmation}
             onChange={e => setConfirmation(e.target.value.toUpperCase())}
             placeholder="e.g. ABC123"
@@ -95,8 +96,9 @@ function StepLookup({ prefillConfirmation, onFound }) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Email Address</label>
+          <label htmlFor="checkin-email" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Email Address</label>
           <input
+            id="checkin-email"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}

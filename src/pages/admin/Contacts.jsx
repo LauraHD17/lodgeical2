@@ -105,9 +105,10 @@ function CopyButton({ text }) {
 function VendorCard({ contact, onEdit }) {
   const catColor = CATEGORY_COLORS[contact.category] ?? CATEGORY_COLORS.Other
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'bg-surface-raised border border-border rounded-[8px] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow',
+        'bg-surface-raised border border-border rounded-[8px] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow text-left w-full',
         !contact.is_active && 'opacity-60'
       )}
       onClick={() => onEdit(contact)}
@@ -174,7 +175,7 @@ function VendorCard({ contact, onEdit }) {
           {contact.notes}
         </p>
       )}
-    </div>
+    </button>
   )
 }
 

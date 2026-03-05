@@ -85,7 +85,6 @@ function MergeModal({ primaryGuest, onClose, onMerged }) {
               placeholder="Search by name or email..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              autoFocus
               className="h-11 w-full border-[1.5px] border-border rounded-[6px] pl-9 pr-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
             />
           </div>
@@ -195,7 +194,7 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-[9990] bg-black opacity-30" onClick={onClose} />
+      <div className="fixed inset-0 z-[9990] bg-black opacity-30" role="presentation" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-[440px] max-w-full z-[9991] bg-surface-raised shadow-xl flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">

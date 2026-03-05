@@ -6,10 +6,7 @@ import { WarningCircle, SpinnerGap } from '@phosphor-icons/react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/Button'
-
-function formatCents(cents) {
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 // ─── Stripe inner form ────────────────────────────────────────────────────────
 

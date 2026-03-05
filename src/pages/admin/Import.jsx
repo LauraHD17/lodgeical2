@@ -153,6 +153,9 @@ export default function Import() {
 
       {/* Upload area */}
       <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); !file && fileInputRef.current?.click() } }}
         onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}

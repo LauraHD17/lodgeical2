@@ -9,11 +9,7 @@ import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabaseClient'
 import { PageLoader } from '@/components/shared/PageLoader'
 import { ErrorState } from '@/components/shared/ErrorState'
-
-function formatCents(cents) {
-  if (cents == null) return '$0.00'
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
