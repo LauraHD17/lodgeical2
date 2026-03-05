@@ -275,7 +275,8 @@ function initForm(room) {
     return {
       name: '', type: 'standard', max_guests: '2',
       base_rate_cents: '0', description: '',
-      allows_pets: false, cleaning_fee_dollars: '', pet_fee_dollars: '',
+      allows_pets: false, linkable: false,
+      cleaning_fee_dollars: '', pet_fee_dollars: '',
     }
   }
   return {
@@ -285,6 +286,7 @@ function initForm(room) {
     base_rate_cents: String(room.base_rate_cents ?? 0),
     description: room.description ?? '',
     allows_pets: room.allows_pets ?? false,
+    linkable: room.linkable ?? false,
     cleaning_fee_dollars: room.cleaning_fee_cents != null ? (room.cleaning_fee_cents / 100).toFixed(2) : '',
     pet_fee_dollars: room.pet_fee_cents != null ? (room.pet_fee_cents / 100).toFixed(2) : '',
   }
@@ -327,6 +329,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
       base_rate_cents: Math.round(Number(form.base_rate_cents) * 100),
       description: form.description.trim(),
       allows_pets: form.allows_pets,
+      linkable: form.linkable,
       cleaning_fee_cents: form.cleaning_fee_dollars === '' ? null : Math.round(Number(form.cleaning_fee_dollars) * 100),
       pet_fee_cents: form.pet_fee_dollars === '' ? null : Math.round(Number(form.pet_fee_dollars) * 100),
     }
@@ -520,6 +523,24 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
             </div>
           </div>
 
+          {/* Linkable toggle */}
+          <div className="flex items-center justify-between p-3 border border-border rounded-[6px] bg-surface">
+            <div>
+              <p className="font-body font-semibold text-[14px] text-text-primary">Linkable</p>
+              <p className="font-body text-[12px] text-text-muted mt-0.5">Allow this room to be linked with other rooms as a combined listing</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch.Root
+                checked={form.linkable}
+                onCheckedChange={v => set('linkable', v)}
+                className={cn('w-10 h-6 rounded-full transition-colors', form.linkable ? 'bg-info' : 'bg-border')}
+              >
+                <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+              </Switch.Root>
+              <span className="font-body text-[13px] text-text-secondary">{form.linkable ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+
           {/* Fee overrides */}
           <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
             <p className="font-body font-semibold text-[13px] text-text-secondary uppercase tracking-[0.06em]">
@@ -599,6 +620,218 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
             </Button>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Room Links section ──────────────────────────────────────────────────────
+
+function useRoomLinks() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: ['room-links', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data } = await supabase.from('room_links').select('*').eq('property_id', propertyId).order('created_at')
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
+function RoomLinksSection({ rooms }) {
+  const { propertyId } = useProperty()
+  const { data: links = [], isLoading } = useRoomLinks()
+  const qc = useQueryClient()
+  const { addToast } = useToast()
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState({ name: '', linkedRoomIds: [], baseRateDollars: '', maxGuests: '2', description: '' })
+
+  const linkableRooms = rooms.filter(r => r.linkable)
+  if (linkableRooms.length < 2 && links.length === 0) return null
+
+  function resetForm() {
+    setForm({ name: '', linkedRoomIds: [], baseRateDollars: '', maxGuests: '2', description: '' })
+    setShowForm(false)
+    setEditingId(null)
+  }
+
+  function startEdit(link) {
+    setForm({
+      name: link.name,
+      linkedRoomIds: link.linked_room_ids ?? [],
+      baseRateDollars: ((link.base_rate_cents ?? 0) / 100).toFixed(2),
+      maxGuests: String(link.max_guests ?? 2),
+      description: link.description ?? '',
+    })
+    setEditingId(link.id)
+    setShowForm(true)
+  }
+
+  function toggleRoom(roomId) {
+    setForm(f => ({
+      ...f,
+      linkedRoomIds: f.linkedRoomIds.includes(roomId)
+        ? f.linkedRoomIds.filter(id => id !== roomId)
+        : [...f.linkedRoomIds, roomId],
+    }))
+  }
+
+  async function handleSave() {
+    if (!form.name.trim() || form.linkedRoomIds.length < 2) {
+      addToast({ message: 'Name and at least 2 rooms required', variant: 'error' })
+      return
+    }
+    const payload = {
+      property_id: propertyId,
+      name: form.name.trim(),
+      linked_room_ids: form.linkedRoomIds,
+      base_rate_cents: Math.round(Number(form.baseRateDollars || 0) * 100),
+      max_guests: Number(form.maxGuests) || 2,
+      description: form.description.trim() || null,
+    }
+    try {
+      if (editingId) {
+        await supabase.from('room_links').update(payload).eq('id', editingId)
+        addToast({ message: 'Room link updated', variant: 'success' })
+      } else {
+        await supabase.from('room_links').insert(payload)
+        addToast({ message: 'Room link created', variant: 'success' })
+      }
+      qc.invalidateQueries({ queryKey: ['room-links'] })
+      resetForm()
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to save', variant: 'error' })
+    }
+  }
+
+  async function handleDelete(linkId) {
+    if (!confirm('Delete this room link?')) return
+    await supabase.from('room_links').delete().eq('id', linkId)
+    qc.invalidateQueries({ queryKey: ['room-links'] })
+    addToast({ message: 'Room link deleted', variant: 'success' })
+  }
+
+  function roomName(id) {
+    return rooms.find(r => r.id === id)?.name ?? 'Unknown'
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-[22px] text-text-primary">Room Links</h2>
+          <p className="font-body text-[13px] text-text-muted mt-0.5">Combine linkable rooms into bookable listings</p>
+        </div>
+        {!showForm && (
+          <Button variant="secondary" size="md" onClick={() => setShowForm(true)} disabled={linkableRooms.length < 2}>
+            <Plus size={16} weight="bold" /> New Link
+          </Button>
+        )}
+      </div>
+
+      {isLoading && <div className="animate-pulse bg-border rounded-[8px] h-16" />}
+
+      {/* Existing links */}
+      {links.map(link => (
+        <div key={link.id} className="border border-border rounded-[8px] p-4 bg-surface-raised flex items-start justify-between gap-3">
+          <div>
+            <p className="font-body font-semibold text-[15px] text-text-primary">{link.name}</p>
+            <p className="font-body text-[13px] text-text-secondary mt-0.5">
+              {(link.linked_room_ids ?? []).map(roomName).join(' + ')}
+            </p>
+            <p className="font-mono text-[13px] text-text-secondary mt-0.5">
+              ${((link.base_rate_cents ?? 0) / 100).toFixed(2)}/night · Max {link.max_guests} guests
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => startEdit(link)} className="font-body text-[13px] text-info hover:underline">Edit</button>
+            <button onClick={() => handleDelete(link.id)} className="font-body text-[13px] text-danger hover:underline">Delete</button>
+          </div>
+        </div>
+      ))}
+
+      {/* Create/Edit form */}
+      {showForm && (
+        <div className="border border-info rounded-[8px] p-5 bg-surface flex flex-col gap-4">
+          <h3 className="font-body font-semibold text-[15px] text-text-primary">
+            {editingId ? 'Edit Room Link' : 'New Room Link'}
+          </h3>
+          <Input
+            label="Link Name"
+            placeholder="e.g. Suite 1A+1B"
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          />
+          <div>
+            <p className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-2">
+              Select Rooms (min 2)
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {linkableRooms.map(room => {
+                const isSelected = form.linkedRoomIds.includes(room.id)
+                return (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => toggleRoom(room.id)}
+                    className={cn(
+                      'text-left p-2.5 rounded-[6px] border transition-colors flex items-center gap-2',
+                      isSelected ? 'border-info bg-info-bg' : 'border-border bg-surface-raised'
+                    )}
+                  >
+                    {isSelected && <Check size={14} weight="bold" className="text-info" />}
+                    <span className="font-body text-[14px] text-text-primary">{room.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Combined Rate ($/night)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.baseRateDollars}
+              onChange={e => setForm(f => ({ ...f, baseRateDollars: e.target.value }))}
+            />
+            <Input
+              label="Max Guests"
+              type="number"
+              min="1"
+              value={form.maxGuests}
+              onChange={e => setForm(f => ({ ...f, maxGuests: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor="link-description" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+              Description (optional)
+            </label>
+            <textarea
+              id="link-description"
+              rows={2}
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised resize-none focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            />
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" size="md" onClick={resetForm}>Cancel</Button>
+            <Button variant="primary" size="md" onClick={handleSave}>
+              <Check size={15} weight="bold" />
+              {editingId ? 'Save Changes' : 'Create Link'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {linkableRooms.length < 2 && links.length === 0 && (
+        <p className="font-body text-[14px] text-text-muted text-center py-4">
+          Mark at least 2 rooms as "Linkable" to create combined listings.
+        </p>
       )}
     </div>
   )
@@ -697,6 +930,11 @@ export default function Rooms() {
             />
           )}
         </div>
+      )}
+
+      {/* Room Links */}
+      {!isLoading && localRooms.length >= 2 && (
+        <RoomLinksSection rooms={localRooms} />
       )}
     </div>
   )

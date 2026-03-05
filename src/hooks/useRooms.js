@@ -44,6 +44,26 @@ export function useUpdateRoom() {
   })
 }
 
+export function useRoomLinks() {
+  const { propertyId } = useProperty()
+
+  return useQuery({
+    queryKey: ['room-links', propertyId],
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data, error } = await supabase
+        .from('room_links')
+        .select('*')
+        .eq('property_id', propertyId)
+        .eq('is_active', true)
+        .order('created_at')
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
 export function useCreateRoom() {
   const queryClient = useQueryClient()
   const { propertyId } = useProperty()
