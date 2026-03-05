@@ -1,6 +1,6 @@
 // src/pages/admin/Settings.jsx
 // Settings page with Radix Tabs: Property, Check-in/out, Tax & Policy, Team,
-// iCal Feeds, Channel Sync.
+// iCal Feeds, Channel Sync, Booking Widget.
 
 import { useState, useEffect } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
@@ -17,7 +17,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
 
-import { EmailTemplatesTab, SectionHeader } from './settings/EmailTemplatesTab'
+import { SectionHeader } from './settings/EmailTemplatesTab'
 import { ICalFeedsTab } from './settings/ICalFeedsTab'
 import { ChannelSyncTab } from './settings/ChannelSyncTab'
 import { BookingWidgetTab } from './settings/BookingWidgetTab'
@@ -196,7 +196,7 @@ export default function Settings() {
 
       <Tabs.Root defaultValue="property">
         <Tabs.List className="flex gap-0 border-b border-border mb-6 overflow-x-auto">
-          {['property', 'checkin', 'tax', 'emails', 'team', 'ical', 'sync', 'widget'].map((tab) => (
+          {['property', 'checkin', 'tax', 'team', 'ical', 'sync', 'widget'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -209,7 +209,6 @@ export default function Settings() {
               {tab === 'property' && 'Property'}
               {tab === 'checkin' && 'Check-in/out'}
               {tab === 'tax' && 'Tax & Policy'}
-              {tab === 'emails' && 'Email Templates'}
               {tab === 'team' && 'Team'}
               {tab === 'ical' && 'iCal Feeds'}
               {tab === 'sync' && 'Channel Sync'}
@@ -447,11 +446,6 @@ export default function Settings() {
               Save Tax &amp; Policy Settings
             </Button>
           </div>
-        </Tabs.Content>
-
-        {/* Email Templates Tab */}
-        <Tabs.Content value="emails">
-          <EmailTemplatesTab />
         </Tabs.Content>
 
         {/* iCal Feeds Tab */}
