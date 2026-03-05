@@ -239,8 +239,6 @@ function HelpSection({ section }) {
 // ---------------------------------------------------------------------------
 
 export default function Help() {
-  const [allDone, setAllDone] = useState(false)
-
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       {/* Header */}

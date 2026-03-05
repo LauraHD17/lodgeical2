@@ -98,7 +98,7 @@ export function BlockModal({ open, onClose }) {
 
         {/* Block type selector */}
         <div className="flex flex-col gap-2">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Block Type</label>
+          <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Block Type</span>
           <div className="grid grid-cols-2 gap-3">
             {BLOCK_TYPES.map(({ value, label, icon, description }) => (
               <button
@@ -121,7 +121,7 @@ export function BlockModal({ open, onClose }) {
 
         {/* Room multi-select */}
         <div className="flex flex-col gap-2">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Rooms</label>
+          <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Rooms</span>
           <div className="flex flex-wrap gap-2">
             {rooms.map(room => (
               <button
@@ -155,7 +155,7 @@ export function BlockModal({ open, onClose }) {
             Control whether this block prevents guests from checking in or out on the boundary dates.
           </p>
           <div className="flex items-center justify-between">
-            <label className="font-body text-[14px] text-text-primary">Blocks guest check-in on start date</label>
+            <span className="font-body text-[14px] text-text-primary">Blocks guest check-in on start date</span>
             <Switch.Root
               checked={affectsCheckin}
               onCheckedChange={setAffectsCheckin}
@@ -165,7 +165,7 @@ export function BlockModal({ open, onClose }) {
             </Switch.Root>
           </div>
           <div className="flex items-center justify-between">
-            <label className="font-body text-[14px] text-text-primary">Blocks guest check-out on end date</label>
+            <span className="font-body text-[14px] text-text-primary">Blocks guest check-out on end date</span>
             <Switch.Root
               checked={affectsCheckout}
               onCheckedChange={setAffectsCheckout}

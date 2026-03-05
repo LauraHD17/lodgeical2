@@ -10,11 +10,7 @@ import { format, parseISO } from 'date-fns'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/shared/StatusChip'
-
-function formatCents(cents) {
-  if (cents == null) return '$0.00'
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -144,7 +140,16 @@ function PaymentSection({ reservation, paymentSummary, onPaymentSuccess }) {
           {payError && (
             <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-3">
               <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
-              <p className="font-body text-[13px] text-danger">{payError}</p>
+              <div>
+                <p className="font-body text-[13px] text-danger">{payError}</p>
+                <button
+                  type="button"
+                  onClick={() => { setPayError(''); setShowPayment(false); setClientSecret(null) }}
+                  className="font-body text-[13px] text-info underline mt-1"
+                >
+                  Try again
+                </button>
+              </div>
             </div>
           )}
           {loadingIntent && (
@@ -281,8 +286,8 @@ function CancellationSection({ reservation, onCancelled }) {
 
       {step === 'previewing' && preview && (
         <div>
-          <div className="bg-warning-bg border border-warning rounded-[6px] p-4 mb-4">
-            <p className="font-body text-[14px] text-warning font-semibold mb-1">
+          <div className="bg-danger-bg border border-danger rounded-[6px] p-4 mb-4">
+            <p className="font-body text-[14px] text-danger font-semibold mb-1">
               Are you sure you want to cancel?
             </p>
             {preview.refund_cents != null && (

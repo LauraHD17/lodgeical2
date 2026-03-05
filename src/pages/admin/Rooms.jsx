@@ -219,6 +219,9 @@ function PhotoManager({ room }) {
 
       {photos.length === 0 ? (
         <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click() } }}
           onClick={() => fileRef.current?.click()}
           className="border-2 border-dashed border-border rounded-[6px] p-6 text-center cursor-pointer hover:border-info transition-colors"
         >
@@ -300,6 +303,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
 
   // Keep form in sync if room prop changes (e.g., after save)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: sync form state with room prop
     if (room && !open) setForm(initForm(room))
   }, [room, open])
 
@@ -460,12 +464,13 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
 
           {/* Base rate */}
           <div className="flex flex-col">
-            <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+            <label htmlFor="room-base-rate" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
               Base Rate ($/night)
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
               <input
+                id="room-base-rate"
                 type="number"
                 min={0}
                 step={0.01}
@@ -485,10 +490,11 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
 
           {/* Description */}
           <div className="flex flex-col">
-            <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+            <label htmlFor="room-description" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
               Description
             </label>
             <textarea
+              id="room-description"
               rows={3}
               value={form.description}
               onChange={e => set('description', e.target.value)}
@@ -520,12 +526,13 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
               Fee Overrides <span className="normal-case font-normal text-text-muted">(leave blank to use property default)</span>
             </p>
             <div className="flex flex-col">
-              <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+              <label htmlFor="room-cleaning-fee" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
                 Cleaning Fee ($)
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
                 <input
+                  id="room-cleaning-fee"
                   type="number"
                   min={0}
                   step={0.01}
@@ -538,12 +545,13 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
             </div>
             {form.allows_pets && (
               <div className="flex flex-col">
-                <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                <label htmlFor="room-pet-fee" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
                   Pet Fee ($)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
                   <input
+                    id="room-pet-fee"
                     type="number"
                     min={0}
                     step={0.01}

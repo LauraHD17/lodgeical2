@@ -103,6 +103,7 @@ function ReservationDrawer({ reservation, onClose }) {
     <>
       {/* Backdrop */}
       <div
+        role="presentation"
         className="fixed inset-0 z-[9990] bg-black opacity-30"
         onClick={onClose}
       />
@@ -120,18 +121,18 @@ function ReservationDrawer({ reservation, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
           <div>
-            <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
               Confirmation #
-            </label>
+            </span>
             <p className="font-mono text-[16px] text-text-primary mt-1">
               {reservation.confirmation_number ?? '—'}
             </p>
           </div>
 
           <div>
-            <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
               Status
-            </label>
+            </span>
             <div className="mt-1">
               <StatusChip status={reservation.status} />
             </div>
@@ -139,9 +140,9 @@ function ReservationDrawer({ reservation, onClose }) {
 
           {g && (
             <div>
-              <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
                 Guest
-              </label>
+              </span>
               <p className="font-body text-[15px] text-text-primary mt-1">
                 {g.first_name} {g.last_name}
               </p>
@@ -154,17 +155,17 @@ function ReservationDrawer({ reservation, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
                 Check-in
-              </label>
+              </span>
               <p className="font-mono text-[14px] text-text-primary mt-1">
                 {reservation.check_in ? format(parseISO(reservation.check_in), 'MMM d, yyyy') : '—'}
               </p>
             </div>
             <div>
-              <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
                 Check-out
-              </label>
+              </span>
               <p className="font-mono text-[14px] text-text-primary mt-1">
                 {reservation.check_out ? format(parseISO(reservation.check_out), 'MMM d, yyyy') : '—'}
               </p>
@@ -172,23 +173,23 @@ function ReservationDrawer({ reservation, onClose }) {
           </div>
 
           <div>
-            <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
               Nights
-            </label>
+            </span>
             <p className="font-mono text-[14px] text-text-primary mt-1">{nights}</p>
           </div>
 
           <div>
-            <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
               Guests
-            </label>
+            </span>
             <p className="font-mono text-[14px] text-text-primary mt-1">{reservation.num_guests ?? '—'}</p>
           </div>
 
           <div>
-            <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
               Total Due
-            </label>
+            </span>
             <p className="font-mono text-[20px] text-text-primary mt-1">
               ${reservation.total_due_cents != null ? (reservation.total_due_cents / 100).toFixed(2) : '0.00'}
             </p>
@@ -196,9 +197,9 @@ function ReservationDrawer({ reservation, onClose }) {
 
           {reservation.notes && (
             <div>
-              <label className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
                 Notes
-              </label>
+              </span>
               <p className="font-body text-[14px] text-text-secondary mt-1">{reservation.notes}</p>
             </div>
           )}
@@ -299,6 +300,7 @@ export default function Reservations() {
           columns={COLUMNS}
           data={allReservations}
           loading={isLoading}
+          onRowClick={(row) => setSelectedReservation(row)}
           emptyState={
             <div className="flex flex-col items-center gap-3 py-8">
               <CalendarBlank size={40} className="text-text-muted" weight="light" />
