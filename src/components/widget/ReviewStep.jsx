@@ -6,10 +6,7 @@ import { WarningCircle, SpinnerGap } from '@phosphor-icons/react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/Button'
-
-function formatCents(cents) {
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 // ─── Stripe inner form ────────────────────────────────────────────────────────
 
@@ -59,7 +56,12 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
   const subtotal = room.base_rate_cents * nights
   const taxRate = Number(settings?.tax_rate ?? settings?.tax_rate_percent ?? 0)
   const taxAmount = Math.round(subtotal * (taxRate / 100))
-  const total = subtotal + taxAmount
+  const preFeeCents = subtotal + taxAmount
+  const passThroughStripe = settings?.pass_through_stripe_fee ?? false
+  const STRIPE_FIXED = 30
+  const STRIPE_PCT = 0.029
+  const stripeFee = passThroughStripe ? Math.ceil((preFeeCents + STRIPE_FIXED) / (1 - STRIPE_PCT)) - preFeeCents : 0
+  const total = preFeeCents + stripeFee
 
   const requirePayment = settings?.require_payment_at_booking
   const stripeKey = settings?.stripe_publishable_key || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -138,6 +140,12 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
             <div className="flex justify-between">
               <span className="text-text-secondary">Tax ({taxRate}%)</span>
               <span className="font-mono text-[14px] text-text-primary">{formatCents(taxAmount)}</span>
+            </div>
+          )}
+          {stripeFee > 0 && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Processing fee</span>
+              <span className="font-mono text-[14px] text-text-primary">{formatCents(stripeFee)}</span>
             </div>
           )}
           <div className="flex justify-between pt-2 border-t border-border mt-1">

@@ -3,10 +3,10 @@
 // NEVER calculates per-reservation payment balances locally — those always come from usePaymentSummary.
 // Page-level aggregate totals (collected, refunded, pending) summarize the raw payments list for display only.
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { CurrencyDollar, Plus } from '@phosphor-icons/react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -26,13 +26,15 @@ const METHOD_OPTIONS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ]
 
+const PAGE_SIZE = 200
+
 function usePayments() {
   const { propertyId } = useProperty()
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.payments.list({ propertyId }),
-    queryFn: async () => {
-      if (!propertyId) return []
+    queryFn: async ({ pageParam = 0 }) => {
+      if (!propertyId) return { data: [], nextOffset: null }
       const { data, error } = await supabase
         .from('payments')
         .select(`
@@ -43,10 +45,16 @@ function usePayments() {
         `)
         .eq('property_id', propertyId)
         .order('created_at', { ascending: false })
-        .limit(200)
+        .range(pageParam, pageParam + PAGE_SIZE - 1)
       if (error) throw error
-      return data ?? []
+      const rows = data ?? []
+      return {
+        data: rows,
+        nextOffset: rows.length === PAGE_SIZE ? pageParam + PAGE_SIZE : null,
+      }
     },
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    initialPageParam: 0,
     enabled: !!propertyId,
   })
 }
@@ -114,12 +122,13 @@ function RecordPaymentModal({ open, onClose }) {
     <Modal open={open} onClose={onClose} title="Record Payment">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+          <label htmlFor="payment-amount" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
             Amount ($)
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[15px] text-text-muted">$</span>
             <input
+              id="payment-amount"
               type="number"
               min={0}
               step={0.01}
@@ -148,10 +157,11 @@ function RecordPaymentModal({ open, onClose }) {
         />
 
         <div className="flex flex-col">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+          <label htmlFor="payment-notes" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
             Notes <span className="text-danger">*</span>
           </label>
           <textarea
+            id="payment-notes"
             rows={3}
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -228,7 +238,8 @@ const COLUMNS = [
 
 export default function Payments() {
   const [recordOpen, setRecordOpen] = useState(false)
-  const { data: payments = [], isLoading } = usePayments()
+  const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } = usePayments()
+  const payments = useMemo(() => data?.pages?.flatMap((p) => p.data) ?? [], [data])
 
   const totalCollectedCents = payments
     .filter((p) => p.status === 'paid')
@@ -294,6 +305,19 @@ export default function Payments() {
           }
         />
       </div>
+
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            variant="secondary"
+            size="md"
+            loading={isFetchingNextPage}
+            onClick={() => fetchNextPage()}
+          >
+            Load more payments
+          </Button>
+        </div>
+      )}
 
       <RecordPaymentModal open={recordOpen} onClose={() => setRecordOpen(false)} />
     </div>

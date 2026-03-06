@@ -5,7 +5,7 @@
 import { useState, useMemo } from 'react'
 import {
   format, subMonths, startOfMonth, endOfMonth,
-  parseISO, eachMonthOfInterval, getYear, differenceInDays,
+  parseISO, eachMonthOfInterval, getYear, getDay, differenceInDays,
 } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -40,12 +40,13 @@ function useFinancialData() {
     queryKey: queryKeys.financials.monthly(propertyId, getYear(now)),
     queryFn: async () => {
       if (!propertyId) return null
-      const [paymentsRes, reservationsRes, roomsRes, lastYearPayRes, lastYearResRes] = await Promise.all([
+      const [paymentsRes, reservationsRes, roomsRes, lastYearPayRes, lastYearResRes, cancelledRes] = await Promise.all([
         supabase.from('payments').select('id, amount_cents, status, created_at, type').eq('property_id', propertyId).gte('created_at', chartFrom).lte('created_at', yearEnd).in('status', ['succeeded', 'paid']).eq('type', 'charge'),
-        supabase.from('reservations').select('id, room_ids, check_in, check_out, status').eq('property_id', propertyId).gte('check_in', yearStart).lte('check_in', yearEnd).neq('status', 'cancelled'),
+        supabase.from('reservations').select('id, room_ids, check_in, check_out, status, created_at').eq('property_id', propertyId).gte('check_in', yearStart).lte('check_in', yearEnd).neq('status', 'cancelled'),
         supabase.from('rooms').select('id, name').eq('property_id', propertyId).eq('is_active', true),
         supabase.from('payments').select('id, amount_cents, status, created_at, type').eq('property_id', propertyId).gte('created_at', lastYStart).lte('created_at', lastYEnd).in('status', ['succeeded', 'paid']).eq('type', 'charge'),
         supabase.from('reservations').select('id, room_ids, check_in, check_out, status').eq('property_id', propertyId).gte('check_in', lastYStart).lte('check_in', lastYEnd).neq('status', 'cancelled'),
+        supabase.from('reservations').select('id, status').eq('property_id', propertyId).gte('check_in', yearStart).lte('check_in', yearEnd),
       ])
       return {
         payments:         paymentsRes.data     ?? [],
@@ -53,6 +54,7 @@ function useFinancialData() {
         rooms:            roomsRes.data         ?? [],
         lastYearPayments: lastYearPayRes.data   ?? [],
         lastYearRes:      lastYearResRes.data   ?? [],
+        allResWithCancelled: cancelledRes.data   ?? [],
       }
     },
     enabled: !!propertyId,
@@ -158,28 +160,71 @@ function MetricSkeleton() {
 // ---------------------------------------------------------------------------
 
 function InsightsPanel({ metrics }) {
-  const { adr, occupancyPct, thisYearEarnings, lastYearEarnings, bestMonth, roomPerf } = metrics
+  const {
+    adr, occupancyPct, thisYearEarnings, lastYearEarnings, bestMonth, roomPerf,
+    avgLeadTime, avgStay, weekdayPct, weekendPct, cancellationRate, totalCheckins,
+  } = metrics
 
   const insights = (() => {
-    const out = []
+    const actionable = []
+    const informational = []
+
+    // YoY revenue
     if (lastYearEarnings > 0) {
       const diff = thisYearEarnings - lastYearEarnings
       const pct  = Math.abs(Math.round((diff / lastYearEarnings) * 100))
-      if (diff > 0)       out.push({ icon: TrendUp,   color: 'text-success', text: `Revenue is up ${pct}% vs. the same time last year.` })
-      else if (diff < 0)  out.push({ icon: TrendDown,  color: 'text-danger',  text: `Revenue is down ${pct}% vs. this time last year. Consider reviewing pricing or minimum stay settings.` })
+      if (diff > 0)      actionable.push({ icon: TrendUp,  color: 'text-success', text: `Revenue is up ${pct}% vs. the same time last year. Keep it up!` })
+      else if (diff < 0) actionable.push({ icon: TrendDown, color: 'text-danger',  text: `Revenue is down ${pct}% vs. this time last year. Consider reviewing pricing or minimum stay settings.` })
     }
-    if (occupancyPct >= 80)              out.push({ icon: TrendUp,   color: 'text-success', text: `Occupancy is ${occupancyPct}% — demand is strong. You may be able to raise nightly rates slightly.` })
-    else if (occupancyPct > 0 && occupancyPct < 35) out.push({ icon: TrendDown, color: 'text-warning', text: `Occupancy is ${occupancyPct}% so far this year. Consider dropping a 2-night minimum or running a weeknight promo.` })
-    if (adr > 0 && adr < 10000)          out.push({ icon: Lightbulb, color: 'text-info',    text: `Average nightly rate is ${fmt$(adr)}. A small increase during high-demand periods can add up quickly.` })
+
+    // Occupancy
+    if (occupancyPct >= 80) actionable.push({ icon: TrendUp, color: 'text-success', text: `Occupancy is ${occupancyPct}% — demand is strong. You may be able to raise nightly rates without losing bookings.` })
+    else if (occupancyPct > 0 && occupancyPct < 35) actionable.push({ icon: TrendDown, color: 'text-warning', text: `Occupancy is ${occupancyPct}% so far this year. Consider dropping a 2-night minimum or running a weeknight promo.` })
+
+    // ADR
+    if (adr > 0 && adr < 10000) actionable.push({ icon: Lightbulb, color: 'text-info', text: `Average nightly rate is ${fmt$(adr)}. A small increase during high-demand periods can add up quickly.` })
+
+    // Booking lead time
+    if (avgLeadTime > 0) {
+      if (avgLeadTime <= 7) actionable.push({ icon: Lightbulb, color: 'text-warning', text: `Most bookings come ${avgLeadTime} days in advance. Guests are booking last-minute — consider a small last-minute discount to fill gaps or early-bird pricing to lock in revenue sooner.` })
+      else if (avgLeadTime >= 30) informational.push({ icon: TrendUp, color: 'text-success', text: `Average booking lead time is ${avgLeadTime} days. Guests plan ahead — you can confidently set rates further in advance.` })
+      else informational.push({ icon: Lightbulb, color: 'text-info', text: `Average booking lead time is ${avgLeadTime} days. Consider offering an early-bird rate for bookings 30+ days out.` })
+    }
+
+    // Length of stay
+    if (avgStay > 0) {
+      if (avgStay < 2) actionable.push({ icon: Lightbulb, color: 'text-info', text: `Average stay is ${avgStay} nights. A 2-night minimum on weekends could increase revenue and reduce turnover costs.` })
+      else if (avgStay >= 4) informational.push({ icon: TrendUp, color: 'text-success', text: `Average stay is ${avgStay} nights — guests are staying longer. Consider a weekly rate discount to encourage even more extended bookings.` })
+    }
+
+    // Day-of-week patterns
+    if (totalCheckins >= 5 && weekdayPct > 0) {
+      if (weekdayPct < 25) actionable.push({ icon: Lightbulb, color: 'text-info', text: `Only ${weekdayPct}% of check-ins are on weekdays vs. ${weekendPct}% on weekends. Try a weeknight rate reduction to fill midweek gaps.` })
+      else if (weekendPct < 25) informational.push({ icon: Lightbulb, color: 'text-info', text: `${weekdayPct}% of check-ins are on weekdays. Your weekend rates may be too high — consider a small weekend promotion.` })
+    }
+
+    // Cancellation rate
+    if (cancellationRate > 15) actionable.push({ icon: TrendDown, color: 'text-warning', text: `${cancellationRate}% of bookings have been cancelled. Consider requiring a deposit at booking or tightening your cancellation policy.` })
+    else if (cancellationRate > 0 && cancellationRate <= 5) informational.push({ icon: TrendUp, color: 'text-success', text: `Only ${cancellationRate}% cancellation rate — your guests commit and follow through.` })
+
+    // Room-level insights
     if (roomPerf) {
-      const low  = roomPerf.filter(r => r.occupancy < 30 && r.nights > 0)
       const high = roomPerf.filter(r => r.occupancy >= 80)
-      if (high.length > 0) out.push({ icon: TrendUp,   color: 'text-success', text: `${high.map(r => r.name).join(', ')} ${high.length === 1 ? 'has' : 'have'} high occupancy and may support a rate increase.` })
-      if (low.length > 0)  out.push({ icon: Lightbulb, color: 'text-info',    text: `${low.map(r => r.name).join(', ')} ${low.length === 1 ? 'has' : 'have'} low bookings this year. Adding photos or adjusting minimum stay might help.` })
+      const low  = roomPerf.filter(r => r.occupancy < 30 && r.nights > 0)
+      if (high.length > 0) actionable.push({ icon: TrendUp, color: 'text-success', text: `${high.map(r => r.name).join(', ')} ${high.length === 1 ? 'has' : 'have'} high occupancy and may support a rate increase.` })
+      if (low.length > 0) actionable.push({ icon: Lightbulb, color: 'text-info', text: `${low.map(r => r.name).join(', ')} ${low.length === 1 ? 'has' : 'have'} low bookings this year. Adding photos or adjusting minimum stay might help.` })
     }
-    if (out.length === 0 && thisYearEarnings === 0) out.push({ icon: Lightbulb, color: 'text-text-muted', text: 'Not enough booking data yet. Check back once some reservations have been recorded.' })
-    if (bestMonth.total > 0) out.push({ icon: Lightbulb, color: 'text-info', text: `${bestMonth.name} was your strongest month this year (${fmt$(bestMonth.total)}). Consider pricing that month higher next year.` })
-    return out.slice(0, 4)
+
+    // Best month
+    if (bestMonth.total > 0) informational.push({ icon: Lightbulb, color: 'text-info', text: `${bestMonth.name} was your strongest month this year (${fmt$(bestMonth.total)}). Consider pricing that month higher next year.` })
+
+    // Not enough data
+    if (actionable.length === 0 && informational.length === 0 && thisYearEarnings === 0) {
+      return [{ icon: Lightbulb, color: 'text-text-muted', text: 'Not enough booking data yet. Check back once some reservations have been recorded.' }]
+    }
+
+    // Prioritize actionable, then informational, cap at 6
+    return [...actionable, ...informational].slice(0, 6)
   })()
 
   if (!insights.length) return null
@@ -357,7 +402,27 @@ export default function Reports() {
       return { id: room.id, name: room.name, nights: roomNights, occupancy: Math.min(100, occ), adr: roomNights > 0 ? Math.round(roomRevenue / roomNights) : 0, revenue: roomRevenue }
     }).sort((a, b) => b.revenue - a.revenue)
 
-    return { thisMonthEarnings, lastMonthEarnings, thisYearEarnings, lastYearEarnings, totalNightsYTD, occupancyPct, adr, revpar, bestMonth, avgPerMonth, roomPerf, daysElapsed, thisYearLabel: String(now.getFullYear()), thisMonthLabel: format(now, 'MMMM') }
+    // Booking lead time: days between created_at and check_in
+    const leadTimes = yearRes.filter(r => r.created_at && r.check_in).map(r => differenceInDays(parseISO(r.check_in), parseISO(r.created_at)))
+    const avgLeadTime = leadTimes.length > 0 ? Math.round(leadTimes.reduce((s, d) => s + d, 0) / leadTimes.length) : 0
+
+    // Average length of stay
+    const stayLengths = yearRes.filter(r => r.check_in && r.check_out).map(r => differenceInDays(parseISO(r.check_out), parseISO(r.check_in)))
+    const avgStay = stayLengths.length > 0 ? Math.round((stayLengths.reduce((s, d) => s + d, 0) / stayLengths.length) * 10) / 10 : 0
+
+    // Day-of-week check-in distribution
+    const weekdayCheckins = yearRes.filter(r => r.check_in).reduce((acc, r) => { const d = getDay(parseISO(r.check_in)); return d >= 1 && d <= 4 ? acc + 1 : acc }, 0)
+    const weekendCheckins = yearRes.filter(r => r.check_in).length - weekdayCheckins
+    const totalCheckins = weekdayCheckins + weekendCheckins
+    const weekdayPct = totalCheckins > 0 ? Math.round((weekdayCheckins / totalCheckins) * 100) : 0
+    const weekendPct = totalCheckins > 0 ? 100 - weekdayPct : 0
+
+    // Cancellation rate
+    const allRes = finData.allResWithCancelled ?? []
+    const cancelledCount = allRes.filter(r => r.status === 'cancelled').length
+    const cancellationRate = allRes.length > 0 ? Math.round((cancelledCount / allRes.length) * 100) : 0
+
+    return { thisMonthEarnings, lastMonthEarnings, thisYearEarnings, lastYearEarnings, totalNightsYTD, occupancyPct, adr, revpar, bestMonth, avgPerMonth, roomPerf, daysElapsed, thisYearLabel: String(now.getFullYear()), thisMonthLabel: format(now, 'MMMM'), avgLeadTime, avgStay, weekdayPct, weekendPct, cancellationRate, totalCheckins }
   }, [finData, now])
 
   // 12-month earnings chart

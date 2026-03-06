@@ -4,10 +4,7 @@ import { useMemo } from 'react'
 import { differenceInCalendarDays, format } from 'date-fns'
 import { Users, Tag } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/Button'
-
-function formatCents(cents) {
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 export function RoomStep({ rooms, checkIn, checkOut, onNext, onBack }) {
   const nights = useMemo(() => {

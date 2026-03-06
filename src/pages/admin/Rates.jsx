@@ -106,7 +106,6 @@ function InlineEditCell({ displayValue, inputValue, onInputChange, onSave, onCan
     <div className="flex items-center gap-2">
       {prefix && <span className="font-mono text-[15px] text-text-muted">{prefix}</span>}
       <input
-        autoFocus
         value={inputValue}
         onChange={e => onInputChange(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -136,7 +135,7 @@ function InlineEditCell({ displayValue, inputValue, onInputChange, onSave, onCan
 // Base rate row (inline editable)
 // ---------------------------------------------------------------------------
 
-function RateRow({ room, overrides, settings }) {
+function RateRow({ room, overrides: _overrides, settings }) {
   const updateRoom = useUpdateRoom()
   const { addToast } = useToast()
   const [rateValue, setRateValue]   = useState(((room.base_rate_cents ?? 0) / 100).toFixed(2))
@@ -268,10 +267,10 @@ function OverrideModal({ open, onClose, rooms, existing, propertyId }) {
           <Input label="End Date (inclusive)" type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Rate / Night</label>
+          <label htmlFor="override-rate" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Rate / Night</label>
           <div className="flex items-center gap-2">
             <span className="font-mono text-[15px] text-text-muted">$</span>
-            <input type="number" min={0} step={0.01} value={form.rate} onChange={e => set('rate', e.target.value)} placeholder="0.00"
+            <input id="override-rate" type="number" min={0} step={0.01} value={form.rate} onChange={e => set('rate', e.target.value)} placeholder="0.00"
               className="flex-1 h-11 border-[1.5px] border-border rounded-[6px] px-3 font-mono text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2" />
           </div>
         </div>
@@ -352,10 +351,11 @@ function RoomCalculator({ room, settings }) {
       {/* Misc fee row */}
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+          <label htmlFor="calc-misc-label" className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
             Misc fee label <span className="normal-case font-normal text-text-muted">(optional)</span>
           </label>
           <input
+            id="calc-misc-label"
             type="text"
             value={miscLabel}
             onChange={e => setMiscLabel(e.target.value)}
@@ -364,10 +364,11 @@ function RoomCalculator({ room, settings }) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Amount ($)</label>
+          <label htmlFor="calc-misc-amount" className="font-body text-[12px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Amount ($)</label>
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[14px] text-text-muted">$</span>
             <input
+              id="calc-misc-amount"
               type="number"
               min={0}
               step={0.01}

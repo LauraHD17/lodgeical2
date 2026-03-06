@@ -14,17 +14,12 @@ import { CaretLeft, CaretRight, X, User, CalendarBlank, Door, Plus } from '@phos
 import { useReservations } from '@/hooks/useReservations'
 import { useRooms } from '@/hooks/useRooms'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
-import { cn } from '@/lib/utils'
+import { cn, fmtMoney } from '@/lib/utils'
 
 // Room colour palette (12 slots)
 const ROOM_COLORS_BG   = ['bg-blue-200','bg-green-200','bg-purple-200','bg-orange-200','bg-pink-200','bg-teal-200','bg-yellow-200','bg-red-200','bg-indigo-200','bg-cyan-200','bg-lime-200','bg-rose-200']
 const ROOM_COLORS_TEXT = ['text-blue-900','text-green-900','text-purple-900','text-orange-900','text-pink-900','text-teal-900','text-yellow-900','text-red-900','text-indigo-900','text-cyan-900','text-lime-900','text-rose-900']
 const ROOM_COLORS_PILL = ['bg-blue-100 text-blue-800 border-blue-200','bg-green-100 text-green-800 border-green-200','bg-purple-100 text-purple-800 border-purple-200','bg-orange-100 text-orange-800 border-orange-200','bg-pink-100 text-pink-800 border-pink-200','bg-teal-100 text-teal-800 border-teal-200','bg-yellow-100 text-yellow-800 border-yellow-200','bg-red-100 text-red-800 border-red-200','bg-indigo-100 text-indigo-800 border-indigo-200','bg-cyan-100 text-cyan-800 border-cyan-200','bg-lime-100 text-lime-800 border-lime-200','bg-rose-100 text-rose-800 border-rose-200']
-
-function fmtMoney(cents) {
-  if (!cents) return '$0.00'
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
 
 // ── Reservation detail popup ──────────────────────────────────────────────────
 
@@ -38,9 +33,10 @@ function ReservationPopup({ reservation, rooms, onClose }) {
     : 0
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" role="presentation" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
-      <div className="relative z-[9999] bg-surface-raised border border-border rounded-[12px] p-6 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+      <div className="relative z-[9999] bg-surface-raised border border-border rounded-[12px] p-6 w-full max-w-sm shadow-xl" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="font-heading text-[18px] text-text-primary">{guest.first_name ?? ''} {guest.last_name ?? 'Guest'}</h3>
@@ -229,6 +225,9 @@ export default function Calendar() {
                       return (
                         <div
                           key={dIdx}
+                          role="button"
+                          tabIndex={day && inMonth ? 0 : -1}
+                          onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && day && inMonth) { e.preventDefault(); setNewResDate(day) } }}
                           onClick={() => day && inMonth && setNewResDate(day)}
                           className={cn(
                             'pt-2 px-2 min-h-[90px] group cursor-pointer select-none',
