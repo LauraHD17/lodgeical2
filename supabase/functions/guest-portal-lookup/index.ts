@@ -47,6 +47,7 @@ serve(async (req) => {
       id, confirmation_number, check_in, check_out, num_guests,
       status, origin, total_due_cents, notes, created_at,
       room_ids, property_id, modification_count,
+      booker_email, cc_emails,
       guests!inner(id, first_name, last_name, email, phone),
       properties(name, timezone, location)
     `)
@@ -61,9 +62,12 @@ serve(async (req) => {
 
   if (resError || !reservation) return GENERIC_NOT_FOUND
 
-  // Type-safe access to guest email
+  // Type-safe access to guest email — also allow booker email to access portal
   const guest = reservation.guests as { email: string; first_name: string; last_name: string; phone: string | null }
-  if (!guest || guest.email.toLowerCase() !== parsed.data.email.toLowerCase()) {
+  const inputEmail = parsed.data.email.toLowerCase()
+  const guestEmailMatch = guest?.email.toLowerCase() === inputEmail
+  const bookerEmailMatch = reservation.booker_email?.toLowerCase() === inputEmail
+  if (!guest || (!guestEmailMatch && !bookerEmailMatch)) {
     return GENERIC_NOT_FOUND
   }
 

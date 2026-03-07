@@ -130,12 +130,24 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
               {format(new Date(dates.checkOut + 'T12:00:00'), 'MMM d, yyyy')}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-text-secondary">
-              {formatCents(room.base_rate_cents)} × {nights} night{nights !== 1 ? 's' : ''}
-            </span>
-            <span className="font-mono text-[14px] text-text-primary">{formatCents(subtotal)}</span>
-          </div>
+          {/* Per-room breakdown for multi-room bookings */}
+          {room.type === 'multi_room' && room.rooms ? (
+            room.rooms.map(r => (
+              <div key={r.id} className="flex justify-between">
+                <span className="text-text-secondary">
+                  {r.name}: {formatCents(r.base_rate_cents)} × {nights} night{nights !== 1 ? 's' : ''}
+                </span>
+                <span className="font-mono text-[14px] text-text-primary">{formatCents(r.base_rate_cents * nights)}</span>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">
+                {formatCents(room.base_rate_cents)} × {nights} night{nights !== 1 ? 's' : ''}
+              </span>
+              <span className="font-mono text-[14px] text-text-primary">{formatCents(subtotal)}</span>
+            </div>
+          )}
           {taxRate > 0 && (
             <div className="flex justify-between">
               <span className="text-text-secondary">Tax ({taxRate}%)</span>
@@ -170,6 +182,18 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
         <p className="font-body text-[14px] text-text-secondary mt-0.5">
           {guestInfo.numGuests} guest{guestInfo.numGuests !== 1 ? 's' : ''}
         </p>
+        {guestInfo.bookerEmail && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <p className="font-body text-[13px] text-text-muted">Booked by</p>
+            <p className="font-body text-[14px] text-text-secondary">{guestInfo.bookerEmail}</p>
+          </div>
+        )}
+        {guestInfo.ccEmails?.length > 0 && (
+          <div className="mt-2">
+            <p className="font-body text-[13px] text-text-muted">Check-in details CC&apos;d to</p>
+            <p className="font-body text-[14px] text-text-secondary">{guestInfo.ccEmails.join(', ')}</p>
+          </div>
+        )}
       </div>
 
       {/* Error from booking */}

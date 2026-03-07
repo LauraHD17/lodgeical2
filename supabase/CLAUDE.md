@@ -25,13 +25,14 @@ Emails sent locally are captured by Inbucket — they are **not** actually deliv
 
 ## Database Migrations
 
-21 numbered SQL migrations in `supabase/migrations/`:
+22 numbered SQL migrations in `supabase/migrations/`:
 
 ```
 001_properties.sql          → Core property tables
 008_enable_rls.sql          → Enable RLS on all tables
 009_rls_policies.sql        → Comprehensive RLS policies
-021_room_links_and_modifications.sql → Latest migration
+021_room_links_and_modifications.sql → Room links, modification tracking, misc fees
+022_booker_and_cc_emails.sql → Booker email + CC emails on reservations
 ```
 
 ### RLS Policy Pattern
@@ -184,9 +185,11 @@ All errors return `{ error: "message" }` JSON. Errors are logged with function n
 - Collision handling: DB UNIQUE constraint + retry loop (up to 10 attempts) — no check-then-insert
 
 ### Reservation Rules
-- New reservations: `pending` if `require_payment_at_booking = true`, else `confirmed`
+- New reservations: `confirmed` for widget bookings (guest always confirmed). `pending` only for admin-created ("direct") bookings when `require_payment_at_booking = true`
 - Modifications: max 1 per reservation, new total must be >= original total (prevents price-down attacks)
 - Conflict detection: overlapping date ranges checked per room (`check_in < new_check_out AND check_out > new_check_in`)
+- `booker_email` (optional): who made/paid for the booking — null means guest is booker
+- `cc_emails` (text array, max 5): additional recipients for check-in/arrival info
 
 ### Payment Lifecycle
 1. Guest creates reservation → `total_due_cents` set

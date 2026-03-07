@@ -12,7 +12,7 @@ import { ReviewStep } from './ReviewStep'
 
 const STEPS = ['Dates', 'Room', 'Your Info', 'Review & Pay']
 
-export function BookingWidget({ property, rooms, settings }) {
+export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [dates, setDates] = useState({ checkIn: null, checkOut: null })
@@ -31,7 +31,7 @@ export function BookingWidget({ property, rooms, settings }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            room_ids: [selectedRoom.id],
+            room_ids: selectedRoom.room_ids,
             check_in: dates.checkIn,
             check_out: dates.checkOut,
             num_guests: guestInfo.numGuests,
@@ -39,6 +39,8 @@ export function BookingWidget({ property, rooms, settings }) {
             guest_first_name: guestInfo.firstName,
             guest_last_name: guestInfo.lastName,
             guest_phone: guestInfo.phone || null,
+            booker_email: guestInfo.bookerEmail || null,
+            cc_emails: guestInfo.ccEmails || [],
             origin: 'widget',
           }),
         }
@@ -105,6 +107,7 @@ export function BookingWidget({ property, rooms, settings }) {
         {step === 1 && (
           <RoomStep
             rooms={rooms}
+            roomLinks={roomLinks}
             checkIn={dates.checkIn}
             checkOut={dates.checkOut}
             onNext={(room) => { setSelectedRoom(room); setStep(2) }}

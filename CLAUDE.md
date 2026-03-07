@@ -70,7 +70,7 @@ supabase/               # Backend — see supabase/CLAUDE.md
 ├── functions/          # 15 Edge Functions (TypeScript/Deno)
 │   ├── _shared/        # Shared utilities (auth, email, pricing, stripe, rate-limiting)
 │   └── [name]/         # Individual functions
-├── migrations/         # 21 SQL database migrations
+├── migrations/         # 22 SQL database migrations
 ├── seed.sql            # Seed data (runs on `supabase db reset`)
 └── config.toml         # Local Supabase configuration
 
@@ -131,6 +131,18 @@ QueryClientProvider → BrowserRouter → AuthProvider → PropertyProvider
 - Pages are lazy-loaded via `React.lazy()` in App.jsx.
 - All pages in `src/pages/admin/` or `src/pages/public/`.
 - Path alias: `@/` maps to `src/` (configured in Vite).
+
+### Widget Selection Model
+- **Room selection** in the public booking widget is normalized: every selection (single room, room link, or multi-room) produces a `{ type, room_ids, base_rate_cents, max_guests, name }` object.
+- `type` is one of `'room'`, `'room_link'`, or `'multi_room'`.
+- `room_ids` is always an array — the rest of the widget (GuestStep, ReviewStep, handleBook) never branches on selection type.
+- Room links (`room_links` table) are property-configured combinations of linkable rooms with their own rate and capacity.
+
+### Book-on-Behalf (Third-Party Bookings)
+- Reservations have optional `booker_email` (who booked/paid) and `cc_emails` (text array, max 5).
+- When `booker_email` is null, the guest is the booker (default).
+- Email distribution: guest gets all emails; booker gets confirmations/receipts; CC'd addresses get check-in/arrival info only.
+- Guest portal lookup matches either guest email or booker email.
 
 ### Route Redirects
 - `/financials` → `/reports` (legacy redirect)

@@ -88,6 +88,7 @@ export default function Widget() {
       <BookingWidget
         property={widgetData.property}
         rooms={widgetData.rooms}
+        roomLinks={widgetData.roomLinks}
         settings={widgetData.settings}
       />
     </div>
