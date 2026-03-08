@@ -253,5 +253,6 @@ Located in `supabase/functions/`, written in TypeScript for the Deno runtime:
 - `guest-portal-lookup` — Public guest access
 - `merge-guests` — Guest deduplication
 - `public-bootstrap` — Widget/public page initialization
+- `preview-pricing` — Public server-side pricing preview for booking widget
 - `confirm-modification` — Reservation modification confirmation
 - `update-reservation` — Reservation updates

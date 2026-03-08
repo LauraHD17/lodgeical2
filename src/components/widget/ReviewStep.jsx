@@ -4,64 +4,55 @@ import { useState, useEffect, useMemo } from 'react'
 import { differenceInCalendarDays, format } from 'date-fns'
 import { WarningCircle, SpinnerGap } from '@phosphor-icons/react'
 import { loadStripe } from '@stripe/stripe-js'
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { Elements } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/Button'
 import { fmtMoney as formatCents } from '@/lib/utils'
-
-// ─── Stripe inner form ────────────────────────────────────────────────────────
-
-function StripeForm({ totalCents, onSuccess, onError }) {
-  const stripe = useStripe()
-  const elements = useElements()
-  const [paying, setPaying] = useState(false)
-
-  async function handlePay() {
-    if (!stripe || !elements) return
-    setPaying(true)
-    const { error } = await stripe.confirmPayment({
-      elements,
-      redirect: 'if_required',
-    })
-    if (error) {
-      onError(error.message)
-      setPaying(false)
-    } else {
-      onSuccess()
-    }
-  }
-
-  return (
-    <div className="mt-4">
-      <PaymentElement />
-      <Button
-        variant="primary"
-        size="lg"
-        loading={paying}
-        onClick={handlePay}
-        className="w-full mt-4"
-      >
-        Pay {formatCents(totalCents)}
-      </Button>
-    </div>
-  )
-}
+import { StripeForm } from './StripeForm'
 
 // ─── ReviewStep ────────────────────────────────────────────────────────────────
 
-export function ReviewStep({ property: _property, room, dates, guestInfo, settings, onBook, onBack, isLoading, error }) {
+export function ReviewStep({ property, room, dates, guestInfo, settings, onBook, onBack, isLoading, error }) {
   const nights = differenceInCalendarDays(
     new Date(dates.checkOut + 'T12:00:00'),
     new Date(dates.checkIn + 'T12:00:00')
   )
-  const subtotal = room.base_rate_cents * nights
-  const taxRate = Number(settings?.tax_rate ?? settings?.tax_rate_percent ?? 0)
-  const taxAmount = Math.round(subtotal * (taxRate / 100))
-  const preFeeCents = subtotal + taxAmount
-  const passThroughStripe = settings?.pass_through_stripe_fee ?? false
-  const STRIPE_FIXED = 30
-  const STRIPE_PCT = 0.029
-  const stripeFee = passThroughStripe ? Math.ceil((preFeeCents + STRIPE_FIXED) / (1 - STRIPE_PCT)) - preFeeCents : 0
-  const total = preFeeCents + stripeFee
+
+  // Server-side pricing via preview-pricing edge function
+  const [pricing, setPricing] = useState(null)
+  const [pricingLoading, setPricingLoading] = useState(true)
+  const [pricingError, setPricingError] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function fetchPricing() {
+      setPricingLoading(true)
+      setPricingError(null)
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/preview-pricing`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: property.id,
+              room_ids: room.room_ids,
+              check_in: dates.checkIn,
+              check_out: dates.checkOut,
+            }),
+          }
+        )
+        if (!res.ok) throw new Error('Pricing unavailable')
+        const data = await res.json()
+        if (!cancelled) setPricing(data)
+      } catch {
+        if (!cancelled) setPricingError('Could not load pricing. Please go back and try again.')
+      } finally {
+        if (!cancelled) setPricingLoading(false)
+      }
+    }
+    fetchPricing()
+    return () => { cancelled = true }
+  }, [property.id, room.room_ids, dates.checkIn, dates.checkOut])
 
   const requirePayment = settings?.require_payment_at_booking
   const stripeKey = settings?.stripe_publishable_key || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -75,7 +66,7 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
   const [stripeError, setStripeError] = useState('')
 
   useEffect(() => {
-    if (!requirePayment || !stripeKey) return
+    if (!requirePayment || !stripeKey || !pricing) return
 
     async function createIntent() {
       try {
@@ -83,10 +74,8 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ amount_cents: total }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount_cents: pricing.totalCents }),
           }
         )
         const data = await res.json()
@@ -101,9 +90,28 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
       }
     }
     createIntent()
-  }, [requirePayment, stripeKey, total])
+  }, [requirePayment, stripeKey, pricing])
 
   const showStripe = requirePayment && stripeKey
+
+  // Loading state while pricing is fetched
+  if (pricingLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <SpinnerGap size={24} className="animate-spin text-info mb-3" />
+        <p className="font-body text-[14px] text-text-muted">Calculating pricing…</p>
+      </div>
+    )
+  }
+
+  if (pricingError) {
+    return (
+      <div className="text-center py-8">
+        <p className="font-body text-[14px] text-danger mb-4">{pricingError}</p>
+        <Button variant="secondary" size="md" onClick={onBack}>← Back</Button>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -130,39 +138,39 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
               {format(new Date(dates.checkOut + 'T12:00:00'), 'MMM d, yyyy')}
             </span>
           </div>
-          {/* Per-room breakdown for multi-room bookings */}
-          {room.type === 'multi_room' && room.rooms ? (
-            room.rooms.map(r => (
-              <div key={r.id} className="flex justify-between">
+          {/* Per-room breakdown from server pricing */}
+          {pricing.roomRates.length > 1 ? (
+            pricing.roomRates.map(rr => (
+              <div key={rr.roomId} className="flex justify-between">
                 <span className="text-text-secondary">
-                  {r.name}: {formatCents(r.base_rate_cents)} × {nights} night{nights !== 1 ? 's' : ''}
+                  {formatCents(rr.baseCents)} × {rr.nights} night{rr.nights !== 1 ? 's' : ''}
                 </span>
-                <span className="font-mono text-[14px] text-text-primary">{formatCents(r.base_rate_cents * nights)}</span>
+                <span className="font-mono text-[14px] text-text-primary">{formatCents(rr.subtotalCents)}</span>
               </div>
             ))
           ) : (
             <div className="flex justify-between">
               <span className="text-text-secondary">
-                {formatCents(room.base_rate_cents)} × {nights} night{nights !== 1 ? 's' : ''}
+                {formatCents(pricing.roomRates[0]?.baseCents ?? 0)} × {nights} night{nights !== 1 ? 's' : ''}
               </span>
-              <span className="font-mono text-[14px] text-text-primary">{formatCents(subtotal)}</span>
+              <span className="font-mono text-[14px] text-text-primary">{formatCents(pricing.subtotalCents)}</span>
             </div>
           )}
-          {taxRate > 0 && (
+          {pricing.taxCents > 0 && (
             <div className="flex justify-between">
-              <span className="text-text-secondary">Tax ({taxRate}%)</span>
-              <span className="font-mono text-[14px] text-text-primary">{formatCents(taxAmount)}</span>
+              <span className="text-text-secondary">Tax</span>
+              <span className="font-mono text-[14px] text-text-primary">{formatCents(pricing.taxCents)}</span>
             </div>
           )}
-          {stripeFee > 0 && (
+          {pricing.stripeFeePassthroughCents > 0 && (
             <div className="flex justify-between">
               <span className="text-text-secondary">Processing fee</span>
-              <span className="font-mono text-[14px] text-text-primary">{formatCents(stripeFee)}</span>
+              <span className="font-mono text-[14px] text-text-primary">{formatCents(pricing.stripeFeePassthroughCents)}</span>
             </div>
           )}
           <div className="flex justify-between pt-2 border-t border-border mt-1">
             <span className="font-body font-semibold text-text-primary">Total</span>
-            <span className="font-mono text-[20px] font-semibold text-text-primary">{formatCents(total)}</span>
+            <span className="font-mono text-[20px] font-semibold text-text-primary">{formatCents(pricing.totalCents)}</span>
           </div>
         </div>
       </div>
@@ -215,7 +223,7 @@ export function ReviewStep({ property: _property, room, dates, guestInfo, settin
           {stripeReady && clientSecret && stripePromise ? (
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <StripeForm
-                totalCents={total}
+                totalCents={pricing.totalCents}
                 onSuccess={() => onBook()}
                 onError={(msg) => setStripeError(msg)}
               />
