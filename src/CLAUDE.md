@@ -56,7 +56,7 @@ Never reorder or skip providers. Components lower in the tree depend on contexts
 |------|-----|---------|
 | **owner** | All 12 | — |
 | **manager** | 11 | `MANAGE_SETTINGS` |
-| **staff** | 6 | `VIEW_DASHBOARD`, `MANAGE_RESERVATIONS`, `MANAGE_ROOMS`, `MANAGE_PAYMENTS`, `MANAGE_SETTINGS`, `VIEW_REPORTS` |
+| **staff** | `VIEW_DASHBOARD`, `VIEW_RESERVATIONS`, `MANAGE_GUESTS`, `MANAGE_DOCUMENTS`, `MANAGE_MESSAGING`, `MANAGE_MAINTENANCE` | `MANAGE_RESERVATIONS`, `MANAGE_ROOMS`, `MANAGE_PAYMENTS`, `MANAGE_SETTINGS`, `VIEW_REPORTS`, `MANAGE_CONTACTS` |
 
 ### Helper Functions
 

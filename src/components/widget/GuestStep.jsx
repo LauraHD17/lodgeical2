@@ -38,13 +38,16 @@ export function GuestStep({ room, checkIn, checkOut, onNext, onBack }) {
     defaultValues: { numGuests: 1 },
   })
 
+  const ccEmailSchema = z.string().trim().toLowerCase().pipe(z.string().email('Enter a valid email address'))
+
   function addCcEmail() {
-    const email = ccInput.trim().toLowerCase()
-    if (!email) return
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setCcError('Enter a valid email address')
+    const parsed = ccEmailSchema.safeParse(ccInput)
+    if (!parsed.success) {
+      if (!ccInput.trim()) return
+      setCcError(parsed.error.errors[0].message)
       return
     }
+    const email = parsed.data
     if (ccEmails.includes(email)) {
       setCcError('Email already added')
       return

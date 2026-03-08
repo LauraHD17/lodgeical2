@@ -82,7 +82,7 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
           </h4>
           <div className="flex flex-col gap-4">
             {roomLinks.map(link => (
-              <RoomLinkCard key={link.id} link={link} nights={nights} onSelect={(l) => onNext(normalizeRoomLink(l))} />
+              <RoomLinkCard key={link.id} link={link} nights={nights} onSelect={(l) => onNext(normalizeRoomLink(l, rooms))} />
             ))}
           </div>
         </div>
