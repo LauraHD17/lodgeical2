@@ -26,6 +26,8 @@ const inputSchema = z.object({
   guest_last_name: z.string().min(1).optional(),
   guest_phone: z.string().optional(),
   notes: z.string().optional(),
+  booker_email: z.string().email().optional(),
+  cc_emails: z.array(z.string().email()).max(5).default([]),
   origin: z.enum(['direct', 'widget', 'import', 'phone']).default('direct'),
 }).refine(d => d.guest_id || d.guest_email, { message: 'Either guest_id or guest_email is required' })
   .refine(d => new Date(d.check_out) > new Date(d.check_in), { message: 'check_out must be after check_in' })
@@ -158,7 +160,9 @@ serve(async (req) => {
   // 9. INSERT reservation — generate confirmation number and insert directly.
   // Rely on the DB UNIQUE constraint (error code 23505) to detect the rare collision
   // rather than a check-then-insert loop, which has a race condition under concurrency.
-  const reservationStatus = settings?.require_payment_at_booking ? 'pending' : 'confirmed'
+  // Widget bookings are always confirmed (guest pays or pays at property).
+  // Only admin-created ("direct") bookings are pending when payment is required.
+  const reservationStatus = (input.origin !== 'widget' && settings?.require_payment_at_booking) ? 'pending' : 'confirmed'
 
   let reservation: Record<string, unknown> | null = null
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -177,6 +181,8 @@ serve(async (req) => {
         total_due_cents: totalDueCents,
         confirmation_number: candidate,
         notes: input.notes ?? null,
+        booker_email: input.booker_email ?? null,
+        cc_emails: input.cc_emails,
       })
       .select()
       .single()
@@ -194,8 +200,16 @@ serve(async (req) => {
   }
 
   // 10. Send confirmation email (fire-and-forget, uses property template if set)
-  sendBookingConfirmation(guestRecord, { ...reservation, property_id: propertyId, room_ids: input.room_ids }, supabase)
+  const resForEmail = { ...reservation, property_id: propertyId, room_ids: input.room_ids }
+  sendBookingConfirmation(guestRecord, resForEmail, supabase)
     .catch(e => console.error('[create-reservation] email error:', e))
+
+  // 10b. If a booker email is set and different from guest, send them a copy
+  if (input.booker_email && input.booker_email.toLowerCase() !== guestRecord.email.toLowerCase()) {
+    const bookerAsRecipient = { ...guestRecord, email: input.booker_email }
+    sendBookingConfirmation(bookerAsRecipient, resForEmail, supabase)
+      .catch(e => console.error('[create-reservation] booker email error:', e))
+  }
 
   return new Response(
     JSON.stringify({ success: true, reservation, confirmation_number: reservation.confirmation_number }),

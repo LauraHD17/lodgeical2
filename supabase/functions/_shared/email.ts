@@ -22,7 +22,7 @@ interface Reservation {
   room_ids?: string[]
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+async function sendEmail(to: string, subject: string, html: string, cc?: string[]): Promise<void> {
   const apiKey = Deno.env.get('RESEND_API_KEY')
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not set — skipping email send')
@@ -40,6 +40,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
       to,
       subject,
       html,
+      ...(cc?.length ? { cc } : {}),
     }),
   })
 
@@ -176,11 +177,13 @@ export async function sendPaymentFailedAlert(
   await sendEmail(guest.email, subject, html)
 }
 
-/** Send automated check-in reminder (called from a scheduled job or manually). */
+/** Send automated check-in reminder (called from a scheduled job or manually).
+ *  CC'd to reservation.cc_emails if provided (booker does NOT get check-in info). */
 export async function sendCheckInReminder(
   guest: Guest,
   reservation: Reservation,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  ccEmails?: string[]
 ): Promise<void> {
   if (!reservation.property_id) {
     console.error('[email] sendCheckInReminder called without a property_id — skipping')
@@ -188,14 +191,16 @@ export async function sendCheckInReminder(
   }
   const vars = await buildVars(supabase, guest, reservation)
   const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'check_in_reminder', vars)
-  await sendEmail(guest.email, subject, html)
+  await sendEmail(guest.email, subject, html, ccEmails)
 }
 
-/** Send automated check-out reminder. */
+/** Send automated check-out reminder.
+ *  CC'd to reservation.cc_emails if provided. */
 export async function sendCheckOutReminder(
   guest: Guest,
   reservation: Reservation,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  ccEmails?: string[]
 ): Promise<void> {
   if (!reservation.property_id) {
     console.error('[email] sendCheckOutReminder called without a property_id — skipping')
@@ -203,5 +208,5 @@ export async function sendCheckOutReminder(
   }
   const vars = await buildVars(supabase, guest, reservation)
   const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'check_out_reminder', vars)
-  await sendEmail(guest.email, subject, html)
+  await sendEmail(guest.email, subject, html, ccEmails)
 }
