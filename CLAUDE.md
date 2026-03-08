@@ -50,7 +50,7 @@ src/                    # Frontend — see src/CLAUDE.md
 │   ├── auth/           # RouteGuard
 │   ├── shared/         # ErrorBoundary, DataTable, StatusChip, etc.
 │   ├── reservations/   # Reservation-specific modals and components
-│   └── widget/         # Public booking widget step components
+│   └── widget/         # Public booking widget (see Widget Architecture below)
 ├── lib/
 │   ├── auth/           # AuthContext, permissions, auth gates
 │   ├── property/       # PropertyContext, property hooks
@@ -132,11 +132,23 @@ QueryClientProvider → BrowserRouter → AuthProvider → PropertyProvider
 - All pages in `src/pages/admin/` or `src/pages/public/`.
 - Path alias: `@/` maps to `src/` (configured in Vite).
 
-### Widget Selection Model
-- **Room selection** in the public booking widget is normalized: every selection (single room, room link, or multi-room) produces a `{ type, room_ids, base_rate_cents, max_guests, name }` object.
+### Widget Architecture
+
+The public booking widget (`src/components/widget/`) is a multi-step flow: DateStep → RoomStep → GuestStep → ReviewStep, orchestrated by `BookingWidget.jsx`.
+
+**Extracted subcomponents** (keep each focused on a single concern):
+- `RoomCard.jsx` — single room selection card
+- `MultiSelectRoomCard.jsx` — toggleable room card for multi-select mode
+- `RoomLinkCard.jsx` — pre-configured room combination card
+- `StripeForm.jsx` — Stripe Elements payment form (wraps `useStripe`/`useElements`)
+
+**Selection normalization** (`widgetSelections.js`):
+- `normalizeRoom(room)` and `normalizeRoomLink(link)` produce a uniform `{ type, room_ids, base_rate_cents, max_guests, name }` object.
 - `type` is one of `'room'`, `'room_link'`, or `'multi_room'`.
-- `room_ids` is always an array — the rest of the widget (GuestStep, ReviewStep, handleBook) never branches on selection type.
+- `room_ids` is always an array — downstream steps (GuestStep, ReviewStep, handleBook) never branch on selection type.
 - Room links (`room_links` table) are property-configured combinations of linkable rooms with their own rate and capacity.
+
+**Pricing**: ReviewStep fetches server-side pricing from the `preview-pricing` Edge Function. No payment math is calculated client-side.
 
 ### Book-on-Behalf (Third-Party Bookings)
 - Reservations have optional `booker_email` (who booked/paid) and `cc_emails` (text array, max 5).
@@ -253,6 +265,6 @@ Located in `supabase/functions/`, written in TypeScript for the Deno runtime:
 - `guest-portal-lookup` — Public guest access
 - `merge-guests` — Guest deduplication
 - `public-bootstrap` — Widget/public page initialization
-- `preview-pricing` — Public server-side pricing preview for booking widget
+- `preview-pricing` — Server-side pricing preview for booking widget (subtotal, tax, fees, total)
 - `confirm-modification` — Reservation modification confirmation
 - `update-reservation` — Reservation updates

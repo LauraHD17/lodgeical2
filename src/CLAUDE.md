@@ -112,3 +112,27 @@ queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all })
 `@/` maps to `src/` (configured in `vite.config.js`). Use `@/` for all imports — relative imports are not conventional in this project.
 
 In MSW mode, `@/lib/supabaseClient` is additionally aliased to `src/mocks/supabaseMock.js`.
+
+## Widget Component Structure
+
+The booking widget (`components/widget/`) follows a step-based flow orchestrated by `BookingWidget.jsx`:
+
+```
+BookingWidget.jsx          ← Step orchestrator, progress bar, state management
+├── DateStep.jsx           ← Check-in/out date selection
+├── RoomStep.jsx           ← Room/link/multi-room selection
+│   ├── RoomCard.jsx       ← Single room card (extracted)
+│   ├── MultiSelectRoomCard.jsx  ← Multi-select toggle card (extracted)
+│   └── RoomLinkCard.jsx   ← Room link card (extracted)
+├── GuestStep.jsx          ← Guest info, booker info, CC emails
+└── ReviewStep.jsx         ← Booking summary, server-side pricing, payment
+    └── StripeForm.jsx     ← Stripe Elements form (extracted)
+```
+
+**Shared utilities:**
+- `widgetSelections.js` — `normalizeRoom()` and `normalizeRoomLink()` produce uniform selection objects. All selection types flow through these normalizers.
+
+**Key conventions:**
+- Selection shape is always `{ type, room_ids, base_rate_cents, max_guests, name }` — downstream steps never branch on selection type.
+- Pricing displayed in ReviewStep comes from the `preview-pricing` Edge Function — never calculated client-side.
+- Guest capacity validation uses `max_guests` from the normalized selection.

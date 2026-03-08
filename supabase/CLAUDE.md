@@ -141,7 +141,7 @@ All errors return `{ error: "message" }` JSON. Errors are logged with function n
 | `pricing.ts` | Nightly rate calculation (base rate → rate overrides → tax → Stripe fee pass-through) |
 | `paymentSummary.ts` | Payment balance: charges - refunds = net paid, derives status (paid/partial/unpaid/overpaid) |
 | `stripe.ts` | Stripe client singleton |
-| `email.ts` | Resend API integration, template rendering, booking/cancellation email helpers |
+| `email.ts` | Resend API integration, template rendering, booking/cancellation/booker email helpers |
 | `emailTemplates.ts` | HTML email templates with variable substitution |
 | `rateLimit.ts` | DB-backed sliding window rate limiting (atomic INSERT...ON CONFLICT) |
 | `ical.ts` | iCalendar format parsing and generation |
