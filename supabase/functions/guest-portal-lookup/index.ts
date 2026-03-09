@@ -1,8 +1,8 @@
 // guest-portal-lookup Edge Function
-// Validates confirmation_number + email match.
-// Two modes:
-//   1. confirmation_number + email → single reservation (original behavior)
-//   2. email only → all reservations for that guest (for history/payments tabs)
+// Validates confirmation_number + email match, then returns:
+//   - Full detail for the looked-up reservation (payment, modification, cancellation support)
+//   - Summary of ALL reservations for that email (history, payments tabs)
+// Confirmation number + email are ALWAYS required — no email-only mode (prevents enumeration).
 // Returns GENERIC error for both wrong confirmation AND wrong email — never reveals which field failed.
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
@@ -21,7 +21,7 @@ const CORS_HEADERS = {
 const PORTAL_RATE_LIMIT = 10
 
 const inputSchema = z.object({
-  confirmation_number: z.string().min(6).max(6).toUpperCase().optional(),
+  confirmation_number: z.string().min(6).max(6).toUpperCase(),
   email: z.string().email(),
 })
 
@@ -49,163 +49,120 @@ serve(async (req) => {
 
   const inputEmail = parsed.data.email.toLowerCase()
 
-  // ── Mode 1: Single reservation lookup (confirmation_number + email) ──────
-  if (parsed.data.confirmation_number) {
-    const { data: reservation, error: resError } = await supabase
-      .from('reservations')
-      .select(`
-        id, confirmation_number, check_in, check_out, num_guests,
-        status, origin, total_due_cents, notes, created_at,
-        room_ids, property_id, modification_count,
-        booker_email, cc_emails,
-        guests!inner(id, first_name, last_name, email, phone),
-        properties(name, timezone, location)
-      `)
-      .eq('confirmation_number', parsed.data.confirmation_number)
-      .single()
+  // ── Validate confirmation_number + email ───────────────────────────────────
+  const { data: reservation, error: resError } = await supabase
+    .from('reservations')
+    .select(`
+      id, confirmation_number, check_in, check_out, num_guests,
+      status, origin, total_due_cents, notes, created_at,
+      room_ids, property_id, modification_count,
+      booker_email, cc_emails,
+      guests!inner(id, first_name, last_name, email, phone),
+      properties(name, timezone, location)
+    `)
+    .eq('confirmation_number', parsed.data.confirmation_number)
+    .single()
 
-    if (resError || !reservation) return GENERIC_NOT_FOUND
+  if (resError || !reservation) return GENERIC_NOT_FOUND
 
-    const guest = reservation.guests as { id: string; email: string; first_name: string; last_name: string; phone: string | null }
-    const guestEmailMatch = guest?.email.toLowerCase() === inputEmail
-    const bookerEmailMatch = reservation.booker_email?.toLowerCase() === inputEmail
-    if (!guest || (!guestEmailMatch && !bookerEmailMatch)) {
-      return GENERIC_NOT_FOUND
-    }
-
-    const { data: settings } = await supabase
-      .from('settings')
-      .select('check_in_time, check_out_time, min_stay_nights, cancellation_policy, house_rules')
-      .eq('property_id', reservation.property_id)
-      .single()
-
-    const reservationWithTimes = {
-      ...reservation,
-      properties: {
-        ...(reservation.properties as Record<string, unknown> ?? {}),
-        check_in_time:       settings?.check_in_time       ?? null,
-        check_out_time:      settings?.check_out_time      ?? null,
-        min_stay_nights:     settings?.min_stay_nights     ?? null,
-        cancellation_policy: settings?.cancellation_policy ?? null,
-        house_rules:         settings?.house_rules         ?? null,
-      },
-    }
-
-    const [{ data: rooms }, { data: allRooms }, { data: payments }] = await Promise.all([
-      supabase
-        .from('rooms')
-        .select('id, name, type, images')
-        .in('id', reservation.room_ids),
-      supabase
-        .from('rooms')
-        .select('id, name, type, base_rate_cents, max_guests')
-        .eq('property_id', reservation.property_id)
-        .eq('is_active', true),
-      supabase
-        .from('payments')
-        .select('type, status, amount_cents, method, created_at')
-        .eq('reservation_id', reservation.id),
-    ])
-
-    const paymentSummary = calculatePaymentSummary(reservation.total_due_cents, payments ?? [])
-
-    return new Response(
-      JSON.stringify({
-        reservation: { ...reservationWithTimes, modification_count: reservation.modification_count ?? 0 },
-        rooms: rooms ?? [],
-        availableRooms: allRooms ?? [],
-        paymentSummary,
-      }),
-      { headers: CORS_HEADERS }
-    )
-  }
-
-  // ── Mode 2: All reservations by email ────────────────────────────────────
-  // First find the guest by email
-  const { data: guestRows } = await supabase
-    .from('guests')
-    .select('id, first_name, last_name, email, phone, property_id')
-    .ilike('email', inputEmail)
-
-  if (!guestRows || guestRows.length === 0) {
+  const guest = reservation.guests as { id: string; email: string; first_name: string; last_name: string; phone: string | null }
+  const guestEmailMatch = guest?.email.toLowerCase() === inputEmail
+  const bookerEmailMatch = reservation.booker_email?.toLowerCase() === inputEmail
+  if (!guest || (!guestEmailMatch && !bookerEmailMatch)) {
     return GENERIC_NOT_FOUND
   }
 
-  const guest = guestRows[0]
-  const propertyId = guest.property_id
+  // ── Fetch settings ─────────────────────────────────────────────────────────
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('check_in_time, check_out_time, min_stay_nights, cancellation_policy, house_rules')
+    .eq('property_id', reservation.property_id)
+    .single()
 
-  // Fetch all reservations for this guest + any where they are booker
-  const [{ data: guestReservations }, { data: bookerReservations }] = await Promise.all([
-    supabase
-      .from('reservations')
-      .select(`
-        id, confirmation_number, check_in, check_out, num_guests,
-        status, origin, total_due_cents, notes, created_at,
-        room_ids, property_id, modification_count,
-        booker_email, cc_emails,
-        guests!inner(id, first_name, last_name, email, phone),
-        properties(name, timezone, location)
-      `)
-      .eq('guest_id', guest.id)
-      .order('check_in', { ascending: false }),
-    supabase
-      .from('reservations')
-      .select(`
-        id, confirmation_number, check_in, check_out, num_guests,
-        status, origin, total_due_cents, notes, created_at,
-        room_ids, property_id, modification_count,
-        booker_email, cc_emails,
-        guests!inner(id, first_name, last_name, email, phone),
-        properties(name, timezone, location)
-      `)
-      .ilike('booker_email', inputEmail)
-      .neq('guest_id', guest.id)
-      .order('check_in', { ascending: false }),
-  ])
-
-  // Deduplicate and merge
-  const allReservations = [...(guestReservations ?? []), ...(bookerReservations ?? [])]
-  const seen = new Set<string>()
-  const reservations = allReservations.filter(r => {
-    if (seen.has(r.id)) return false
-    seen.add(r.id)
-    return true
-  })
-
-  if (reservations.length === 0) {
-    return GENERIC_NOT_FOUND
+  const reservationWithTimes = {
+    ...reservation,
+    properties: {
+      ...(reservation.properties as Record<string, unknown> ?? {}),
+      check_in_time:       settings?.check_in_time       ?? null,
+      check_out_time:      settings?.check_out_time      ?? null,
+      min_stay_nights:     settings?.min_stay_nights     ?? null,
+      cancellation_policy: settings?.cancellation_policy ?? null,
+      house_rules:         settings?.house_rules         ?? null,
+    },
   }
 
-  // Fetch settings, rooms, and all payments for these reservations
-  const reservationIds = reservations.map(r => r.id)
-  const allRoomIds = [...new Set(reservations.flatMap(r => r.room_ids ?? []))]
-
-  const [{ data: settings }, { data: rooms }, { data: allRooms }, { data: payments }] = await Promise.all([
-    supabase
-      .from('settings')
-      .select('check_in_time, check_out_time, min_stay_nights, cancellation_policy, house_rules')
-      .eq('property_id', propertyId)
-      .single(),
+  // ── Fetch rooms, payments for this reservation + all reservations for this email ──
+  const [{ data: rooms }, { data: allRooms }, { data: payments }, { data: guestReservations }, { data: bookerReservations }] = await Promise.all([
     supabase
       .from('rooms')
       .select('id, name, type, images')
-      .in('id', allRoomIds),
+      .in('id', reservation.room_ids),
     supabase
       .from('rooms')
       .select('id, name, type, base_rate_cents, max_guests')
-      .eq('property_id', propertyId)
+      .eq('property_id', reservation.property_id)
       .eq('is_active', true),
     supabase
       .from('payments')
-      .select('type, status, amount_cents, method, created_at, reservation_id')
-      .in('reservation_id', reservationIds)
-      .order('created_at', { ascending: false }),
+      .select('type, status, amount_cents, method, created_at')
+      .eq('reservation_id', reservation.id),
+    // All reservations where guest email matches (for history/payments tabs)
+    supabase
+      .from('reservations')
+      .select(`
+        id, confirmation_number, check_in, check_out, num_guests,
+        status, origin, total_due_cents, notes, created_at,
+        room_ids, property_id, modification_count,
+        booker_email, cc_emails,
+        guests!inner(id, first_name, last_name, email, phone),
+        properties(name, timezone, location)
+      `)
+      .eq('property_id', reservation.property_id)
+      .eq('guests.email', guest.email)
+      .order('check_in', { ascending: false }),
+    // All reservations where booker email matches
+    supabase
+      .from('reservations')
+      .select(`
+        id, confirmation_number, check_in, check_out, num_guests,
+        status, origin, total_due_cents, notes, created_at,
+        room_ids, property_id, modification_count,
+        booker_email, cc_emails,
+        guests!inner(id, first_name, last_name, email, phone),
+        properties(name, timezone, location)
+      `)
+      .eq('property_id', reservation.property_id)
+      .ilike('booker_email', inputEmail)
+      .order('check_in', { ascending: false }),
   ])
 
-  // Enrich reservations with settings
-  const enrichedReservations = reservations.map(r => ({
+  // Deduplicate all reservations
+  const allResMap = new Map<string, Record<string, unknown>>()
+  for (const r of (guestReservations ?? [])) allResMap.set(r.id, r)
+  for (const r of (bookerReservations ?? [])) allResMap.set(r.id, r)
+  const allReservationsList = Array.from(allResMap.values())
+
+  // Fetch all payments across all reservations (for Payments tab)
+  const allReservationIds = allReservationsList.map((r) => r.id as string)
+  const allResRoomIds = [...new Set(allReservationsList.flatMap((r) => (r.room_ids as string[]) ?? []))]
+
+  const [{ data: allPayments }, { data: allResRooms }] = await Promise.all([
+    allReservationIds.length > 0
+      ? supabase
+          .from('payments')
+          .select('id, type, status, amount_cents, method, created_at, reservation_id')
+          .in('reservation_id', allReservationIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    allResRoomIds.length > 0
+      ? supabase.from('rooms').select('id, name, type, images').in('id', allResRoomIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  // Enrich all reservations with settings
+  const enrichedReservations = allReservationsList.map((r) => ({
     ...r,
-    modification_count: r.modification_count ?? 0,
+    modification_count: (r.modification_count as number) ?? 0,
     properties: {
       ...(r.properties as Record<string, unknown> ?? {}),
       check_in_time:       settings?.check_in_time       ?? null,
@@ -216,13 +173,19 @@ serve(async (req) => {
     },
   }))
 
+  const paymentSummary = calculatePaymentSummary(reservation.total_due_cents, payments ?? [])
+
   return new Response(
     JSON.stringify({
-      reservations: enrichedReservations,
-      guest: { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone },
+      reservation: { ...reservationWithTimes, modification_count: reservation.modification_count ?? 0 },
       rooms: rooms ?? [],
       availableRooms: allRooms ?? [],
-      payments: payments ?? [],
+      paymentSummary,
+      // All-reservations data (for history/payments/contact tabs)
+      reservations: enrichedReservations,
+      guest: { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone },
+      allRooms: allResRooms ?? [],
+      payments: allPayments ?? [],
     }),
     { headers: CORS_HEADERS }
   )

@@ -1137,12 +1137,12 @@ function ContactTab({ guest, confirmationNumber, upcomingReservations, onUpdated
 
 // ─── Portal Tabs (replaces ReservationDetail) ─────────────────────────────────
 
-function PortalTabs({ data, allData, onBack, onRefresh }) {
+function PortalTabs({ data, onBack, onRefresh }) {
   const { reservation, paymentSummary, availableRooms, rooms } = data
-  const allReservations = allData?.reservations ?? (reservation ? [reservation] : [])
-  const allPayments = allData?.payments ?? []
-  const allRooms = allData?.rooms ?? rooms ?? []
-  const guest = allData?.guest ?? reservation?.guests
+  const allReservations = data?.reservations ?? (reservation ? [reservation] : [])
+  const allPayments = data?.payments ?? []
+  const allRooms = data?.allRooms ?? rooms ?? []
+  const guest = data?.guest ?? reservation?.guests
 
   // Determine upcoming reservation (non-cancelled, check_out >= today)
   const upcomingReservation = reservation?.status !== 'cancelled' && reservation?.check_out >= today
@@ -1337,33 +1337,12 @@ export default function GuestPortal() {
 
   const [view, setView] = useState('lookup') // 'lookup' | 'detail'
   const [reservationData, setReservationData] = useState(null)
-  const [allData, setAllData] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [guestEmail, setGuestEmail] = useState('')
+  const [verifiedEmail, setVerifiedEmail] = useState('')
 
   useEffect(() => {
     // Pre-fill is handled by passing initialConfirmation to LookupForm
   }, [])
-
-  // After single-reservation lookup succeeds, fetch all reservations by email
-  async function fetchAllByEmail(emailAddr) {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/guest-portal-lookup`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailAddr }),
-        }
-      )
-      const data = await res.json()
-      if (data && !data.error) {
-        setAllData(data)
-      }
-    } catch {
-      // Non-fatal — tabs will still work with single reservation data
-    }
-  }
 
   async function handleRefresh() {
     if (!reservationData) return
@@ -1375,7 +1354,7 @@ export default function GuestPortal() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             confirmation_number: reservationData.reservation.confirmation_number,
-            email: reservationData.reservation.guests?.email || '',
+            email: verifiedEmail || reservationData.reservation.guests?.email || '',
           }),
         }
       )
@@ -1387,10 +1366,6 @@ export default function GuestPortal() {
     } catch {
       // Non-fatal
     }
-    // Also refresh all-data
-    if (guestEmail) {
-      fetchAllByEmail(guestEmail)
-    }
   }
 
   return (
@@ -1400,18 +1375,15 @@ export default function GuestPortal() {
           initialConfirmation={initialConfirmation}
           onFound={(data, emailAddr) => {
             setReservationData(data)
-            setGuestEmail(emailAddr)
+            setVerifiedEmail(emailAddr)
             setView('detail')
-            // Fetch all reservations for this email in background
-            fetchAllByEmail(emailAddr)
           }}
         />
       ) : (
         <PortalTabs
           key={refreshKey}
           data={reservationData}
-          allData={allData}
-          onBack={() => { setView('lookup'); setAllData(null) }}
+          onBack={() => { setView('lookup') }}
           onRefresh={handleRefresh}
         />
       )}

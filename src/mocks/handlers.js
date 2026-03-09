@@ -225,53 +225,48 @@ export const handlers = [
     })
   }),
 
-  // Guest portal lookup — supports single (confirmation_number + email) or multi (email only)
+  // Guest portal lookup — requires confirmation_number + email (security gate)
+  // Returns single reservation detail + all reservations for that email
   http.post(`${BASE}/functions/v1/guest-portal-lookup`, async ({ request }) => {
     const body = await request.json().catch(() => ({}))
     const { confirmation_number, email } = body
 
-    // Mode 1: Single reservation by confirmation_number + email
-    if (confirmation_number) {
-      const res = MOCK_RESERVATIONS.find(
-        r => r.confirmation_number === confirmation_number && r.guests?.email === email
-      )
-      if (!res) {
-        return HttpResponse.json({ error: 'Reservation not found. Please check your confirmation number and email.' }, { status: 404 })
-      }
-      return HttpResponse.json({
-        reservation: res,
-        rooms: MOCK_ROOMS.filter(r => res.room_ids?.includes(r.id)),
-        paymentSummary: {
-          total_due_cents:  res.total_due_cents ?? 0,
-          total_paid_cents: 0,
-          balance_cents:    res.total_due_cents ?? 0,
-          status:           'unpaid',
-        },
-        availableRooms: MOCK_ROOMS.filter(r => r.is_active),
-      })
+    if (!confirmation_number || !email) {
+      return HttpResponse.json({ error: 'Reservation not found.' }, { status: 404 })
     }
 
-    // Mode 2: All reservations by email
-    if (!email) {
-      return HttpResponse.json({ error: 'Reservation not found.' }, { status: 404 })
+    const res = MOCK_RESERVATIONS.find(
+      r => r.confirmation_number === confirmation_number && r.guests?.email === email
+    )
+    if (!res) {
+      return HttpResponse.json({ error: 'Reservation not found. Please check your confirmation number and email.' }, { status: 404 })
     }
+
+    // All reservations for this email (for history/payments tabs)
     const lowerEmail = email.toLowerCase()
-    const matchingReservations = MOCK_RESERVATIONS.filter(
+    const allReservations = MOCK_RESERVATIONS.filter(
       r => r.guests?.email?.toLowerCase() === lowerEmail || r.booker_email?.toLowerCase() === lowerEmail
     )
-    if (matchingReservations.length === 0) {
-      return HttpResponse.json({ error: 'Reservation not found.' }, { status: 404 })
-    }
     const guest = MOCK_GUESTS.find(g => g.email.toLowerCase() === lowerEmail)
-    const allRoomIds = [...new Set(matchingReservations.flatMap(r => r.room_ids ?? []))]
+    const allRoomIds = [...new Set(allReservations.flatMap(r => r.room_ids ?? []))]
     const matchingPayments = MOCK_PAYMENTS.filter(p =>
-      matchingReservations.some(r => r.id === p.reservation_id)
+      allReservations.some(r => r.id === p.reservation_id)
     )
+
     return HttpResponse.json({
-      reservations: matchingReservations,
-      guest: guest ? { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone } : null,
-      rooms: MOCK_ROOMS.filter(r => allRoomIds.includes(r.id)),
+      reservation: res,
+      rooms: MOCK_ROOMS.filter(r => res.room_ids?.includes(r.id)),
+      paymentSummary: {
+        total_due_cents:  res.total_due_cents ?? 0,
+        total_paid_cents: 0,
+        balance_cents:    res.total_due_cents ?? 0,
+        status:           'unpaid',
+      },
       availableRooms: MOCK_ROOMS.filter(r => r.is_active),
+      // All-reservations data
+      reservations: allReservations,
+      guest: guest ? { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone } : null,
+      allRooms: MOCK_ROOMS.filter(r => allRoomIds.includes(r.id)),
       payments: matchingPayments,
     })
   }),
