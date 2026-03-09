@@ -38,7 +38,7 @@ function usePayments() {
       const { data, error } = await supabase
         .from('payments')
         .select(`
-          id, amount_cents, method, status, created_at, notes,
+          id, amount_cents, method, status, created_at, notes, payment_date, check_number,
           reservations(id, confirmation_number,
             guests(first_name, last_name)
           )
@@ -64,7 +64,7 @@ function useRecordPayment() {
   const { propertyId } = useProperty()
 
   return useMutation({
-    mutationFn: async ({ amount_cents, method, notes, reservation_id }) => {
+    mutationFn: async ({ amount_cents, method, notes, reservation_id, payment_date, check_number }) => {
       const { data, error } = await supabase
         .from('payments')
         .insert({
@@ -72,6 +72,8 @@ function useRecordPayment() {
           method,
           notes,
           reservation_id,
+          payment_date,
+          check_number,
           property_id: propertyId,
           status: 'paid',
         })
@@ -90,7 +92,7 @@ function useRecordPayment() {
 function RecordPaymentModal({ open, onClose }) {
   const { addToast } = useToast()
   const recordPayment = useRecordPayment()
-  const [form, setForm] = useState({ amount: '', method: 'cash', notes: '', reservation_id: '' })
+  const [form, setForm] = useState({ amount: '', method: 'cash', notes: '', reservation_id: '', payment_date: '', check_number: '' })
   const [errors, setErrors] = useState({})
 
   function validate() {
@@ -109,9 +111,11 @@ function RecordPaymentModal({ open, onClose }) {
         method: form.method,
         notes: form.notes,
         reservation_id: form.reservation_id || null,
+        payment_date: form.payment_date || null,
+        check_number: form.method === 'check' ? (form.check_number || null) : null,
       })
       addToast({ message: 'Payment recorded successfully', variant: 'success' })
-      setForm({ amount: '', method: 'cash', notes: '', reservation_id: '' })
+      setForm({ amount: '', method: 'cash', notes: '', reservation_id: '', payment_date: '', check_number: '' })
       onClose()
     } catch (err) {
       addToast({ message: err?.message ?? 'Failed to record payment', variant: 'error' })
@@ -147,7 +151,23 @@ function RecordPaymentModal({ open, onClose }) {
           label="Method"
           options={METHOD_OPTIONS}
           value={form.method}
-          onValueChange={(v) => setForm((f) => ({ ...f, method: v }))}
+          onValueChange={(v) => setForm((f) => ({ ...f, method: v, check_number: v === 'check' ? f.check_number : '' }))}
+        />
+
+        {form.method === 'check' && (
+          <Input
+            label="Check Number"
+            placeholder="e.g. 1042"
+            value={form.check_number}
+            onChange={(e) => setForm((f) => ({ ...f, check_number: e.target.value }))}
+          />
+        )}
+
+        <Input
+          label="Payment Date (optional)"
+          type="date"
+          value={form.payment_date}
+          onChange={(e) => setForm((f) => ({ ...f, payment_date: e.target.value }))}
         />
 
         <Input
@@ -188,11 +208,14 @@ const COLUMNS = [
   {
     key: 'created_at',
     label: 'Date',
-    render: (val) => (
-      <span className="font-mono text-[14px]">
-        {val ? format(parseISO(val), 'MMM d, yyyy') : '—'}
-      </span>
-    ),
+    render: (_, row) => {
+      const d = row.payment_date ?? row.created_at
+      return (
+        <span className="font-mono text-[14px]">
+          {d ? format(parseISO(d), 'MMM d, yyyy') : '—'}
+        </span>
+      )
+    },
   },
   {
     key: 'reservation',
