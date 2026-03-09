@@ -94,6 +94,9 @@ export const MOCK_ROOMS = [
     allows_pets: true,
     cleaning_fee_cents: 5000,
     pet_fee_cents: 2500,
+    linkable: true,
+    buffer_days_before: 0,
+    buffer_days_after: 0,
     ical_token: 'aaaaaaaa-0000-0000-0000-000000000001',
     created_at: '2024-01-01T00:00:00Z',
   },
@@ -108,6 +111,9 @@ export const MOCK_ROOMS = [
     is_active: true,
     allows_pets: false,
     cleaning_fee_cents: 3500,
+    linkable: true,
+    buffer_days_before: 0,
+    buffer_days_after: 0,
     ical_token: 'bbbbbbbb-0000-0000-0000-000000000002',
     created_at: '2024-01-01T00:00:00Z',
   },
@@ -123,8 +129,30 @@ export const MOCK_ROOMS = [
     allows_pets: true,
     cleaning_fee_cents: 7500,
     pet_fee_cents: 3500,
+    linkable: false,
+    buffer_days_before: 2,
+    buffer_days_after: 3,
     ical_token: 'cccccccc-0000-0000-0000-000000000003',
     created_at: '2024-01-01T00:00:00Z',
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Room Links (combinations of linkable rooms)
+// ---------------------------------------------------------------------------
+
+export const MOCK_ROOM_LINKS = [
+  {
+    id: 'rlink-001',
+    property_id: PROPERTY_ID,
+    name: 'Family Suite (A+B)',
+    linked_room_ids: ['room-001', 'room-002'],
+    base_rate_cents: 30000,
+    max_guests: 6,
+    description: 'Both lakeside cabins combined for families or groups.',
+    is_active: true,
+    created_at: '2024-01-15T00:00:00Z',
+    updated_at: '2024-01-15T00:00:00Z',
   },
 ]
 

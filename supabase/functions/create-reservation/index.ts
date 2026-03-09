@@ -8,6 +8,7 @@ import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { sendBookingConfirmation } from '../_shared/email.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
+import { checkConflicts } from '../_shared/conflicts.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -85,20 +86,15 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: `Guest count ${input.num_guests} exceeds room capacity of ${totalMaxGuests}` }), { status: 400, headers: CORS_HEADERS })
   }
 
-  // 6. Conflict check: any active reservation overlapping dates for these rooms?
-  const { data: conflicts } = await supabase
-    .from('reservations')
-    .select('id, confirmation_number, check_in, check_out, room_ids')
-    .eq('property_id', propertyId)
-    .neq('status', 'cancelled')
-    .lt('check_in', input.check_out)
-    .gt('check_out', input.check_in)
+  // 6. Conflict check (includes buffer days)
+  const { hasConflict, conflictingIds } = await checkConflicts(supabase, {
+    propertyId,
+    roomIds: input.room_ids,
+    checkIn: input.check_in,
+    checkOut: input.check_out,
+  })
 
-  const conflictingIds = (conflicts ?? [])
-    .filter(r => r.room_ids.some((rid: string) => input.room_ids.includes(rid)))
-    .map(r => r.id)
-
-  if (conflictingIds.length > 0) {
+  if (hasConflict) {
     return new Response(
       JSON.stringify({ success: false, code: 'CONFLICT', conflictingIds }),
       { status: 409, headers: CORS_HEADERS }

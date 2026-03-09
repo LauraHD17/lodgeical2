@@ -128,13 +128,90 @@ export default function Calendar() {
     const shiftDay = (str, delta) =>
       format(addDays(new Date(str + 'T00:00:00'), delta), 'yyyy-MM-dd')
 
+    // Build a room buffer map for buffer day bar generation
+    const roomBufferMap = {}
+    for (const r of rooms) {
+      roomBufferMap[r.id] = { before: r.buffer_days_before ?? 0, after: r.buffer_days_after ?? 0 }
+    }
+
     const map = {}
     for (const res of allReservations) {
       if (!res.check_in || !res.check_out) continue
       const ciStr = res.check_in   // YYYY-MM-DD
       const coStr = res.check_out  // YYYY-MM-DD (exclusive — guest leaves this morning)
 
-      // Skip entirely outside view
+      // Compute buffer days for this reservation (max across all rooms)
+      let bufBefore = 0
+      let bufAfter = 0
+      for (const rid of (res.room_ids ?? [])) {
+        const buf = roomBufferMap[rid]
+        if (buf) {
+          bufBefore = Math.max(bufBefore, buf.before)
+          bufAfter = Math.max(bufAfter, buf.after)
+        }
+      }
+
+      // Generate buffer bars BEFORE the reservation
+      if (bufBefore > 0) {
+        const bufStartStr = shiftDay(ciStr, -bufBefore)
+        const bufEndStr = ciStr // exclusive end (buffer ends when check-in starts)
+        if (bufEndStr > viewFirstStr && bufStartStr <= viewLastStr) {
+          weeks.forEach((week, wIdx) => {
+            const weekStrs = week.map(d => (d ? format(d, 'yyyy-MM-dd') : null))
+            const realStrs = weekStrs.filter(Boolean)
+            if (!realStrs.length) return
+            const weekFirstStr = realStrs[0]
+            const weekLastStr = realStrs[realStrs.length - 1]
+            const weekNextStr = shiftDay(weekLastStr, 1)
+            const barStartStr = bufStartStr > weekFirstStr ? bufStartStr : weekFirstStr
+            const barEndStr2 = bufEndStr <= weekNextStr ? bufEndStr : weekNextStr
+            if (barEndStr2 <= barStartStr) return
+            const colStart = weekStrs.indexOf(barStartStr)
+            if (colStart === -1) return
+            const barEndDayStr = shiftDay(barEndStr2, -1)
+            let colEnd = weekStrs.indexOf(barEndDayStr)
+            if (colEnd === -1) colEnd = weekStrs.reduce((last, s, i) => (s !== null ? i : last), colStart)
+            const colorIdx = roomColorMap[(res.room_ids ?? [])[0]] ?? 0
+            ;(map[wIdx] ??= []).push({
+              colStart, colEnd, reservation: null, colorIdx, roomName: '',
+              isStart: bufStartStr === barStartStr, isEnd: bufEndStr === barEndStr2,
+              isBuffer: true,
+            })
+          })
+        }
+      }
+
+      // Generate buffer bars AFTER the reservation
+      if (bufAfter > 0) {
+        const bufStartStr = coStr
+        const bufEndStr = shiftDay(coStr, bufAfter) // exclusive end
+        if (bufEndStr > viewFirstStr && bufStartStr <= viewLastStr) {
+          weeks.forEach((week, wIdx) => {
+            const weekStrs = week.map(d => (d ? format(d, 'yyyy-MM-dd') : null))
+            const realStrs = weekStrs.filter(Boolean)
+            if (!realStrs.length) return
+            const weekFirstStr = realStrs[0]
+            const weekLastStr = realStrs[realStrs.length - 1]
+            const weekNextStr = shiftDay(weekLastStr, 1)
+            const barStartStr = bufStartStr > weekFirstStr ? bufStartStr : weekFirstStr
+            const barEndStr2 = bufEndStr <= weekNextStr ? bufEndStr : weekNextStr
+            if (barEndStr2 <= barStartStr) return
+            const colStart = weekStrs.indexOf(barStartStr)
+            if (colStart === -1) return
+            const barEndDayStr = shiftDay(barEndStr2, -1)
+            let colEnd = weekStrs.indexOf(barEndDayStr)
+            if (colEnd === -1) colEnd = weekStrs.reduce((last, s, i) => (s !== null ? i : last), colStart)
+            const colorIdx = roomColorMap[(res.room_ids ?? [])[0]] ?? 0
+            ;(map[wIdx] ??= []).push({
+              colStart, colEnd, reservation: null, colorIdx, roomName: '',
+              isStart: bufStartStr === barStartStr, isEnd: bufEndStr === barEndStr2,
+              isBuffer: true,
+            })
+          })
+        }
+      }
+
+      // Skip reservation bar if entirely outside view
       if (coStr <= viewFirstStr || ciStr > viewLastStr) continue
 
       weeks.forEach((week, wIdx) => {
@@ -169,6 +246,7 @@ export default function Calendar() {
           colStart, colEnd, reservation: res, colorIdx, roomName,
           isStart: ciStr === barStartStr,  // arrival day is visible in this week
           isEnd:   coStr === barEndStr,    // checkout day is visible in this week
+          isBuffer: false,
         })
       })
     }
@@ -189,10 +267,13 @@ export default function Calendar() {
 
       {/* Room legend */}
       {rooms.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           {rooms.map((room, i) => (
             <span key={room.id} className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body border', ROOM_COLORS_PILL[i % ROOM_COLORS_PILL.length])}>{room.name}</span>
           ))}
+          {rooms.some(r => (r.buffer_days_before ?? 0) > 0 || (r.buffer_days_after ?? 0) > 0) && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body border border-dashed border-border text-text-muted bg-surface opacity-60 italic">Buffer</span>
+          )}
         </div>
       )}
 
@@ -256,17 +337,43 @@ export default function Calendar() {
                     })}
                   </div>
 
-                  {/* Reservation bars (absolute over the cells) */}
+                  {/* Reservation + buffer bars (absolute over the cells) */}
                   <div className="absolute inset-0 top-[36px] pointer-events-none">
                     {weekBars.map((bar, bIdx) => {
+                      const multiCell = bar.colEnd > bar.colStart
+                      const cellPct = 100 / 7
+
+                      if (bar.isBuffer) {
+                        // Buffer day bar — dashed border, lighter opacity, non-clickable
+                        const leftPct = (bar.colStart / 7) * 100
+                        const widthPct = ((bar.colEnd - bar.colStart + 1) / 7) * 100
+                        return (
+                          <div
+                            key={bIdx}
+                            className={cn(
+                              'absolute h-6 flex items-center px-2 opacity-40 border border-dashed rounded-[4px]',
+                              ROOM_COLORS_BG[bar.colorIdx],
+                              ROOM_COLORS_TEXT[bar.colorIdx],
+                              'border-current',
+                            )}
+                            style={{
+                              left: `calc(${leftPct}% + 1px)`,
+                              width: `calc(${widthPct}% - 2px)`,
+                              top: `${bIdx * 26}px`,
+                            }}
+                            title="Buffer days"
+                          >
+                            <span className="font-body text-[10px] truncate leading-none italic">Buffer</span>
+                          </div>
+                        )
+                      }
+
                       const res       = bar.reservation
                       const guest     = res.guests ?? {}
                       const isPending = res.status === 'pending'
-                      const multiCell = bar.colEnd > bar.colStart
 
                       // Time-of-day offsets: only when bar spans >1 column
                       // (prevents negative-width bars on single-night stays)
-                      const cellPct        = 100 / 7
                       const arrivalOffset  = (bar.isStart && multiCell) ? (CHECK_IN_HOUR  / 24) * cellPct : 0
                       const departureOffset= (bar.isEnd   && multiCell) ? ((24 - CHECK_OUT_HOUR) / 24) * cellPct : 0
 

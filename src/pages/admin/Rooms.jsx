@@ -277,6 +277,7 @@ function initForm(room) {
       base_rate_cents: '0', description: '',
       allows_pets: false, linkable: false,
       cleaning_fee_dollars: '', pet_fee_dollars: '',
+      buffer_days_before: '0', buffer_days_after: '0',
     }
   }
   return {
@@ -289,6 +290,8 @@ function initForm(room) {
     linkable: room.linkable ?? false,
     cleaning_fee_dollars: room.cleaning_fee_cents != null ? (room.cleaning_fee_cents / 100).toFixed(2) : '',
     pet_fee_dollars: room.pet_fee_cents != null ? (room.pet_fee_cents / 100).toFixed(2) : '',
+    buffer_days_before: String(room.buffer_days_before ?? 0),
+    buffer_days_after: String(room.buffer_days_after ?? 0),
   }
 }
 
@@ -332,6 +335,8 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
       linkable: form.linkable,
       cleaning_fee_cents: form.cleaning_fee_dollars === '' ? null : Math.round(Number(form.cleaning_fee_dollars) * 100),
       pet_fee_cents: form.pet_fee_dollars === '' ? null : Math.round(Number(form.pet_fee_dollars) * 100),
+      buffer_days_before: Number(form.buffer_days_before) || 0,
+      buffer_days_after: Number(form.buffer_days_after) || 0,
     }
     try {
       if (isNew) {
@@ -538,6 +543,32 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
                 <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
               </Switch.Root>
               <span className="font-body text-[13px] text-text-secondary">{form.linkable ? 'Yes' : 'No'}</span>
+            </div>
+          </div>
+
+          {/* Buffer days */}
+          <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
+            <div>
+              <p className="font-body font-semibold text-[14px] text-text-primary">Buffer Days</p>
+              <p className="font-body text-[12px] text-text-muted mt-0.5">Block extra days before and after each reservation for room prep and turnover</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Days Before"
+                type="number"
+                min={0}
+                max={30}
+                value={form.buffer_days_before}
+                onChange={e => set('buffer_days_before', e.target.value)}
+              />
+              <Input
+                label="Days After"
+                type="number"
+                min={0}
+                max={30}
+                value={form.buffer_days_after}
+                onChange={e => set('buffer_days_after', e.target.value)}
+              />
             </div>
           </div>
 
