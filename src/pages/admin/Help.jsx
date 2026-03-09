@@ -347,15 +347,7 @@ export default function Help() {
         <div>
           <p className="font-body font-semibold text-[14px] text-text-primary mb-0.5">Need more help?</p>
           <p className="font-body text-[13px] text-text-secondary">
-            Check our documentation or file an issue at{' '}
-            <a
-              href="https://github.com/anthropics/claude-code/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-info hover:underline"
-            >
-              github.com/anthropics/claude-code/issues
-            </a>.
+            Reach out to us via the contact information in your account settings.
           </p>
         </div>
       </div>
