@@ -103,7 +103,7 @@ export default function Settings() {
   // Tax & Policy tab state
   const [taxPolicy, setTaxPolicy] = useState({
     tax_rate: 0, cancellation_policy: 'flexible', cleaning_fee_cents: 0,
-    pet_fee_cents: 0, pet_fee_type: 'flat',
+    pet_fee_cents: 0, pet_fee_type: 'flat', pass_through_stripe_fee: false,
   })
 
   useEffect(() => {
@@ -128,6 +128,7 @@ export default function Settings() {
         cleaning_fee_cents: settings.cleaning_fee_cents ?? 0,
         pet_fee_cents: settings.pet_fee_cents ?? 0,
         pet_fee_type: settings.pet_fee_type ?? 'flat',
+        pass_through_stripe_fee: settings.pass_through_stripe_fee ?? false,
       })
     }
   }, [settings])
@@ -436,11 +437,23 @@ export default function Settings() {
               </div>
             </div>
 
+            <SectionHeader>Stripe Processing Fee</SectionHeader>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={taxPolicy.pass_through_stripe_fee}
+                onChange={(e) => setTaxPolicy((t) => ({ ...t, pass_through_stripe_fee: e.target.checked }))}
+                className="accent-info w-4 h-4"
+              />
+              <span className="font-body text-[14px] text-text-primary">Pass processing fee to guests</span>
+            </label>
+            <p className="font-body text-[12px] text-text-muted">When enabled, a 2.9% + $0.30 processing fee is added to the guest&apos;s total so your property receives the full booking amount.</p>
+
             <Button
               variant="primary"
               size="md"
               loading={saving}
-              onClick={() => saveTab({ tax_rate: taxPolicy.tax_rate, cancellation_policy: taxPolicy.cancellation_policy, cleaning_fee_cents: taxPolicy.cleaning_fee_cents, pet_fee_cents: taxPolicy.pet_fee_cents, pet_fee_type: taxPolicy.pet_fee_type })}
+              onClick={() => saveTab({ tax_rate: taxPolicy.tax_rate, cancellation_policy: taxPolicy.cancellation_policy, cleaning_fee_cents: taxPolicy.cleaning_fee_cents, pet_fee_cents: taxPolicy.pet_fee_cents, pet_fee_type: taxPolicy.pet_fee_type, pass_through_stripe_fee: taxPolicy.pass_through_stripe_fee })}
               className="self-start"
             >
               Save Tax & Policy Settings
