@@ -7,6 +7,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { getStripe } from '../_shared/stripe.ts'
+import { sendCancellationNotice } from '../_shared/email.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -188,6 +189,11 @@ serve(async (req) => {
     .from('reservations')
     .update({ status: 'cancelled' })
     .eq('id', parsed.data.reservation_id)
+
+  // Send cancellation email (fire-and-forget — don't block the response)
+  sendCancellationNotice(reservation.guests, reservation, refundCents, supabase).catch(e =>
+    console.error('[cancel-reservation] email error:', e)
+  )
 
   return new Response(
     JSON.stringify({ success: true, refund_cents: refundCents, policy }),

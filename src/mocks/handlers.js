@@ -219,6 +219,7 @@ export const handlers = [
     return HttpResponse.json({
       property: MOCK_PROPERTY,
       rooms:    MOCK_ROOMS.filter(r => r.is_active),
+      roomLinks: [],
       settings: { ...MOCK_SETTINGS, currency: 'USD', min_stay_nights: 1, require_payment_at_booking: false, allow_partial_payment: true },
     })
   }),
@@ -241,6 +242,7 @@ export const handlers = [
         balance_cents:    res.total_due_cents ?? 0,
         status:           'unpaid',
       },
+      availableRooms: MOCK_ROOMS.filter(r => r.is_active),
     })
   }),
 
@@ -250,8 +252,36 @@ export const handlers = [
     if (body.preview_only) {
       return HttpResponse.json({ refund_cents: 0, policy: 'strict', message: 'No refund per cancellation policy.' })
     }
-    return HttpResponse.json({ success: true, message: 'Reservation cancelled.' })
+    return HttpResponse.json({ success: true, refund_cents: 0, message: 'Reservation cancelled.' })
   }),
+
+  // Modify reservation (guest-facing)
+  http.post(`${BASE}/functions/v1/modify-reservation`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const res = MOCK_RESERVATIONS.find(r => r.id === body.reservation_id) ?? MOCK_RESERVATIONS[0]
+    if (body.preview_only) {
+      return HttpResponse.json({
+        original: {
+          check_in: res.check_in,
+          check_out: res.check_out,
+          total_cents: res.total_due_cents ?? 0,
+        },
+        modified: {
+          check_in: body.new_check_in ?? res.check_in,
+          check_out: body.new_check_out ?? res.check_out,
+          total_cents: res.total_due_cents ?? 0,
+        },
+        balance_due_cents: 0,
+        requires_payment: false,
+      })
+    }
+    return HttpResponse.json({ success: true, requires_payment: false })
+  }),
+
+  // Confirm modification (after payment)
+  http.post(`${BASE}/functions/v1/confirm-modification`, () =>
+    HttpResponse.json({ success: true }),
+  ),
 
   http.get(`${BASE}/functions/v1/ical-export`, () =>
     new HttpResponse(

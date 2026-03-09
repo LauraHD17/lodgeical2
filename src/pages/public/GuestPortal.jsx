@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowLeft, SpinnerGap, WarningCircle, PencilSimple, CheckCircle } from '@phosphor-icons/react'
+import { ArrowLeft, SpinnerGap, WarningCircle, PencilSimple, CheckCircle, Printer } from '@phosphor-icons/react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { DayPicker } from 'react-day-picker'
@@ -249,6 +249,7 @@ function CancellationSection({ reservation, onCancelled }) {
       if (!res.ok) {
         setCancelError(data.error || 'Cancellation failed. Please contact the property.')
       } else {
+        setPreview(prev => ({ ...prev, refund_cents: data.refund_cents ?? prev?.refund_cents ?? 0 }))
         setStep('done')
         onCancelled()
       }
@@ -319,9 +320,31 @@ function CancellationSection({ reservation, onCancelled }) {
       )}
 
       {step === 'done' && (
-        <p className="font-body text-[14px] text-success font-semibold">
-          Reservation cancelled successfully.
-        </p>
+        <div>
+          <div className="flex flex-col items-center text-center py-4">
+            <CheckCircle size={48} weight="fill" className="text-success mb-3" />
+            <h3 className="font-heading text-[18px] text-text-primary mb-1">Reservation Cancelled</h3>
+            <p className="font-mono text-[14px] text-text-secondary mb-3">
+              Confirmation: {reservation.confirmation_number}
+            </p>
+            {preview?.refund_cents > 0 && (
+              <p className="font-body text-[14px] text-text-primary mb-2">
+                Refund amount: <span className="font-mono font-semibold">{formatCents(preview.refund_cents)}</span>
+              </p>
+            )}
+            <p className="font-body text-[13px] text-text-muted mb-4">
+              A cancellation confirmation email has been sent to{' '}
+              <span className="text-text-primary font-semibold">{reservation.guests?.email}</span>.
+            </p>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 h-11 px-4 text-[15px] font-body font-medium bg-transparent border-[1.5px] border-text-primary text-text-primary rounded-none hover:opacity-80 transition-opacity print:hidden"
+            >
+              <Printer size={16} />
+              Print Confirmation
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -789,6 +812,17 @@ function ReservationDetail({ data, onBack, onRefresh }) {
         <p className="font-body text-[14px] text-text-muted">
           Document upload and e-signature features available through your host.
         </p>
+      </div>
+
+      {/* Print */}
+      <div className="flex justify-center print:hidden">
+        <button
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 h-11 px-4 text-[15px] font-body font-medium bg-transparent border-[1.5px] border-text-primary text-text-primary rounded-none hover:opacity-80 transition-opacity"
+        >
+          <Printer size={16} />
+          Print Reservation
+        </button>
       </div>
     </div>
   )
