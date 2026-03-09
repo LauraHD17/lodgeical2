@@ -232,6 +232,24 @@ serve(async (req) => {
     supabase
   ).catch(e => console.error('[modify-reservation] email error:', e))
 
+  // Log guest portal activity (fire-and-forget)
+  supabase.from('guest_portal_activity').insert({
+    property_id: reservation.property_id,
+    reservation_id: reservation.id,
+    guest_id: reservation.guest_id,
+    action: 'modification_confirmed',
+    details: {
+      old_check_in: reservation.check_in,
+      new_check_in,
+      old_check_out: reservation.check_out,
+      new_check_out,
+      old_room_ids: reservation.room_ids,
+      new_room_ids,
+      old_total_cents: reservation.total_due_cents,
+      new_total_cents: newPricing.totalCents,
+    },
+  }).then(null, (e: unknown) => console.error('[modify-reservation] activity log error:', e))
+
   return new Response(JSON.stringify({
     success: true,
     requires_payment: false,

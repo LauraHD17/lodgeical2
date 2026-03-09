@@ -1,5 +1,8 @@
 // guest-portal-lookup Edge Function
-// Validates confirmation_number + email match.
+// Validates confirmation_number + email match, then returns:
+//   - Full detail for the looked-up reservation (payment, modification, cancellation support)
+//   - Summary of ALL reservations for that email (history, payments tabs)
+// Confirmation number + email are ALWAYS required — no email-only mode (prevents enumeration).
 // Returns GENERIC error for both wrong confirmation AND wrong email — never reveals which field failed.
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
@@ -39,8 +42,14 @@ serve(async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // Fetch reservation by confirmation number
-  // check_in_time / check_out_time live on the settings table, not properties
+  const GENERIC_NOT_FOUND = new Response(
+    JSON.stringify({ error: 'Reservation not found. Please check your confirmation number and email address.' }),
+    { status: 404, headers: CORS_HEADERS }
+  )
+
+  const inputEmail = parsed.data.email.toLowerCase()
+
+  // ── Validate confirmation_number + email ───────────────────────────────────
   const { data: reservation, error: resError } = await supabase
     .from('reservations')
     .select(`
@@ -54,31 +63,22 @@ serve(async (req) => {
     .eq('confirmation_number', parsed.data.confirmation_number)
     .single()
 
-  // Verify email matches — same error message whether confirmation or email is wrong
-  const GENERIC_NOT_FOUND = new Response(
-    JSON.stringify({ error: 'Reservation not found. Please check your confirmation number and email address.' }),
-    { status: 404, headers: CORS_HEADERS }
-  )
-
   if (resError || !reservation) return GENERIC_NOT_FOUND
 
-  // Type-safe access to guest email — also allow booker email to access portal
-  const guest = reservation.guests as { email: string; first_name: string; last_name: string; phone: string | null }
-  const inputEmail = parsed.data.email.toLowerCase()
+  const guest = reservation.guests as { id: string; email: string; first_name: string; last_name: string; phone: string | null }
   const guestEmailMatch = guest?.email.toLowerCase() === inputEmail
   const bookerEmailMatch = reservation.booker_email?.toLowerCase() === inputEmail
   if (!guest || (!guestEmailMatch && !bookerEmailMatch)) {
     return GENERIC_NOT_FOUND
   }
 
-  // Fetch settings fields used on the guest-facing check-in / policies screen
+  // ── Fetch settings ─────────────────────────────────────────────────────────
   const { data: settings } = await supabase
     .from('settings')
     .select('check_in_time, check_out_time, min_stay_nights, cancellation_policy, house_rules')
     .eq('property_id', reservation.property_id)
     .single()
 
-  // Merge settings into the properties object to preserve the API shape the frontend expects
   const reservationWithTimes = {
     ...reservation,
     properties: {
@@ -91,8 +91,8 @@ serve(async (req) => {
     },
   }
 
-  // Fetch rooms, all property rooms (for modification), and payments in parallel
-  const [{ data: rooms }, { data: allRooms }, { data: payments }] = await Promise.all([
+  // ── Fetch rooms, payments for this reservation + all reservations for this email ──
+  const [{ data: rooms }, { data: allRooms }, { data: payments }, { data: guestReservations }, { data: bookerReservations }] = await Promise.all([
     supabase
       .from('rooms')
       .select('id, name, type, images')
@@ -106,7 +106,72 @@ serve(async (req) => {
       .from('payments')
       .select('type, status, amount_cents, method, created_at')
       .eq('reservation_id', reservation.id),
+    // All reservations where guest email matches (for history/payments tabs)
+    supabase
+      .from('reservations')
+      .select(`
+        id, confirmation_number, check_in, check_out, num_guests,
+        status, origin, total_due_cents, notes, created_at,
+        room_ids, property_id, modification_count,
+        booker_email, cc_emails,
+        guests!inner(id, first_name, last_name, email, phone),
+        properties(name, timezone, location)
+      `)
+      .eq('property_id', reservation.property_id)
+      .eq('guests.email', guest.email)
+      .order('check_in', { ascending: false }),
+    // All reservations where booker email matches
+    supabase
+      .from('reservations')
+      .select(`
+        id, confirmation_number, check_in, check_out, num_guests,
+        status, origin, total_due_cents, notes, created_at,
+        room_ids, property_id, modification_count,
+        booker_email, cc_emails,
+        guests!inner(id, first_name, last_name, email, phone),
+        properties(name, timezone, location)
+      `)
+      .eq('property_id', reservation.property_id)
+      .ilike('booker_email', inputEmail)
+      .order('check_in', { ascending: false }),
   ])
+
+  // Deduplicate all reservations
+  const allResMap = new Map<string, Record<string, unknown>>()
+  for (const r of (guestReservations ?? [])) allResMap.set(r.id, r)
+  for (const r of (bookerReservations ?? [])) allResMap.set(r.id, r)
+  const allReservationsList = Array.from(allResMap.values())
+
+  // Fetch all payments across all reservations (for Payments tab)
+  const allReservationIds = allReservationsList.map((r) => r.id as string)
+  const allResRoomIds = [...new Set(allReservationsList.flatMap((r) => (r.room_ids as string[]) ?? []))]
+
+  const [{ data: allPayments }, { data: allResRooms }] = await Promise.all([
+    allReservationIds.length > 0
+      ? supabase
+          .from('payments')
+          .select('id, type, status, amount_cents, method, created_at, reservation_id')
+          .in('reservation_id', allReservationIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+    allResRoomIds.length > 0
+      ? supabase.from('rooms').select('id, name, type, images').in('id', allResRoomIds)
+      : Promise.resolve({ data: [] }),
+  ])
+
+  // Enrich all reservations with settings
+  const enrichedReservations = allReservationsList.map((r) => ({
+    ...r,
+    modification_count: (r.modification_count as number) ?? 0,
+    properties: {
+      ...(r.properties as Record<string, unknown> ?? {}),
+      check_in_time:       settings?.check_in_time       ?? null,
+      check_out_time:      settings?.check_out_time      ?? null,
+      min_stay_nights:     settings?.min_stay_nights     ?? null,
+      cancellation_policy: settings?.cancellation_policy ?? null,
+      house_rules:         settings?.house_rules         ?? null,
+    },
+  }))
 
   const paymentSummary = calculatePaymentSummary(reservation.total_due_cents, payments ?? [])
 
@@ -116,6 +181,11 @@ serve(async (req) => {
       rooms: rooms ?? [],
       availableRooms: allRooms ?? [],
       paymentSummary,
+      // All-reservations data (for history/payments/contact tabs)
+      reservations: enrichedReservations,
+      guest: { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone },
+      allRooms: allResRooms ?? [],
+      payments: allPayments ?? [],
     }),
     { headers: CORS_HEADERS }
   )

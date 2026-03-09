@@ -201,6 +201,24 @@ function useModifiedReservations() {
   })
 }
 
+function useGuestActivity() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: queryKeys.guestActivity.list(propertyId),
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data } = await supabase
+        .from('guest_portal_activity')
+        .select('*')
+        .eq('property_id', propertyId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Shared card shell — left accent bar + collapsible body
 // ---------------------------------------------------------------------------
@@ -325,6 +343,74 @@ function DepartingCard({ reservations, rooms, dayView, loading }) {
         : (
           <ul className="mt-1">
             {reservations.map(r => <GuestRow key={r.id} reservation={r} rooms={rooms} />)}
+          </ul>
+        )
+      }
+    </StatCard>
+  )
+}
+
+const ACTIVITY_LABELS = {
+  modification_confirmed: 'Modified reservation',
+  contact_updated: 'Updated contact info',
+  booker_attached: 'Attached as booker',
+}
+
+function activityDetail(action, details) {
+  if (action === 'modification_confirmed' && details) {
+    const oldIn = details.old_check_in ? format(parseISO(details.old_check_in), 'MMM d') : ''
+    const newIn = details.new_check_in ? format(parseISO(details.new_check_in), 'MMM d') : ''
+    const oldOut = details.old_check_out ? format(parseISO(details.old_check_out), 'MMM d') : ''
+    const newOut = details.new_check_out ? format(parseISO(details.new_check_out), 'MMM d') : ''
+    return `${oldIn}–${oldOut} → ${newIn}–${newOut}`
+  }
+  if (action === 'contact_updated' && details) {
+    const parts = []
+    if (details.new_email) parts.push(`email → ${details.new_email}`)
+    if (details.new_phone) parts.push(`phone → ${details.new_phone}`)
+    return parts.join(', ')
+  }
+  if (action === 'booker_attached' && details) {
+    return `on ${details.confirmation_number ?? 'reservation'}`
+  }
+  return ''
+}
+
+function GuestActivityCard({ activities, loading }) {
+  return (
+    <StatCard
+      id="modified"
+      label="Guest Activity"
+      count={activities.length}
+      loading={loading}
+      defaultOpen={activities.length > 0}
+    >
+      {activities.length === 0
+        ? <p className="font-body text-[13px] text-text-muted pt-3">No recent guest activity.</p>
+        : (
+          <ul className="mt-1">
+            {activities.map(a => {
+              const g = a.guests ?? {}
+              const ago = a.created_at
+                ? formatDistanceToNow(new Date(a.created_at), { addSuffix: true })
+                : ''
+              const detail = activityDetail(a.action, a.details)
+              return (
+                <li key={a.id} className="flex flex-col gap-0.5 py-2.5 border-b border-border/40 last:border-b-0">
+                  <div className="flex items-center gap-2">
+                    <Bell size={13} weight="fill" className="text-warning shrink-0" />
+                    <span className="font-body text-[14px] font-semibold text-text-primary">
+                      {g.first_name} {g.last_name}
+                    </span>
+                  </div>
+                  <span className="font-body text-[12px] text-text-secondary pl-5">
+                    {ACTIVITY_LABELS[a.action] ?? a.action}
+                    {detail && <span className="text-text-muted"> · {detail}</span>}
+                  </span>
+                  <span className="font-mono text-[11px] text-text-muted pl-5">{ago}</span>
+                </li>
+              )
+            })}
           </ul>
         )
       }
@@ -537,7 +623,7 @@ function RevenueCardWrapper({ thisMonth, ytd, loading }) {
 // DayCards — magazine grid layout
 // ---------------------------------------------------------------------------
 
-function DayCards({ dayView, calReservations, rooms, payments, modifiedReservations, loading }) {
+function DayCards({ dayView, calReservations, rooms, payments, modifiedReservations, guestActivities, loading }) {
   const today    = startOfDay(new Date())
   const viewDate = dayView === 'today' ? today : addDays(today, 1)
   const dateStr  = format(viewDate, 'yyyy-MM-dd')
@@ -571,13 +657,21 @@ function DayCards({ dayView, calReservations, rooms, payments, modifiedReservati
         />
       </div>
 
-      {/* Row 2: Guest Modified + Occupancy + Revenue */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Row 2: Guest Modified + Guest Activity */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ModifiedCard
           reservations={modifiedReservations}
           rooms={rooms}
           loading={loading}
         />
+        <GuestActivityCard
+          activities={guestActivities}
+          loading={loading}
+        />
+      </div>
+
+      {/* Row 3: Occupancy + Revenue */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <OccupancyCardWrapper
           pct={occupancyPct}
           inHouse={inHouseToday.length}
@@ -774,6 +868,7 @@ export default function Dashboard() {
   const { data: maintenanceTickets = [] }   = useOpenMaintenanceTickets()
   const { data: payments }                  = usePaymentsSummary()
   const { data: modifiedReservations = [] } = useModifiedReservations()
+  const { data: guestActivities = [] }     = useGuestActivity()
 
   return (
     <div className="flex flex-col gap-8">
@@ -816,6 +911,7 @@ export default function Dashboard() {
         rooms={rooms}
         payments={payments}
         modifiedReservations={modifiedReservations}
+        guestActivities={guestActivities}
         loading={calLoading}
       />
 

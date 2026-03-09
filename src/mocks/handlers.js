@@ -8,7 +8,7 @@ import {
   MOCK_PROPERTY, MOCK_USER_ACCESS, MOCK_SETTINGS,
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
-  MOCK_EMAIL_LOGS,
+  MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -225,16 +225,34 @@ export const handlers = [
     })
   }),
 
-  // Guest portal lookup
+  // Guest portal lookup — requires confirmation_number + email (security gate)
+  // Returns single reservation detail + all reservations for that email
   http.post(`${BASE}/functions/v1/guest-portal-lookup`, async ({ request }) => {
     const body = await request.json().catch(() => ({}))
     const { confirmation_number, email } = body
+
+    if (!confirmation_number || !email) {
+      return HttpResponse.json({ error: 'Reservation not found.' }, { status: 404 })
+    }
+
     const res = MOCK_RESERVATIONS.find(
       r => r.confirmation_number === confirmation_number && r.guests?.email === email
     )
     if (!res) {
       return HttpResponse.json({ error: 'Reservation not found. Please check your confirmation number and email.' }, { status: 404 })
     }
+
+    // All reservations for this email (for history/payments tabs)
+    const lowerEmail = email.toLowerCase()
+    const allReservations = MOCK_RESERVATIONS.filter(
+      r => r.guests?.email?.toLowerCase() === lowerEmail || r.booker_email?.toLowerCase() === lowerEmail
+    )
+    const guest = MOCK_GUESTS.find(g => g.email.toLowerCase() === lowerEmail)
+    const allRoomIds = [...new Set(allReservations.flatMap(r => r.room_ids ?? []))]
+    const matchingPayments = MOCK_PAYMENTS.filter(p =>
+      allReservations.some(r => r.id === p.reservation_id)
+    )
+
     return HttpResponse.json({
       reservation: res,
       rooms: MOCK_ROOMS.filter(r => res.room_ids?.includes(r.id)),
@@ -245,6 +263,11 @@ export const handlers = [
         status:           'unpaid',
       },
       availableRooms: MOCK_ROOMS.filter(r => r.is_active),
+      // All-reservations data
+      reservations: allReservations,
+      guest: guest ? { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone } : null,
+      allRooms: MOCK_ROOMS.filter(r => allRoomIds.includes(r.id)),
+      payments: matchingPayments,
     })
   }),
 
@@ -398,6 +421,66 @@ export const handlers = [
   http.get(`${BASE}/rest/v1/email_logs`, ({ request }) => {
     const sorted = [...MOCK_EMAIL_LOGS].sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
     return pgRespond(request, sorted)
+  }),
+
+  // -------------------------------------------------------------------------
+  // guest_portal_activity
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/guest_portal_activity`, ({ request }) => {
+    const sorted = [...MOCK_GUEST_ACTIVITY].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return pgRespond(request, sorted)
+  }),
+
+  // -------------------------------------------------------------------------
+  // Guest portal update (contact info + booker attachment)
+  // -------------------------------------------------------------------------
+
+  http.post(`${BASE}/functions/v1/guest-portal-update`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const { action, confirmation_number, email } = body
+
+    // Verify identity
+    const res = MOCK_RESERVATIONS.find(
+      r => r.confirmation_number === confirmation_number && r.guests?.email === email
+    )
+    if (!res) {
+      return HttpResponse.json({ error: 'Reservation not found.' }, { status: 404 })
+    }
+
+    if (action === 'update_contact') {
+      const guest = MOCK_GUESTS.find(g => g.email === email)
+      if (guest) {
+        if (body.new_email) guest.email = body.new_email
+        if (body.new_phone) guest.phone = body.new_phone
+      }
+      MOCK_GUEST_ACTIVITY.push({
+        id: `gact-${Date.now()}`, property_id: res.property_id, reservation_id: null,
+        guest_id: guest?.id ?? res.guest_id, action: 'contact_updated',
+        details: { old_email: email, new_email: body.new_email, old_phone: guest?.phone, new_phone: body.new_phone },
+        created_at: new Date().toISOString(),
+        guests: { first_name: guest?.first_name ?? '', last_name: guest?.last_name ?? '' },
+      })
+      return HttpResponse.json({ success: true, message: 'Contact information updated.' })
+    }
+
+    if (action === 'attach_booker') {
+      const target = MOCK_RESERVATIONS.find(r => r.id === body.target_reservation_id)
+      if (!target) return HttpResponse.json({ error: 'Target reservation not found.' }, { status: 404 })
+      if (target.guest_id !== res.guest_id) return HttpResponse.json({ error: 'You can only attach yourself as booker to your own reservations.' }, { status: 403 })
+      target.booker_email = email
+      const guest = MOCK_GUESTS.find(g => g.email === email)
+      MOCK_GUEST_ACTIVITY.push({
+        id: `gact-${Date.now()}`, property_id: target.property_id, reservation_id: target.id,
+        guest_id: guest?.id ?? res.guest_id, action: 'booker_attached',
+        details: { target_reservation_id: target.id, booker_email: email, confirmation_number: target.confirmation_number },
+        created_at: new Date().toISOString(),
+        guests: { first_name: guest?.first_name ?? '', last_name: guest?.last_name ?? '' },
+      })
+      return HttpResponse.json({ success: true, message: 'You have been attached as booker to this reservation.' })
+    }
+
+    return HttpResponse.json({ error: 'Unknown action' }, { status: 400 })
   }),
 
 ]
