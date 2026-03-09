@@ -7,6 +7,7 @@ import {
   MOCK_USER, MOCK_SESSION,
   MOCK_PROPERTY, MOCK_USER_ACCESS, MOCK_SETTINGS,
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
+  MOCK_EMAIL_LOGS,
 } from './db.js'
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,7 @@ const TABLE_DATA = {
   guests:               MOCK_GUESTS,
   documents:            [],
   room_external_feeds:  [],
+  email_logs:           MOCK_EMAIL_LOGS,
 }
 
 // ---------------------------------------------------------------------------
