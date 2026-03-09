@@ -343,7 +343,7 @@ function RoomCalculator({ room, settings }) {
         {roomAllowsPets && petFeeRate > 0 && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={includePetFee} onChange={e => setIncludePetFee(e.target.checked)} className="w-4 h-4 accent-info" />
-            <span className="font-body text-[12px] text-text-secondary">Pet fee ({fmt(petFeeRate)} {petFeeType === 'per_night' ? '/night' : 'flat'})</span>
+            <span className="font-body text-[12px] text-text-secondary">Pet fee ({fmt(petFeeRate)} {petFeeType === 'per_night' ? '/night' : 'one-time'})</span>
           </label>
         )}
       </div>

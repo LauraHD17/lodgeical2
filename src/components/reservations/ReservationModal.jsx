@@ -125,7 +125,7 @@ function Step1Dates({ checkIn, checkOut, onSelect, bookedRanges = [], minStay = 
   return (
     <div>
       <h3 className="font-body font-semibold text-[16px] text-text-primary mb-4">
-        Select check-in &amp; check-out dates
+        Select check-in & check-out dates
       </h3>
       <div className="flex justify-center">
         <DayPicker
@@ -392,7 +392,7 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
   return (
     <div className="flex flex-col gap-4">
       <h3 className="font-body font-semibold text-[16px] text-text-primary">
-        Review &amp; confirm
+        Review & confirm
       </h3>
 
       <div className="bg-surface border border-border rounded-[8px] p-4 flex flex-col gap-3">
@@ -538,7 +538,7 @@ function Step4Fees({ selectedRooms, nights, propertySettings, feesData, onFeesCh
   return (
     <div className="flex flex-col gap-4">
       <h3 className="font-body font-semibold text-[16px] text-text-primary">
-        Fees &amp; Tax
+        Fees & Tax
       </h3>
 
       {/* Cleaning fee */}
@@ -656,7 +656,7 @@ function Step4Fees({ selectedRooms, nights, propertySettings, feesData, onFeesCh
         <div className="flex items-center justify-between">
           <div>
             <p className="font-body font-semibold text-[15px] text-text-primary">Tax Exempt</p>
-            <p className="font-body text-[13px] text-text-muted">State &amp; local tax waived</p>
+            <p className="font-body text-[13px] text-text-muted">State & local tax waived</p>
           </div>
           <div className="flex items-center gap-2">
             <Switch.Root

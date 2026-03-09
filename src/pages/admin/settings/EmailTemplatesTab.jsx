@@ -18,6 +18,7 @@ const TEMPLATE_TYPES = [
   { value: 'payment_failed',            label: 'Payment Failed' },
   { value: 'check_in_reminder',         label: 'Check-in Reminder' },
   { value: 'check_out_reminder',        label: 'Check-out Reminder' },
+  { value: 'custom',                    label: 'Custom (Blank)' },
 ]
 
 const VARIABLE_TAGS = [
@@ -120,7 +121,7 @@ export function EmailTemplatesTab() {
     <div className="flex flex-col gap-5">
       <SectionHeader>Email Templates</SectionHeader>
       <p className="font-body text-[14px] text-text-secondary -mt-3">
-        Customise the emails sent to guests. Use <span className="font-mono text-[13px] bg-border px-1 rounded">{'{{variable}}'}</span> tags to insert dynamic content.
+        Customize the emails sent to guests. Use <span className="font-mono text-[13px] bg-border px-1 rounded">{'{{variable}}'}</span> tags to insert dynamic content.
         Leave a template blank to use the built-in default.
       </p>
 

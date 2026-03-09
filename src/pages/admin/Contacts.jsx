@@ -305,7 +305,7 @@ function ContactDrawer({ contact, onClose, onSaved }) {
       <div className="pt-2 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button variant="primary" disabled={saving} onClick={handleSave}>
-          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add contact'}
+          {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Contact'}
         </Button>
       </div>
     </div>

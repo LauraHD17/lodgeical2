@@ -375,7 +375,7 @@ function ModificationPaymentForm({ balanceCents, onSuccess, onError }) {
     <div className="mt-4">
       <PaymentElement />
       <Button variant="primary" size="lg" loading={paying} onClick={handlePay} className="w-full mt-4">
-        Pay {formatCents(balanceCents)} &amp; Confirm
+        Pay {formatCents(balanceCents)} & Confirm
       </Button>
     </div>
   )

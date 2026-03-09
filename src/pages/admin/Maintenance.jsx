@@ -232,7 +232,7 @@ function LogForm({ log, rooms, onClose }) {
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
         <Button variant="primary" type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Save entry'}
+          {saving ? 'Saving…' : 'Save Entry'}
         </Button>
       </div>
     </form>
