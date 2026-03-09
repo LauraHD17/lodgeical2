@@ -66,4 +66,9 @@ export const queryKeys = {
   weather: {
     current: (lat, lon) => ['weather', 'current', lat, lon],
   },
+
+  emailLogs: {
+    all: ['emailLogs'],
+    list: (propertyId) => ['emailLogs', 'list', propertyId],
+  },
 }

@@ -8,6 +8,7 @@ import {
   MOCK_PROPERTY, MOCK_USER_ACCESS, MOCK_SETTINGS,
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
+  MOCK_EMAIL_LOGS,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -276,13 +277,26 @@ export const handlers = [
         requires_payment: false,
       })
     }
+    // Apply mode — mutate mock data so re-fetch returns updated values
+    if (res) {
+      if (body.new_check_in)   res.check_in = body.new_check_in
+      if (body.new_check_out)  res.check_out = body.new_check_out
+      if (body.new_room_ids)   res.room_ids = body.new_room_ids
+      if (body.new_num_guests) res.num_guests = body.new_num_guests
+      res.modification_count = (res.modification_count ?? 0) + 1
+    }
     return HttpResponse.json({ success: true, requires_payment: false })
   }),
 
   // Confirm modification (after payment)
-  http.post(`${BASE}/functions/v1/confirm-modification`, () =>
-    HttpResponse.json({ success: true }),
-  ),
+  http.post(`${BASE}/functions/v1/confirm-modification`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const target = MOCK_RESERVATIONS.find(r => r.id === body.reservation_id)
+    if (target) {
+      target.modification_count = (target.modification_count ?? 0) + 1
+    }
+    return HttpResponse.json({ success: true })
+  }),
 
   http.get(`${BASE}/functions/v1/ical-export`, () =>
     new HttpResponse(
@@ -375,6 +389,15 @@ export const handlers = [
   http.post(`${BASE}/rest/v1/payments`, async ({ request }) => {
     const body = await request.json()
     return pgRespond(request, { id: `pay-new-${Date.now()}`, ...body, created_at: new Date().toISOString() })
+  }),
+
+  // -------------------------------------------------------------------------
+  // email_logs
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/email_logs`, ({ request }) => {
+    const sorted = [...MOCK_EMAIL_LOGS].sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
+    return pgRespond(request, sorted)
   }),
 
 ]

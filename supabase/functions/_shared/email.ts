@@ -22,11 +22,11 @@ interface Reservation {
   room_ids?: string[]
 }
 
-async function sendEmail(to: string, subject: string, html: string, cc?: string[]): Promise<void> {
+async function sendEmail(to: string, subject: string, html: string, cc?: string[]): Promise<boolean> {
   const apiKey = Deno.env.get('RESEND_API_KEY')
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not set — skipping email send')
-    return
+    return false
   }
 
   const res = await fetch('https://api.resend.com/emails', {
@@ -47,6 +47,34 @@ async function sendEmail(to: string, subject: string, html: string, cc?: string[
   if (!res.ok) {
     const err = await res.text()
     console.error('[email] Send failed:', err)
+    return false
+  }
+
+  return true
+}
+
+/** Log a sent (or failed) email to the email_logs table for the message center. */
+async function logEmail(
+  supabase: SupabaseClient | null,
+  propertyId: string | undefined,
+  reservationId: string | undefined,
+  guestEmail: string,
+  templateType: string,
+  subject: string,
+  status: 'sent' | 'failed'
+): Promise<void> {
+  if (!supabase || !propertyId) return
+  try {
+    await supabase.from('email_logs').insert({
+      property_id: propertyId,
+      reservation_id: reservationId ?? null,
+      guest_email: guestEmail,
+      template_type: templateType,
+      subject,
+      status,
+    })
+  } catch (e) {
+    console.error('[email] Failed to log email:', e)
   }
 }
 
@@ -128,7 +156,8 @@ export async function sendBookingConfirmation(
       <p>Total: $${(reservation.total_due_cents / 100).toFixed(2)}</p>`
   }
 
-  await sendEmail(guest.email, subject, html)
+  const ok = await sendEmail(guest.email, subject, html)
+  await logEmail(supabase, reservation.property_id, undefined, guest.email, 'booking_confirmation', subject, ok ? 'sent' : 'failed')
 }
 
 export async function sendCancellationNotice(
@@ -153,7 +182,32 @@ export async function sendCancellationNotice(
       ${refundCents > 0 ? `<p>Refund: $${(refundCents / 100).toFixed(2)}</p>` : ''}`
   }
 
-  await sendEmail(guest.email, subject, html)
+  const ok = await sendEmail(guest.email, subject, html)
+  await logEmail(supabase, reservation.property_id, undefined, guest.email, 'cancellation_notice', subject, ok ? 'sent' : 'failed')
+}
+
+export async function sendModificationConfirmation(
+  guest: Guest,
+  reservation: Reservation,
+  supabase: SupabaseClient | null = null
+): Promise<void> {
+  const vars = await buildVars(supabase, guest, reservation)
+
+  let subject: string
+  let html: string
+
+  if (supabase && reservation.property_id) {
+    ;({ subject, html } = await renderTemplate(supabase, reservation.property_id, 'modification_confirmation', vars))
+  } else {
+    subject = `Reservation Modified — ${reservation.confirmation_number}`
+    html = `<h2>Reservation Modified</h2><p>Hi ${guest.first_name},</p>
+      <p>Your reservation ${reservation.confirmation_number} has been updated.</p>
+      <p>Check-in: ${reservation.check_in} | Check-out: ${reservation.check_out}</p>
+      <p>New Total: $${(reservation.total_due_cents / 100).toFixed(2)}</p>`
+  }
+
+  const ok = await sendEmail(guest.email, subject, html)
+  await logEmail(supabase, reservation.property_id, undefined, guest.email, 'modification_confirmation', subject, ok ? 'sent' : 'failed')
 }
 
 export async function sendPaymentFailedAlert(
@@ -174,7 +228,8 @@ export async function sendPaymentFailedAlert(
       <p>Payment for ${reservation.confirmation_number} could not be processed.</p>`
   }
 
-  await sendEmail(guest.email, subject, html)
+  const ok = await sendEmail(guest.email, subject, html)
+  await logEmail(supabase, reservation.property_id, undefined, guest.email, 'payment_failed', subject, ok ? 'sent' : 'failed')
 }
 
 /** Send automated check-in reminder (called from a scheduled job or manually).
@@ -191,7 +246,8 @@ export async function sendCheckInReminder(
   }
   const vars = await buildVars(supabase, guest, reservation)
   const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'check_in_reminder', vars)
-  await sendEmail(guest.email, subject, html, ccEmails)
+  const ok = await sendEmail(guest.email, subject, html, ccEmails)
+  await logEmail(supabase, reservation.property_id, undefined, guest.email, 'check_in_reminder', subject, ok ? 'sent' : 'failed')
 }
 
 /** Send automated check-out reminder.
@@ -208,5 +264,6 @@ export async function sendCheckOutReminder(
   }
   const vars = await buildVars(supabase, guest, reservation)
   const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'check_out_reminder', vars)
-  await sendEmail(guest.email, subject, html, ccEmails)
+  const ok = await sendEmail(guest.email, subject, html, ccEmails)
+  await logEmail(supabase, reservation.property_id, undefined, guest.email, 'check_out_reminder', subject, ok ? 'sent' : 'failed')
 }

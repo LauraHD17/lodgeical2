@@ -12,11 +12,12 @@ import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
 
 const TEMPLATE_TYPES = [
-  { value: 'booking_confirmation',  label: 'Booking Confirmation' },
-  { value: 'cancellation_notice',   label: 'Cancellation Notice' },
-  { value: 'payment_failed',        label: 'Payment Failed' },
-  { value: 'check_in_reminder',     label: 'Check-in Reminder' },
-  { value: 'check_out_reminder',    label: 'Check-out Reminder' },
+  { value: 'booking_confirmation',      label: 'Booking Confirmation' },
+  { value: 'cancellation_notice',       label: 'Cancellation Notice' },
+  { value: 'modification_confirmation', label: 'Modification Confirmation' },
+  { value: 'payment_failed',            label: 'Payment Failed' },
+  { value: 'check_in_reminder',         label: 'Check-in Reminder' },
+  { value: 'check_out_reminder',        label: 'Check-out Reminder' },
 ]
 
 const VARIABLE_TAGS = [

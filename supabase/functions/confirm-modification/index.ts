@@ -7,6 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { getStripe } from '../_shared/stripe.ts'
+import { sendModificationConfirmation } from '../_shared/email.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -122,6 +123,13 @@ serve(async (req) => {
     console.error('[confirm-modification] update error:', updateError)
     return new Response(JSON.stringify({ error: 'Failed to apply modification' }), { status: 500, headers: CORS_HEADERS })
   }
+
+  // Send modification confirmation email (fire-and-forget)
+  sendModificationConfirmation(
+    { first_name, last_name, email },
+    { ...reservation, check_in: newCheckIn, check_out: newCheckOut, room_ids: newRoomIds, total_due_cents: newTotalCents },
+    supabase
+  ).catch(e => console.error('[confirm-modification] email error:', e))
 
   return new Response(JSON.stringify({
     success: true,
