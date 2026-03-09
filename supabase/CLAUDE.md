@@ -16,7 +16,7 @@ supabase secrets set KEY=value  # Set edge function secrets (Stripe, Resend, etc
 | Service | Port |
 |---------|------|
 | API (PostgREST) | 54321 |
-| Database (Postgres 17) | 54322 |
+| Database (Postgres 17, set in config.toml) | 54322 |
 | Studio (Web UI) | 54323 |
 | Inbucket (Email testing) | 54324 |
 | Edge Runtime Inspector | 8083 |

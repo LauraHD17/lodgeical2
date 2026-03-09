@@ -119,7 +119,7 @@ QueryClientProvider → BrowserRouter → AuthProvider → PropertyProvider
 ### Single Sources of Truth
 - **Routes**: All defined in `src/config/routes.js`. Navigation items, permissions, and public-route detection derive from this array. Never hardcode route paths elsewhere. Enforced by `npm run routes:check` in CI.
 - **Query Keys**: All defined in `src/config/queryKeys.js`. Never define query keys inline in hooks. Uses factory pattern: `queryKeys.reservations.list(filters)`.
-- **Permissions**: Role-based (owner, manager, staff), defined in `src/lib/auth/permissions.js`. Each route specifies its required permission. Owner has all 12 permissions; manager has all except `MANAGE_SETTINGS`; staff has 6 (view-only + messaging, documents, maintenance, contacts, guests).
+- **Permissions**: Role-based (owner, manager, staff), defined in `src/lib/auth/permissions.js`. Each route specifies its required permission. Owner has all 12 permissions; manager has all except `MANAGE_SETTINGS`; staff has 6 (view-only + guests, documents, messaging, maintenance).
 
 ### Data Conventions
 - **Dates**: Always ISO strings (`YYYY-MM-DD`) in state and API calls. Never use `Date` objects.
