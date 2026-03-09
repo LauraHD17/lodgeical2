@@ -48,7 +48,7 @@ serve(async (req) => {
   // Fetch active rooms (RLS policy on rooms enforces is_active + public property)
   const { data: rooms } = await supabase
     .from('rooms')
-    .select('id, name, type, max_guests, base_rate_cents, description, images, amenities, sort_order')
+    .select('id, name, type, max_guests, base_rate_cents, description, images, amenities, sort_order, buffer_days_before, buffer_days_after')
     .eq('property_id', property.id)
     .eq('is_active', true)
     .order('sort_order')

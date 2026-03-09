@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
+import { checkConflicts } from '../_shared/conflicts.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -63,23 +64,18 @@ serve(async (req) => {
   const newCheckIn = input.check_in ?? existing.check_in
   const newCheckOut = input.check_out ?? existing.check_out
 
-  // Re-run conflict check if dates or rooms changed
+  // Re-run conflict check if dates or rooms changed (includes buffer days)
   const datesChanged = input.check_in || input.check_out || input.room_ids
   if (datesChanged) {
-    const { data: conflicts } = await supabase
-      .from('reservations')
-      .select('id, room_ids')
-      .eq('property_id', propertyId)
-      .neq('status', 'cancelled')
-      .neq('id', input.reservation_id) // exclude current reservation
-      .lt('check_in', newCheckOut)
-      .gt('check_out', newCheckIn)
+    const { hasConflict, conflictingIds } = await checkConflicts(supabase, {
+      propertyId,
+      roomIds: newRoomIds,
+      checkIn: newCheckIn,
+      checkOut: newCheckOut,
+      excludeReservationId: input.reservation_id,
+    })
 
-    const conflictingIds = (conflicts ?? [])
-      .filter(r => r.room_ids.some((rid: string) => newRoomIds.includes(rid)))
-      .map(r => r.id)
-
-    if (conflictingIds.length > 0) {
+    if (hasConflict) {
       return new Response(
         JSON.stringify({ success: false, code: 'CONFLICT', conflictingIds }),
         { status: 409, headers: CORS_HEADERS }

@@ -100,6 +100,7 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
           <DateStep
             settings={settings}
             propertyId={property.id}
+            rooms={rooms}
             initialDates={dates}
             onNext={(d) => { setDates(d); setStep(1) }}
           />

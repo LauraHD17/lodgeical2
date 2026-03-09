@@ -36,10 +36,10 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  // Look up room by token
+  // Look up room by token (include buffer days)
   const { data: room, error: roomErr } = await supabase
     .from('rooms')
-    .select('id, name, property_id')
+    .select('id, name, property_id, buffer_days_before, buffer_days_after')
     .eq('ical_token', token)
     .single()
 
@@ -66,7 +66,7 @@ serve(async (req) => {
     .contains('room_ids', [room.id])
     .order('check_in', { ascending: true })
 
-  const icsLines = buildIcs(room.name, reservations ?? [])
+  const icsLines = buildIcs(room.name, reservations ?? [], room.buffer_days_before ?? 0, room.buffer_days_after ?? 0)
 
   return new Response(icsLines.join('\r\n'), {
     headers: {
@@ -82,6 +82,13 @@ serve(async (req) => {
 // iCal generation
 // ---------------------------------------------------------------------------
 
+/** Shift a YYYY-MM-DD string by N days */
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 function buildIcs(
   roomName: string,
   reservations: Array<{
@@ -94,6 +101,8 @@ function buildIcs(
     updated_at: string
     guests: { first_name: string; last_name: string } | null
   }>,
+  bufferBefore: number,
+  bufferAfter: number,
 ): string[] {
   const lines: string[] = [
     'BEGIN:VCALENDAR',
@@ -106,8 +115,11 @@ function buildIcs(
   ]
 
   for (const res of reservations) {
-    const dtStart = toIcsDate(res.check_in)
-    const dtEnd   = toIcsDate(res.check_out)
+    // Extend date range by buffer days so external calendars block the full period
+    const effectiveCheckIn = bufferBefore > 0 ? shiftDate(res.check_in, -bufferBefore) : res.check_in
+    const effectiveCheckOut = bufferAfter > 0 ? shiftDate(res.check_out, bufferAfter) : res.check_out
+    const dtStart = toIcsDate(effectiveCheckIn)
+    const dtEnd   = toIcsDate(effectiveCheckOut)
     if (!dtStart || !dtEnd) continue
 
     const guest   = res.guests

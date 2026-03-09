@@ -8,7 +8,7 @@ import {
   MOCK_PROPERTY, MOCK_USER_ACCESS, MOCK_SETTINGS,
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
-  MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY,
+  MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY, MOCK_ROOM_LINKS,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -101,6 +101,37 @@ export const handlers = [
     const body = await request.json()
     const newRoom = { id: `room-new-${Date.now()}`, ...body, created_at: new Date().toISOString() }
     return pgRespond(request, newRoom)
+  }),
+
+  // room_links — CRUD
+  http.get(`${BASE}/rest/v1/room_links`, ({ request }) =>
+    pgRespond(request, MOCK_ROOM_LINKS),
+  ),
+
+  http.post(`${BASE}/rest/v1/room_links`, async ({ request }) => {
+    const body = await request.json()
+    const newLink = { id: `rlink-new-${Date.now()}`, ...body, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    MOCK_ROOM_LINKS.push(newLink)
+    return pgRespond(request, newLink)
+  }),
+
+  http.patch(`${BASE}/rest/v1/room_links`, async ({ request }) => {
+    const body = await request.json()
+    const url = new URL(request.url)
+    const idFilter = url.searchParams.get('id')
+    const id = idFilter?.replace('eq.', '')
+    const idx = MOCK_ROOM_LINKS.findIndex(l => l.id === id)
+    if (idx >= 0) Object.assign(MOCK_ROOM_LINKS[idx], body, { updated_at: new Date().toISOString() })
+    return pgRespond(request, idx >= 0 ? MOCK_ROOM_LINKS[idx] : body)
+  }),
+
+  http.delete(`${BASE}/rest/v1/room_links`, ({ request }) => {
+    const url = new URL(request.url)
+    const idFilter = url.searchParams.get('id')
+    const id = idFilter?.replace('eq.', '')
+    const idx = MOCK_ROOM_LINKS.findIndex(l => l.id === id)
+    if (idx >= 0) MOCK_ROOM_LINKS.splice(idx, 1)
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // reservations — array (paginated)
@@ -220,7 +251,7 @@ export const handlers = [
     return HttpResponse.json({
       property: MOCK_PROPERTY,
       rooms:    MOCK_ROOMS.filter(r => r.is_active),
-      roomLinks: [],
+      roomLinks: MOCK_ROOM_LINKS.filter(l => l.is_active),
       settings: { ...MOCK_SETTINGS, currency: 'USD', min_stay_nights: 1, require_payment_at_booking: false, allow_partial_payment: true },
     })
   }),

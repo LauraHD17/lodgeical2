@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import {
-  House, Tag, Globe, CalendarCheck,
+  House, Tag, Globe, CalendarCheck, Question,
   CaretDown, CaretUp, CheckCircle, ArrowRight, Link as LinkIcon,
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -167,6 +167,53 @@ const SECTIONS = [
 ]
 
 // ---------------------------------------------------------------------------
+// FAQ
+// ---------------------------------------------------------------------------
+
+const FAQ_ITEMS = [
+  {
+    q: 'How do I change my check-in and check-out times?',
+    a: 'Go to Settings and update the Check-in Time and Check-out Time fields. These times are shown to guests on confirmation emails and the guest portal.',
+  },
+  {
+    q: 'What are buffer days?',
+    a: 'Buffer days block extra time before and after a reservation for cleaning and turnover. Set them per room on the Rooms page. For example, if a room has 1 buffer day after, no new guest can check in the day after a checkout. Buffer days appear as hatched blocks on your calendar.',
+  },
+  {
+    q: 'What are fee overrides on rooms?',
+    a: 'Fee overrides let you set a different cleaning fee or pet fee for a specific room, instead of using the property-wide default. Leave them blank to use the default from Settings. Useful when larger rooms need higher cleaning fees.',
+  },
+  {
+    q: 'How do room links work?',
+    a: 'Room links let you sell a combination of rooms as one listing. First mark rooms as "linkable" on the Rooms page, then create a named combination (like "Family Suite") in the Room Links section. Guests see the linked option in the booking widget alongside individual rooms.',
+  },
+  {
+    q: 'Can guests modify their own reservations?',
+    a: 'Yes. Guests can modify once through the Guest Portal. The new total must be equal to or greater than the original. If there\'s a balance due, they\'ll pay the difference by card. You\'ll see a "GUEST MODIFIED" alert on your Dashboard.',
+  },
+  {
+    q: 'How does iCal sync work?',
+    a: 'Each room has a unique iCal feed URL (found in Settings → Integrations). Paste it into Airbnb, VRBO, or Google Calendar to automatically block dates. You can also import external iCal feeds to block dates from other platforms here.',
+  },
+  {
+    q: 'What happens when I cancel a reservation?',
+    a: 'The reservation status changes to "cancelled" and the dates become available again. A cancellation email is sent to the guest automatically. Any refunds need to be processed separately through the Payments page or your Stripe dashboard.',
+  },
+  {
+    q: 'How do I handle a third-party booking (someone booking for someone else)?',
+    a: 'When creating a reservation, fill in the guest info as the person staying, then add a Booker Email for the person who made the booking. You can also add up to 5 CC email addresses. The booker receives confirmations and receipts; CC\'d addresses get check-in info.',
+  },
+  {
+    q: 'Why do my Reports show no data?',
+    a: 'Reports pull from your actual reservation and payment data. If you just started, you may not have enough history yet. As reservations are completed and payments processed, the reports will populate automatically.',
+  },
+  {
+    q: 'How do I set seasonal pricing?',
+    a: 'Go to the Rates page and click "+ Add Seasonal Rate" for any room. Set a date range and a custom nightly rate. Seasonal rates override the base rate for those specific dates — great for holidays, peak weekends, or quiet seasons.',
+  },
+]
+
+// ---------------------------------------------------------------------------
 // Components
 // ---------------------------------------------------------------------------
 
@@ -238,14 +285,43 @@ function HelpSection({ section }) {
 // Page export
 // ---------------------------------------------------------------------------
 
+function FaqSection() {
+  const [openIdx, setOpenIdx] = useState(null)
+
+  return (
+    <div className="flex flex-col gap-0 border border-border rounded-[12px] overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 bg-surface">
+        <Question size={20} className="text-info" weight="duotone" />
+        <span className="font-heading text-[17px] text-info">Frequently Asked Questions</span>
+      </div>
+      {FAQ_ITEMS.map((item, i) => (
+        <div key={i} className="border-t border-border">
+          <button
+            onClick={() => setOpenIdx(openIdx === i ? null : i)}
+            className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-surface/50 transition-colors"
+          >
+            <span className="font-body text-[14px] font-medium text-text-primary flex-1">{item.q}</span>
+            {openIdx === i ? <CaretUp size={13} className="text-text-muted shrink-0" /> : <CaretDown size={13} className="text-text-muted shrink-0" />}
+          </button>
+          {openIdx === i && (
+            <div className="px-5 pb-4">
+              <p className="font-body text-[14px] text-text-secondary leading-relaxed">{item.a}</p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Help() {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       {/* Header */}
       <div>
-        <h1 className="font-heading text-[32px] text-text-primary">Setup Guide</h1>
+        <h1 className="font-heading text-[32px] text-text-primary">Help & FAQ</h1>
         <p className="font-body text-[15px] text-text-secondary mt-1">
-          Follow these steps to get your property configured and ready for bookings.
+          Follow the setup guide to get started, or check the FAQ for common questions.
         </p>
       </div>
 
@@ -261,6 +337,9 @@ export default function Help() {
       {SECTIONS.map(section => (
         <HelpSection key={section.id} section={section} />
       ))}
+
+      {/* FAQ */}
+      <FaqSection />
 
       {/* Footer */}
       <div className="bg-surface-raised border border-border rounded-[12px] px-5 py-4 flex items-start gap-3">

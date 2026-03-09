@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
-import { differenceInCalendarDays, format } from 'date-fns'
+import { differenceInCalendarDays, format, addDays, subDays } from 'date-fns'
 import { Button } from '@/components/ui/Button'
 import { supabase } from '@/lib/supabaseClient'
 
-export function DateStep({ settings, propertyId, initialDates, onNext }) {
+export function DateStep({ settings, propertyId, rooms, initialDates, onNext }) {
   const [range, setRange] = useState(
     initialDates.checkIn
       ? { from: new Date(initialDates.checkIn + 'T12:00:00'), to: initialDates.checkOut ? new Date(initialDates.checkOut + 'T12:00:00') : undefined }
@@ -16,23 +16,44 @@ export function DateStep({ settings, propertyId, initialDates, onNext }) {
   const [bookedRanges, setBookedRanges] = useState([])
   const minStay = settings?.min_stay_nights ?? 1
 
-  // Fetch booked dates
+  // Fetch booked dates and expand with buffer days
   useEffect(() => {
     if (!propertyId) return
     supabase
       .from('reservations')
-      .select('check_in, check_out')
+      .select('check_in, check_out, room_ids')
       .eq('property_id', propertyId)
       .neq('status', 'cancelled')
       .then(({ data }) => {
-        if (data) {
-          setBookedRanges(data.map(r => ({
-            from: new Date(r.check_in + 'T12:00:00'),
-            to: new Date(r.check_out + 'T12:00:00'),
-          })))
+        if (!data) return
+        // Build a map of room_id → buffer days from the rooms prop
+        const bufferMap = new Map()
+        for (const room of (rooms ?? [])) {
+          bufferMap.set(room.id, {
+            before: room.buffer_days_before ?? 0,
+            after: room.buffer_days_after ?? 0,
+          })
         }
+
+        const ranges = data.map(r => {
+          // Find the max buffer days across all rooms in this reservation
+          let maxBefore = 0
+          let maxAfter = 0
+          for (const rid of (r.room_ids ?? [])) {
+            const buf = bufferMap.get(rid)
+            if (buf) {
+              maxBefore = Math.max(maxBefore, buf.before)
+              maxAfter = Math.max(maxAfter, buf.after)
+            }
+          }
+          return {
+            from: subDays(new Date(r.check_in + 'T12:00:00'), maxBefore),
+            to: addDays(new Date(r.check_out + 'T12:00:00'), maxAfter),
+          }
+        })
+        setBookedRanges(ranges)
       })
-  }, [propertyId])
+  }, [propertyId, rooms])
 
   const nights = range?.from && range?.to
     ? differenceInCalendarDays(range.to, range.from)

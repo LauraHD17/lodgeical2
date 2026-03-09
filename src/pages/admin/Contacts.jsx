@@ -255,9 +255,12 @@ function ContactDrawer({ contact, onClose, onSaved }) {
 
       <label className="flex flex-col gap-1">
         <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Category</span>
-        <Select value={form.category} onValueChange={v => set('category', v)}>
-          {VENDOR_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
-        </Select>
+        <Select
+          value={form.category}
+          onValueChange={v => set('category', v)}
+          options={VENDOR_CATEGORIES.map(c => ({ value: c, label: c }))}
+          placeholder="Select a category"
+        />
       </label>
 
       <label className="flex flex-col gap-1">
@@ -381,10 +384,13 @@ export default function Contacts() {
           onChange={e => setSearch(e.target.value)}
           className="h-9 border border-border rounded-[6px] px-3 font-body text-[14px] bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info flex-1 max-w-xs"
         />
-        <Select value={filterCategory} onValueChange={setFilterCategory} className="w-52">
-          <Select.Option value="">All categories</Select.Option>
-          {VENDOR_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
-        </Select>
+        <Select
+          value={filterCategory}
+          onValueChange={setFilterCategory}
+          className="w-52"
+          options={[{ value: '', label: 'All categories' }, ...VENDOR_CATEGORIES.map(c => ({ value: c, label: c }))]}
+          placeholder="All categories"
+        />
         {(search || filterCategory) && (
           <button
             onClick={() => { setSearch(''); setFilterCategory('') }}

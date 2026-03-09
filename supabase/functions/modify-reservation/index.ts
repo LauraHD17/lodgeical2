@@ -9,6 +9,7 @@ import { rateLimit } from '../_shared/rateLimit.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
 import { getStripe } from '../_shared/stripe.ts'
 import { sendModificationConfirmation } from '../_shared/email.ts'
+import { checkConflicts } from '../_shared/conflicts.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -100,21 +101,16 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: `Guest count (${new_num_guests}) exceeds room capacity (${maxGuests})` }), { status: 400, headers: CORS_HEADERS })
   }
 
-  // Check availability (exclude current reservation)
-  const { data: conflicts } = await supabase
-    .from('reservations')
-    .select('id, room_ids')
-    .eq('property_id', reservation.property_id)
-    .neq('status', 'cancelled')
-    .neq('id', reservation_id)
-    .lt('check_in', new_check_out)
-    .gt('check_out', new_check_in)
+  // Check availability (includes buffer days, excludes current reservation)
+  const { hasConflict } = await checkConflicts(supabase, {
+    propertyId: reservation.property_id,
+    roomIds: new_room_ids,
+    checkIn: new_check_in,
+    checkOut: new_check_out,
+    excludeReservationId: reservation_id,
+  })
 
-  const conflictingRooms = (conflicts ?? []).filter(r =>
-    (r.room_ids ?? []).some((rid: string) => new_room_ids.includes(rid))
-  )
-
-  if (conflictingRooms.length > 0) {
+  if (hasConflict) {
     return new Response(JSON.stringify({ error: 'Selected rooms are not available for the chosen dates' }), { status: 409, headers: CORS_HEADERS })
   }
 
