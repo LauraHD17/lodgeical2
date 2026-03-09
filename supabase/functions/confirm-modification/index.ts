@@ -131,6 +131,24 @@ serve(async (req) => {
     supabase
   ).catch(e => console.error('[confirm-modification] email error:', e))
 
+  // Log guest portal activity (fire-and-forget)
+  supabase.from('guest_portal_activity').insert({
+    property_id: reservation.property_id,
+    reservation_id: reservation.id,
+    guest_id: reservation.guest_id,
+    action: 'modification_confirmed',
+    details: {
+      old_check_in: reservation.check_in,
+      new_check_in: newCheckIn,
+      old_check_out: reservation.check_out,
+      new_check_out: newCheckOut,
+      old_room_ids: reservation.room_ids,
+      new_room_ids: newRoomIds,
+      old_total_cents: reservation.total_due_cents,
+      new_total_cents: newTotalCents,
+    },
+  }).then(null, (e: unknown) => console.error('[confirm-modification] activity log error:', e))
+
   return new Response(JSON.stringify({
     success: true,
     new_total_cents: newTotalCents,

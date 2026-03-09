@@ -68,6 +68,11 @@ export const MOCK_SETTINGS = {
   tax_rate: 10,
   tax_label: 'State & Local Tax',
   is_tax_exempt: false,
+  pass_through_stripe_fee: true,
+  cleaning_fee_cents: 5000,
+  pet_fee_cents: 2500,
+  pet_fee_type: 'flat',
+  cancellation_policy: 'moderate',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
@@ -86,6 +91,9 @@ export const MOCK_ROOMS = [
     base_rate_cents: 18500,
     sort_order: 1,
     is_active: true,
+    allows_pets: true,
+    cleaning_fee_cents: 5000,
+    pet_fee_cents: 2500,
     ical_token: 'aaaaaaaa-0000-0000-0000-000000000001',
     created_at: '2024-01-01T00:00:00Z',
   },
@@ -98,6 +106,8 @@ export const MOCK_ROOMS = [
     base_rate_cents: 14500,
     sort_order: 2,
     is_active: true,
+    allows_pets: false,
+    cleaning_fee_cents: 3500,
     ical_token: 'bbbbbbbb-0000-0000-0000-000000000002',
     created_at: '2024-01-01T00:00:00Z',
   },
@@ -110,6 +120,9 @@ export const MOCK_ROOMS = [
     base_rate_cents: 28000,
     sort_order: 3,
     is_active: true,
+    allows_pets: true,
+    cleaning_fee_cents: 7500,
+    pet_fee_cents: 3500,
     ical_token: 'cccccccc-0000-0000-0000-000000000003',
     created_at: '2024-01-01T00:00:00Z',
   },
@@ -346,22 +359,22 @@ function monthsAgoDate(n) {
 
 export const MOCK_PAYMENTS = [
   // This month
-  { id: 'pay-001', property_id: PROPERTY_ID, amount_cents: 55500, status: 'paid', type: 'charge', created_at: daysFromNow(-2) + 'T12:00:00Z' },
-  { id: 'pay-002', property_id: PROPERTY_ID, amount_cents: 43500, status: 'paid', type: 'charge', created_at: daysFromNow(-8) + 'T15:00:00Z' },
+  { id: 'pay-001', property_id: PROPERTY_ID, reservation_id: 'res-001', guest_id: 'guest-001', amount_cents: 55500, status: 'paid', type: 'charge', created_at: daysFromNow(-2) + 'T12:00:00Z' },
+  { id: 'pay-002', property_id: PROPERTY_ID, reservation_id: 'res-002', guest_id: 'guest-002', amount_cents: 43500, status: 'paid', type: 'charge', created_at: daysFromNow(-8) + 'T15:00:00Z' },
   // Last month
-  { id: 'pay-003', property_id: PROPERTY_ID, amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T10:00:00Z' },
-  { id: 'pay-004', property_id: PROPERTY_ID, amount_cents: 74000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T14:00:00Z' },
+  { id: 'pay-003', property_id: PROPERTY_ID, reservation_id: 'res-003', guest_id: 'guest-003', amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T10:00:00Z' },
+  { id: 'pay-004', property_id: PROPERTY_ID, reservation_id: 'res-008', guest_id: 'guest-002', amount_cents: 74000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T14:00:00Z' },
   // 2 months ago
-  { id: 'pay-005', property_id: PROPERTY_ID, amount_cents: 92500, status: 'paid', type: 'charge', created_at: monthsAgoDate(2) + 'T11:00:00Z' },
+  { id: 'pay-005', property_id: PROPERTY_ID, reservation_id: 'res-004', guest_id: 'guest-004', amount_cents: 92500, status: 'paid', type: 'charge', created_at: monthsAgoDate(2) + 'T11:00:00Z' },
   // 3 months ago
-  { id: 'pay-006', property_id: PROPERTY_ID, amount_cents: 43500, status: 'paid', type: 'charge', created_at: monthsAgoDate(3) + 'T09:00:00Z' },
-  { id: 'pay-007', property_id: PROPERTY_ID, amount_cents: 55500, status: 'paid', type: 'charge', created_at: monthsAgoDate(3) + 'T16:00:00Z' },
+  { id: 'pay-006', property_id: PROPERTY_ID, reservation_id: 'res-005', guest_id: 'guest-005', amount_cents: 43500, status: 'paid', type: 'charge', created_at: monthsAgoDate(3) + 'T09:00:00Z' },
+  { id: 'pay-007', property_id: PROPERTY_ID, reservation_id: 'res-007', guest_id: 'guest-001', amount_cents: 55500, status: 'paid', type: 'charge', created_at: monthsAgoDate(3) + 'T16:00:00Z' },
   // 4 months ago
-  { id: 'pay-008', property_id: PROPERTY_ID, amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(4) + 'T13:00:00Z' },
+  { id: 'pay-008', property_id: PROPERTY_ID, reservation_id: 'res-007', guest_id: 'guest-001', amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(4) + 'T13:00:00Z' },
   // 5 months ago
-  { id: 'pay-009', property_id: PROPERTY_ID, amount_cents: 28000, status: 'paid', type: 'charge', created_at: monthsAgoDate(5) + 'T10:00:00Z' },
+  { id: 'pay-009', property_id: PROPERTY_ID, reservation_id: 'res-006', guest_id: 'guest-006', amount_cents: 28000, status: 'paid', type: 'charge', created_at: monthsAgoDate(5) + 'T10:00:00Z' },
   // 6 months ago
-  { id: 'pay-010', property_id: PROPERTY_ID, amount_cents: 196000, status: 'paid', type: 'charge', created_at: monthsAgoDate(6) + 'T11:00:00Z' },
+  { id: 'pay-010', property_id: PROPERTY_ID, reservation_id: 'res-006', guest_id: 'guest-006', amount_cents: 196000, status: 'paid', type: 'charge', created_at: monthsAgoDate(6) + 'T11:00:00Z' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -375,4 +388,39 @@ export const MOCK_EMAIL_LOGS = [
   { id: 'elog-004', property_id: PROPERTY_ID, reservation_id: 'res-003', guest_email: 'carol.williams@example.com', template_type: 'booking_confirmation', subject: 'Booking Confirmed — RES-003', sent_at: daysFromNow(-5) + 'T11:30:00Z', status: 'sent' },
   { id: 'elog-005', property_id: PROPERTY_ID, reservation_id: 'res-003', guest_email: 'carol.williams@example.com', template_type: 'modification_confirmation', subject: 'Reservation Modified — RES-003', sent_at: daysFromNow(-3) + 'T16:45:00Z', status: 'sent' },
   { id: 'elog-006', property_id: PROPERTY_ID, reservation_id: 'res-004', guest_email: 'dan.smith@example.com', template_type: 'payment_failed', subject: 'Payment Failed — Action Required (RES-004)', sent_at: daysFromNow(-1) + 'T08:15:00Z', status: 'sent' },
+]
+
+// ---------------------------------------------------------------------------
+// Guest Portal Activity (audit trail)
+// ---------------------------------------------------------------------------
+
+export const MOCK_GUEST_ACTIVITY = [
+  {
+    id: 'gact-001', property_id: PROPERTY_ID, reservation_id: 'res-001', guest_id: 'guest-001',
+    action: 'modification_confirmed',
+    details: { old_check_in: daysFromNow(-2), new_check_in: daysFromNow(-1), old_check_out: daysFromNow(1), new_check_out: daysFromNow(2) },
+    created_at: daysFromNow(-1) + 'T14:30:00Z',
+    guests: { first_name: 'Alice', last_name: 'Johnson' },
+  },
+  {
+    id: 'gact-002', property_id: PROPERTY_ID, reservation_id: null, guest_id: 'guest-002',
+    action: 'contact_updated',
+    details: { old_phone: '+1 828 555 0102', new_phone: '+1 828 555 9999' },
+    created_at: daysFromNow(-2) + 'T10:15:00Z',
+    guests: { first_name: 'Bob', last_name: 'Smith' },
+  },
+  {
+    id: 'gact-003', property_id: PROPERTY_ID, reservation_id: 'res-004', guest_id: 'guest-003',
+    action: 'booker_attached',
+    details: { target_reservation_id: 'res-004', booker_email: 'carol.w@example.com', confirmation_number: 'RES-004' },
+    created_at: daysFromNow(-3) + 'T16:00:00Z',
+    guests: { first_name: 'Carol', last_name: 'Williams' },
+  },
+  {
+    id: 'gact-004', property_id: PROPERTY_ID, reservation_id: null, guest_id: 'guest-005',
+    action: 'contact_updated',
+    details: { old_email: 'emma.old@example.com', new_email: 'emma.davis@example.com' },
+    created_at: daysFromNow(-5) + 'T09:45:00Z',
+    guests: { first_name: 'Emma', last_name: 'Davis' },
+  },
 ]

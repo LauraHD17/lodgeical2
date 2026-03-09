@@ -71,4 +71,14 @@ export const queryKeys = {
     all: ['emailLogs'],
     list: (propertyId) => ['emailLogs', 'list', propertyId],
   },
+
+  guestPortal: {
+    all: ['guestPortal'],
+    byEmail: (email) => ['guestPortal', 'byEmail', email],
+  },
+
+  guestActivity: {
+    all: ['guestActivity'],
+    list: (propertyId) => ['guestActivity', 'list', propertyId],
+  },
 }
