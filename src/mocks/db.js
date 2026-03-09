@@ -363,3 +363,16 @@ export const MOCK_PAYMENTS = [
   // 6 months ago
   { id: 'pay-010', property_id: PROPERTY_ID, amount_cents: 196000, status: 'paid', type: 'charge', created_at: monthsAgoDate(6) + 'T11:00:00Z' },
 ]
+
+// ---------------------------------------------------------------------------
+// Email Logs
+// ---------------------------------------------------------------------------
+
+export const MOCK_EMAIL_LOGS = [
+  { id: 'elog-001', property_id: PROPERTY_ID, reservation_id: 'res-001', guest_email: 'alice.johnson@example.com', template_type: 'booking_confirmation', subject: 'Booking Confirmed — RES-001', sent_at: daysFromNow(-30) + 'T10:05:00Z', status: 'sent' },
+  { id: 'elog-002', property_id: PROPERTY_ID, reservation_id: 'res-002', guest_email: 'bob.martinez@example.com', template_type: 'booking_confirmation', subject: 'Booking Confirmed — RES-002', sent_at: daysFromNow(-20) + 'T14:22:00Z', status: 'sent' },
+  { id: 'elog-003', property_id: PROPERTY_ID, reservation_id: 'res-001', guest_email: 'alice.johnson@example.com', template_type: 'check_in_reminder', subject: 'Your check-in is tomorrow — Pine Ridge Lodge', sent_at: daysFromNow(-8) + 'T09:00:00Z', status: 'sent' },
+  { id: 'elog-004', property_id: PROPERTY_ID, reservation_id: 'res-003', guest_email: 'carol.williams@example.com', template_type: 'booking_confirmation', subject: 'Booking Confirmed — RES-003', sent_at: daysFromNow(-5) + 'T11:30:00Z', status: 'sent' },
+  { id: 'elog-005', property_id: PROPERTY_ID, reservation_id: 'res-003', guest_email: 'carol.williams@example.com', template_type: 'modification_confirmation', subject: 'Reservation Modified — RES-003', sent_at: daysFromNow(-3) + 'T16:45:00Z', status: 'sent' },
+  { id: 'elog-006', property_id: PROPERTY_ID, reservation_id: 'res-004', guest_email: 'dan.smith@example.com', template_type: 'payment_failed', subject: 'Payment Failed — Action Required (RES-004)', sent_at: daysFromNow(-1) + 'T08:15:00Z', status: 'sent' },
+]

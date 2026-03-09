@@ -8,6 +8,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
 import { getStripe } from '../_shared/stripe.ts'
+import { sendModificationConfirmation } from '../_shared/email.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -223,6 +224,13 @@ serve(async (req) => {
     console.error('[modify-reservation] update error:', updateError)
     return new Response(JSON.stringify({ error: 'Failed to apply modification' }), { status: 500, headers: CORS_HEADERS })
   }
+
+  // Send modification confirmation email (fire-and-forget)
+  sendModificationConfirmation(
+    { first_name, last_name, email },
+    { ...reservation, check_in: new_check_in, check_out: new_check_out, room_ids: new_room_ids, total_due_cents: newPricing.totalCents },
+    supabase
+  ).catch(e => console.error('[modify-reservation] email error:', e))
 
   return new Response(JSON.stringify({
     success: true,

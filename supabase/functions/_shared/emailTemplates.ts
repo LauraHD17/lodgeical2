@@ -7,6 +7,7 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 export type TemplateType =
   | 'booking_confirmation'
   | 'cancellation_notice'
+  | 'modification_confirmation'
   | 'payment_failed'
   | 'check_in_reminder'
   | 'check_out_reminder'
@@ -142,6 +143,24 @@ function defaultTemplate(type: TemplateType, v: TemplateVars): { subject: string
           <p>Hi ${v.guest_first_name},</p>
           <p>This is a reminder that check-out time is <strong>${v.check_out_time ?? 'per property policy'}</strong> today.</p>
           <p>We hope you enjoyed your stay!</p>
+        `),
+      }
+
+    case 'modification_confirmation':
+      return {
+        subject: `Reservation Modified — ${v.confirmation_number}`,
+        html: wrap('Reservation Modified', `
+          <p>Hi ${v.guest_first_name},</p>
+          <p>Your reservation has been updated. Here are the new details:</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr><td style="padding:8px 0;color:#555">Confirmation</td><td><strong>${v.confirmation_number}</strong></td></tr>
+            <tr><td style="padding:8px 0;color:#555">Room(s)</td><td>${v.room_names}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-in</td><td>${v.check_in_date} at ${v.check_in_time ?? ''}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-out</td><td>${v.check_out_date} at ${v.check_out_time ?? ''}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Nights</td><td>${v.num_nights}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">New Total</td><td><strong>${v.total_due}</strong></td></tr>
+          </table>
+          <p>If you have questions, please contact us through your guest portal.</p>
         `),
       }
   }

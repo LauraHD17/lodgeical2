@@ -733,7 +733,7 @@ function ReservationDetail({ data, onBack, onRefresh }) {
     <div className="max-w-lg mx-auto">
       <button
         onClick={onBack}
-        className="flex items-center gap-2 font-body text-[14px] text-text-secondary hover:text-text-primary transition-colors mb-6"
+        className="flex items-center gap-2 font-body text-[14px] text-text-secondary hover:text-text-primary transition-colors mb-6 print:hidden"
       >
         <ArrowLeft size={16} />
         Back to lookup
@@ -790,11 +790,13 @@ function ReservationDetail({ data, onBack, onRefresh }) {
       </div>
 
       {/* Modification */}
-      <ModificationSection
-        reservation={reservation}
-        availableRooms={availableRooms}
-        onModified={onRefresh}
-      />
+      <div data-print-hide>
+        <ModificationSection
+          reservation={reservation}
+          availableRooms={availableRooms}
+          onModified={onRefresh}
+        />
+      </div>
 
       {/* Payment */}
       <PaymentSection
@@ -804,10 +806,12 @@ function ReservationDetail({ data, onBack, onRefresh }) {
       />
 
       {/* Cancellation */}
-      <CancellationSection reservation={reservation} onCancelled={onRefresh} />
+      <div data-print-hide>
+        <CancellationSection reservation={reservation} onCancelled={onRefresh} />
+      </div>
 
       {/* Documents placeholder */}
-      <div className="bg-surface-raised border border-border rounded-[8px] p-5 mb-4">
+      <div data-print-hide className="bg-surface-raised border border-border rounded-[8px] p-5 mb-4">
         <h3 className="font-heading text-[16px] text-text-primary mb-2">Documents</h3>
         <p className="font-body text-[14px] text-text-muted">
           Document upload and e-signature features available through your host.
@@ -824,6 +828,17 @@ function ReservationDetail({ data, onBack, onRefresh }) {
           Print Reservation
         </button>
       </div>
+
+      {/* Print styles — hide non-essential sections, compact layout for one page */}
+      <style>{`
+        @media print {
+          [data-print-hide] { display: none !important; }
+          .print\\:hidden { display: none !important; }
+          body { margin: 0; padding: 0; }
+          .min-h-screen { min-height: auto !important; padding: 0 !important; }
+          .max-w-lg { max-width: 100% !important; margin: 0 !important; padding: 16px !important; }
+        }
+      `}</style>
     </div>
   )
 }
