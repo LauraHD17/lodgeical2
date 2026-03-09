@@ -387,8 +387,8 @@ function monthsAgoDate(n) {
 
 export const MOCK_PAYMENTS = [
   // This month
-  { id: 'pay-001', property_id: PROPERTY_ID, reservation_id: 'res-001', guest_id: 'guest-001', amount_cents: 55500, status: 'paid', type: 'charge', created_at: daysFromNow(-2) + 'T12:00:00Z' },
-  { id: 'pay-002', property_id: PROPERTY_ID, reservation_id: 'res-002', guest_id: 'guest-002', amount_cents: 43500, status: 'paid', type: 'charge', created_at: daysFromNow(-8) + 'T15:00:00Z' },
+  { id: 'pay-001', property_id: PROPERTY_ID, reservation_id: 'res-001', guest_id: 'guest-001', amount_cents: 55500, status: 'paid', type: 'charge', method: 'card', created_at: daysFromNow(-2) + 'T12:00:00Z' },
+  { id: 'pay-002', property_id: PROPERTY_ID, reservation_id: 'res-002', guest_id: 'guest-002', amount_cents: 43500, status: 'paid', type: 'charge', method: 'check', check_number: '1042', payment_date: daysFromNow(-10), created_at: daysFromNow(-8) + 'T15:00:00Z' },
   // Last month
   { id: 'pay-003', property_id: PROPERTY_ID, reservation_id: 'res-003', guest_id: 'guest-003', amount_cents: 112000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T10:00:00Z' },
   { id: 'pay-004', property_id: PROPERTY_ID, reservation_id: 'res-008', guest_id: 'guest-002', amount_cents: 74000, status: 'paid', type: 'charge', created_at: monthsAgoDate(1) + 'T14:00:00Z' },

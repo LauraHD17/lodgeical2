@@ -306,7 +306,7 @@ export default function Settings() {
         {/* Check-in/out Tab */}
         <Tabs.Content value="checkin">
           <div className="max-w-lg flex flex-col gap-5">
-            <SectionHeader>Check-in &amp; Check-out Times</SectionHeader>
+            <SectionHeader>Check-in & Check-out Times</SectionHeader>
             <Input
               label="Check-in Time"
               type="time"
@@ -343,7 +343,7 @@ export default function Settings() {
         {/* Tax & Policy Tab */}
         <Tabs.Content value="tax">
           <div className="max-w-lg flex flex-col gap-5">
-            <SectionHeader>Tax &amp; Cancellation Policy</SectionHeader>
+            <SectionHeader>Tax & Cancellation Policy</SectionHeader>
             <div className="flex flex-col">
               <label htmlFor="settings-tax-rate" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
                 Tax Rate (%)
@@ -418,7 +418,7 @@ export default function Settings() {
               </span>
               <div className="flex gap-5">
                 {[
-                  { value: 'flat', label: 'Flat (one-time charge)' },
+                  { value: 'flat', label: 'One-time charge' },
                   { value: 'per_night', label: 'Per night' },
                 ].map(({ value, label }) => (
                   <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -443,7 +443,7 @@ export default function Settings() {
               onClick={() => saveTab({ tax_rate: taxPolicy.tax_rate, cancellation_policy: taxPolicy.cancellation_policy, cleaning_fee_cents: taxPolicy.cleaning_fee_cents, pet_fee_cents: taxPolicy.pet_fee_cents, pet_fee_type: taxPolicy.pet_fee_type })}
               className="self-start"
             >
-              Save Tax &amp; Policy Settings
+              Save Tax & Policy Settings
             </Button>
           </div>
         </Tabs.Content>

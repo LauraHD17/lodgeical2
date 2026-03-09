@@ -24,6 +24,7 @@ const TEMPLATE_LABELS = {
   payment_failed: 'Payment Failed',
   check_in_reminder: 'Check-in Reminder',
   check_out_reminder: 'Check-out Reminder',
+  custom: 'Custom',
 }
 
 const TYPE_COLORS = {
@@ -33,6 +34,7 @@ const TYPE_COLORS = {
   payment_failed: 'bg-danger-bg text-danger',
   check_in_reminder: 'bg-info-bg text-info',
   check_out_reminder: 'bg-info-bg text-info',
+  custom: 'bg-surface text-text-secondary',
 }
 
 // ---------------------------------------------------------------------------

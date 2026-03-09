@@ -11,6 +11,7 @@ export type TemplateType =
   | 'payment_failed'
   | 'check_in_reminder'
   | 'check_out_reminder'
+  | 'custom'
 
 export interface TemplateVars {
   guest_first_name?: string
