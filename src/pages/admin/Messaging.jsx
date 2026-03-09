@@ -85,10 +85,7 @@ function EmailLogSection() {
   return (
     <div className="flex border border-border rounded-[8px] overflow-hidden" style={{ minHeight: 480 }}>
       {/* Left panel — message list */}
-      <div className={cn(
-        'flex flex-col border-r border-border overflow-y-auto',
-        selected ? 'w-[340px] shrink-0' : 'w-full'
-      )}>
+      <div className="flex flex-col border-r border-border overflow-y-auto w-[400px] shrink-0">
         {logs.map((log, i) => {
           const isActive = log.id === selectedId
           return (
