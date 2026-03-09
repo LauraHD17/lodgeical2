@@ -236,7 +236,8 @@ export const handlers = [
     }
     return HttpResponse.json({
       reservation: res,
-      payment_summary: {
+      rooms: MOCK_ROOMS.filter(r => res.room_ids?.includes(r.id)),
+      paymentSummary: {
         total_due_cents:  res.total_due_cents ?? 0,
         total_paid_cents: 0,
         balance_cents:    res.total_due_cents ?? 0,
@@ -250,7 +251,7 @@ export const handlers = [
   http.post(`${BASE}/functions/v1/cancel-reservation`, async ({ request }) => {
     const body = await request.json().catch(() => ({}))
     if (body.preview_only) {
-      return HttpResponse.json({ refund_cents: 0, policy: 'strict', message: 'No refund per cancellation policy.' })
+      return HttpResponse.json({ refund_cents: 0, policy: 'strict', policy_note: 'Strict policy: Full refund only for cancellations made at least 14 days before check-in. Your check-in is within 14 days — no refund applies.' })
     }
     return HttpResponse.json({ success: true, refund_cents: 0, message: 'Reservation cancelled.' })
   }),
