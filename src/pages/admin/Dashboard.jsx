@@ -6,7 +6,7 @@ import { useState, useMemo, createElement } from 'react'
 import { Link } from 'react-router-dom'
 import {
   format, isToday, parseISO, addDays, startOfDay,
-  subMonths, startOfMonth, subDays, formatDistanceToNow,
+  subMonths, startOfMonth, formatDistanceToNow,
 } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -173,29 +173,6 @@ function usePaymentsSummary() {
         .filter(p => p.created_at.startsWith(String(now.getFullYear())))
         .reduce((s, p) => s + (p.amount_cents ?? 0), 0)
       return { thisMonth, ytd }
-    },
-    enabled: !!propertyId,
-  })
-}
-
-function useModifiedReservations() {
-  const { propertyId } = useProperty()
-  const since = format(subDays(new Date(), 7), 'yyyy-MM-dd')
-  return useQuery({
-    queryKey: ['modified-reservations', propertyId, since],
-    queryFn: async () => {
-      if (!propertyId) return []
-      const { data } = await supabase
-        .from('reservations')
-        .select('id, confirmation_number, check_in, check_out, updated_at, created_at, room_ids, guests(first_name, last_name)')
-        .eq('property_id', propertyId)
-        .neq('status', 'cancelled')
-        .gte('updated_at', since)
-        .order('updated_at', { ascending: false })
-      return (data ?? []).filter(r => {
-        if (!r.updated_at || !r.created_at) return false
-        return new Date(r.updated_at) - new Date(r.created_at) > 1000 * 60 * 5
-      })
     },
     enabled: !!propertyId,
   })
@@ -380,7 +357,7 @@ function GuestActivityCard({ activities, loading }) {
   return (
     <StatCard
       id="modified"
-      label="Guest Activity"
+      label="Guest Modified"
       count={activities.length}
       loading={loading}
       defaultOpen={activities.length > 0}
@@ -408,47 +385,6 @@ function GuestActivityCard({ activities, loading }) {
                     {detail && <span className="text-text-muted"> · {detail}</span>}
                   </span>
                   <span className="font-mono text-[11px] text-text-muted pl-5">{ago}</span>
-                </li>
-              )
-            })}
-          </ul>
-        )
-      }
-    </StatCard>
-  )
-}
-
-function ModifiedCard({ reservations, rooms, loading }) {
-  return (
-    <StatCard
-      id="modified"
-      label="Guest Modified"
-      count={reservations.length}
-      loading={loading}
-      defaultOpen={reservations.length > 0}
-    >
-      {reservations.length === 0
-        ? <p className="font-body text-[13px] text-text-muted pt-3">No recent guest modifications.</p>
-        : (
-          <ul className="mt-1">
-            {reservations.map(r => {
-              const g = r.guests ?? {}
-              const roomName = rooms.find(rm => (r.room_ids ?? []).includes(rm.id))?.name ?? '—'
-              const ago = r.updated_at
-                ? formatDistanceToNow(new Date(r.updated_at), { addSuffix: true })
-                : ''
-              return (
-                <li key={r.id} className="flex flex-col gap-0.5 py-2.5 border-b border-border/40 last:border-b-0">
-                  <div className="flex items-center gap-2">
-                    <Bell size={13} weight="fill" className="text-danger shrink-0" />
-                    <span className="font-body text-[14px] font-semibold text-text-primary">
-                      {g.first_name} {g.last_name}
-                    </span>
-                    <span className="font-body text-[12px] text-text-muted">· {roomName}</span>
-                  </div>
-                  <span className="font-body text-[12px] text-text-muted pl-5">
-                    {r.confirmation_number} · modified {ago}
-                  </span>
                 </li>
               )
             })}
@@ -623,7 +559,7 @@ function RevenueCardWrapper({ thisMonth, ytd, loading }) {
 // DayCards — magazine grid layout
 // ---------------------------------------------------------------------------
 
-function DayCards({ dayView, calReservations, rooms, payments, modifiedReservations, guestActivities, loading }) {
+function DayCards({ dayView, calReservations, rooms, payments, guestActivities, loading }) {
   const today    = startOfDay(new Date())
   const viewDate = dayView === 'today' ? today : addDays(today, 1)
   const dateStr  = format(viewDate, 'yyyy-MM-dd')
@@ -657,18 +593,8 @@ function DayCards({ dayView, calReservations, rooms, payments, modifiedReservati
         />
       </div>
 
-      {/* Row 2: Guest Modified + Guest Activity */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <ModifiedCard
-          reservations={modifiedReservations}
-          rooms={rooms}
-          loading={loading}
-        />
-        <GuestActivityCard
-          activities={guestActivities}
-          loading={loading}
-        />
-      </div>
+      {/* Row 2: Guest Modified */}
+      <GuestActivityCard activities={guestActivities} loading={loading} />
 
       {/* Row 3: Occupancy + Revenue */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -867,7 +793,6 @@ export default function Dashboard() {
           isLoading: calLoading }           = useCalendarReservations()
   const { data: maintenanceTickets = [] }   = useOpenMaintenanceTickets()
   const { data: payments }                  = usePaymentsSummary()
-  const { data: modifiedReservations = [] } = useModifiedReservations()
   const { data: guestActivities = [] }     = useGuestActivity()
 
   return (
@@ -910,7 +835,6 @@ export default function Dashboard() {
         calReservations={calReservations}
         rooms={rooms}
         payments={payments}
-        modifiedReservations={modifiedReservations}
         guestActivities={guestActivities}
         loading={calLoading}
       />
