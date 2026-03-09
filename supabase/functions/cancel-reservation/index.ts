@@ -7,6 +7,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { getStripe } from '../_shared/stripe.ts'
+import { sendCancellationNotice } from '../_shared/email.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -52,6 +53,39 @@ export function calculateRefundCents(
   }
 
   return 0
+}
+
+function getPolicyNote(policy: string, checkInDate: string, today: string = new Date().toISOString().slice(0, 10)): string {
+  const daysUntilCheckIn = Math.ceil(
+    (new Date(checkInDate).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)
+  )
+  const dayLabel = daysUntilCheckIn === 1 ? '1 day' : `${daysUntilCheckIn} days`
+
+  if (policy === 'flexible') {
+    if (daysUntilCheckIn >= 1) {
+      return `Flexible policy: Full refund for cancellations made at least 1 day before check-in. Your check-in is in ${dayLabel} — you qualify for a full refund.`
+    }
+    return 'Flexible policy: Full refund for cancellations made at least 1 day before check-in. Your check-in is today — no refund applies.'
+  }
+
+  if (policy === 'moderate') {
+    if (daysUntilCheckIn >= 5) {
+      return `Moderate policy: Full refund for cancellations made at least 5 days before check-in. Your check-in is in ${dayLabel} — you qualify for a full refund.`
+    }
+    if (daysUntilCheckIn >= 1) {
+      return `Moderate policy: 50% refund for cancellations made 1–4 days before check-in. Your check-in is in ${dayLabel} — you qualify for a 50% refund.`
+    }
+    return 'Moderate policy: No refund for same-day cancellations. Your check-in is today — no refund applies.'
+  }
+
+  if (policy === 'strict') {
+    if (daysUntilCheckIn >= 14) {
+      return `Strict policy: Full refund for cancellations made at least 14 days before check-in. Your check-in is in ${dayLabel} — you qualify for a full refund.`
+    }
+    return `Strict policy: Full refund only for cancellations made at least 14 days before check-in. Your check-in is in ${dayLabel} — no refund applies.`
+  }
+
+  return ''
 }
 
 serve(async (req) => {
@@ -155,7 +189,8 @@ serve(async (req) => {
 
   // If preview only, return the refund amount without cancelling
   if (parsed.data.preview_only) {
-    return new Response(JSON.stringify({ refund_cents: refundCents, policy }), { headers: CORS_HEADERS })
+    const policy_note = getPolicyNote(policy, reservation.check_in)
+    return new Response(JSON.stringify({ refund_cents: refundCents, policy, policy_note }), { headers: CORS_HEADERS })
   }
 
   // Process refund via Stripe if applicable
@@ -188,6 +223,11 @@ serve(async (req) => {
     .from('reservations')
     .update({ status: 'cancelled' })
     .eq('id', parsed.data.reservation_id)
+
+  // Send cancellation email (fire-and-forget — don't block the response)
+  sendCancellationNotice(reservation.guests, reservation, refundCents, supabase).catch(e =>
+    console.error('[cancel-reservation] email error:', e)
+  )
 
   return new Response(
     JSON.stringify({ success: true, refund_cents: refundCents, policy }),

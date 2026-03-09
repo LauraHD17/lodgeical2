@@ -219,6 +219,7 @@ export const handlers = [
     return HttpResponse.json({
       property: MOCK_PROPERTY,
       rooms:    MOCK_ROOMS.filter(r => r.is_active),
+      roomLinks: [],
       settings: { ...MOCK_SETTINGS, currency: 'USD', min_stay_nights: 1, require_payment_at_booking: false, allow_partial_payment: true },
     })
   }),
@@ -235,12 +236,14 @@ export const handlers = [
     }
     return HttpResponse.json({
       reservation: res,
-      payment_summary: {
+      rooms: MOCK_ROOMS.filter(r => res.room_ids?.includes(r.id)),
+      paymentSummary: {
         total_due_cents:  res.total_due_cents ?? 0,
         total_paid_cents: 0,
         balance_cents:    res.total_due_cents ?? 0,
         status:           'unpaid',
       },
+      availableRooms: MOCK_ROOMS.filter(r => r.is_active),
     })
   }),
 
@@ -248,10 +251,38 @@ export const handlers = [
   http.post(`${BASE}/functions/v1/cancel-reservation`, async ({ request }) => {
     const body = await request.json().catch(() => ({}))
     if (body.preview_only) {
-      return HttpResponse.json({ refund_cents: 0, policy: 'strict', message: 'No refund per cancellation policy.' })
+      return HttpResponse.json({ refund_cents: 0, policy: 'strict', policy_note: 'Strict policy: Full refund only for cancellations made at least 14 days before check-in. Your check-in is within 14 days — no refund applies.' })
     }
-    return HttpResponse.json({ success: true, message: 'Reservation cancelled.' })
+    return HttpResponse.json({ success: true, refund_cents: 0, message: 'Reservation cancelled.' })
   }),
+
+  // Modify reservation (guest-facing)
+  http.post(`${BASE}/functions/v1/modify-reservation`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const res = MOCK_RESERVATIONS.find(r => r.id === body.reservation_id) ?? MOCK_RESERVATIONS[0]
+    if (body.preview_only) {
+      return HttpResponse.json({
+        original: {
+          check_in: res.check_in,
+          check_out: res.check_out,
+          total_cents: res.total_due_cents ?? 0,
+        },
+        modified: {
+          check_in: body.new_check_in ?? res.check_in,
+          check_out: body.new_check_out ?? res.check_out,
+          total_cents: res.total_due_cents ?? 0,
+        },
+        balance_due_cents: 0,
+        requires_payment: false,
+      })
+    }
+    return HttpResponse.json({ success: true, requires_payment: false })
+  }),
+
+  // Confirm modification (after payment)
+  http.post(`${BASE}/functions/v1/confirm-modification`, () =>
+    HttpResponse.json({ success: true }),
+  ),
 
   http.get(`${BASE}/functions/v1/ical-export`, () =>
     new HttpResponse(
