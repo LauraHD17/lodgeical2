@@ -2,7 +2,7 @@
 // Multi-step modal for creating / editing reservations.
 // Steps: 1=Dates, 2=Rooms, 3=Guest, 4=Fees, 5=Review
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/style.css'
 import { format, differenceInCalendarDays, isWithinInterval, parseISO } from 'date-fns'
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FolderCard } from '@/components/shared/FolderCard'
 import { ConflictBanner } from './ConflictBanner'
-import { useRooms } from '@/hooks/useRooms'
+import { useRooms, useRoomLinks } from '@/hooks/useRooms'
 import { useGuestByEmail } from '@/hooks/useGuests'
 import { useCreateReservation, useUpdateReservation } from '@/hooks/useReservations'
 import { useToast } from '@/components/ui/useToast'
@@ -34,13 +34,14 @@ function usePropertyFeeSettings() {
       if (!propertyId) return null
       const [propRes, settingsRes] = await Promise.all([
         supabase.from('properties').select('cleaning_fee_cents, pet_fee_cents, pet_fee_type').eq('id', propertyId).single(),
-        supabase.from('settings').select('tax_rate').eq('property_id', propertyId).maybeSingle(),
+        supabase.from('settings').select('tax_rate, pass_through_stripe_fee').eq('property_id', propertyId).maybeSingle(),
       ])
       return {
         cleaning_fee_cents: propRes.data?.cleaning_fee_cents ?? 0,
         pet_fee_cents: propRes.data?.pet_fee_cents ?? 0,
         pet_fee_type: propRes.data?.pet_fee_type ?? 'flat',
         tax_rate: settingsRes.data?.tax_rate ?? 0,
+        pass_through_stripe_fee: settingsRes.data?.pass_through_stripe_fee ?? false,
       }
     },
     enabled: !!propertyId,
@@ -161,30 +162,73 @@ function Step1Dates({ checkIn, checkOut, onSelect, bookedRanges = [], minStay = 
   )
 }
 
-function Step2Rooms({ rooms = [], selectedRoomIds, onToggle }) {
-  const totalCents = rooms
-    .filter((r) => selectedRoomIds.includes(r.id))
-    .reduce((sum, r) => sum + (r.base_rate_cents ?? 0), 0)
+function Step2Rooms({ rooms = [], roomLinks = [], selectedRoomIds, onToggle, onSelectLink, activeLink }) {
+  const totalCents = activeLink
+    ? (activeLink.base_rate_cents ?? 0)
+    : rooms.filter((r) => selectedRoomIds.includes(r.id)).reduce((sum, r) => sum + (r.base_rate_cents ?? 0), 0)
+
+  // Rooms that are part of the active link are grayed out
+  const linkMemberIds = activeLink ? (activeLink.linked_room_ids ?? []) : []
 
   return (
     <div>
       <h3 className="font-body font-semibold text-[16px] text-text-primary mb-4">
         Select room(s)
       </h3>
+
+      {/* Room Links */}
+      {roomLinks.length > 0 && (
+        <div className="mb-4">
+          <p className="font-body text-[12px] text-text-muted uppercase tracking-[0.06em] font-semibold mb-2">Combined Rooms</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {roomLinks.map((link) => {
+              const isSelected = activeLink?.id === link.id
+              const memberNames = (link.linked_room_ids ?? []).map(id => rooms.find(r => r.id === id)?.name ?? '?').join(' + ')
+              return (
+                <button
+                  key={link.id}
+                  type="button"
+                  onClick={() => onSelectLink(isSelected ? null : link)}
+                  className={cn(
+                    'text-left transition-all rounded-[8px] border p-4',
+                    isSelected ? 'ring-2 ring-info border-info bg-info-bg' : 'border-border bg-surface-raised hover:border-info'
+                  )}
+                >
+                  <p className="font-body font-semibold text-[14px] text-text-primary">{link.name}</p>
+                  <p className="font-body text-[12px] text-text-secondary mt-0.5">{memberNames}</p>
+                  <p className="font-mono text-[14px] text-text-primary mt-1">
+                    ${((link.base_rate_cents ?? 0) / 100).toFixed(2)} / night
+                  </p>
+                  <p className="font-body text-[12px] text-text-muted mt-0.5">Max {link.max_guests} guests</p>
+                  {isSelected && (
+                    <span className="inline-flex items-center gap-1 mt-2 text-[12px] font-semibold text-info font-body">
+                      <CheckCircle size={14} weight="fill" /> Selected
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {rooms.length === 0 && (
         <p className="text-text-muted font-body text-[14px]">No rooms found.</p>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {rooms.map((room) => {
           const isSelected = selectedRoomIds.includes(room.id)
+          const isPartOfLink = linkMemberIds.includes(room.id)
           return (
             <button
               key={room.id}
               type="button"
-              onClick={() => onToggle(room.id)}
+              onClick={() => !isPartOfLink && onToggle(room.id)}
+              disabled={isPartOfLink}
               className={cn(
                 'text-left transition-all',
-                isSelected && 'ring-2 ring-info rounded-[8px]'
+                isSelected && 'ring-2 ring-info rounded-[8px]',
+                isPartOfLink && 'opacity-40 cursor-not-allowed'
               )}
             >
               <FolderCard
@@ -206,6 +250,11 @@ function Step2Rooms({ rooms = [], selectedRoomIds, onToggle }) {
                     <CheckCircle size={14} weight="fill" /> Selected
                   </span>
                 )}
+                {isPartOfLink && (
+                  <span className="inline-flex items-center gap-1 mt-2 text-[12px] text-text-muted font-body">
+                    Included in {activeLink.name}
+                  </span>
+                )}
               </FolderCard>
             </button>
           )
@@ -214,7 +263,7 @@ function Step2Rooms({ rooms = [], selectedRoomIds, onToggle }) {
       {selectedRoomIds.length > 0 && (
         <div className="mt-4 flex items-center justify-between p-3 bg-surface border border-border rounded-[6px]">
           <span className="font-body text-[14px] text-text-secondary">
-            {selectedRoomIds.length} room{selectedRoomIds.length > 1 ? 's' : ''} selected
+            {activeLink ? activeLink.name : `${selectedRoomIds.length} room${selectedRoomIds.length > 1 ? 's' : ''}`} selected
           </span>
           <span className="font-mono text-[14px] text-text-primary font-semibold">
             ${(totalCents / 100).toFixed(2)} / night
@@ -327,10 +376,18 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
   const petFeeType = propertySettings?.pet_fee_type ?? 'flat'
   const petFeeTotal = feesData?.petFeeApplied ? (petFeeType === 'per_night' ? petFeeRate * nights : petFeeRate) : 0
 
+  const miscFeeCents = feesData?.miscFeeCents ?? 0
+
   const taxRate = propertySettings?.tax_rate ?? 0
-  const preTaxSubtotal = nightsSubtotalCents + cleaningFeeApplied + petFeeTotal
+  const preTaxSubtotal = nightsSubtotalCents + cleaningFeeApplied + petFeeTotal + miscFeeCents
   const taxAmount = feesData?.taxExempt ? 0 : Math.round(preTaxSubtotal * taxRate / 100)
-  const totalCents = preTaxSubtotal + taxAmount
+
+  const passThroughStripe = propertySettings?.pass_through_stripe_fee ?? false
+  const preFeeCents = preTaxSubtotal + taxAmount
+  const STRIPE_FIXED = 30
+  const STRIPE_PCT = 0.029
+  const stripeFee = passThroughStripe ? Math.ceil((preFeeCents + STRIPE_FIXED) / (1 - STRIPE_PCT)) - preFeeCents : 0
+  const totalCents = preFeeCents + stripeFee
 
   return (
     <div className="flex flex-col gap-4">
@@ -394,6 +451,14 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
               <span className="font-mono text-[14px] text-text-primary">${(petFeeTotal / 100).toFixed(2)}</span>
             </div>
           )}
+          {miscFeeCents > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="font-body text-[14px] text-text-secondary">
+                {feesData?.miscFeeLabel || 'Additional fee'}
+              </span>
+              <span className="font-mono text-[14px] text-text-primary">${(miscFeeCents / 100).toFixed(2)}</span>
+            </div>
+          )}
           {taxRate > 0 && (
             <div className="flex justify-between items-center">
               <span className="font-body text-[14px] text-text-secondary">
@@ -405,6 +470,12 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
               <span className={cn('font-mono text-[14px]', feesData?.taxExempt ? 'text-text-muted line-through' : 'text-text-primary')}>
                 ${(Math.round(preTaxSubtotal * taxRate / 100) / 100).toFixed(2)}
               </span>
+            </div>
+          )}
+          {stripeFee > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="font-body text-[14px] text-text-secondary">Processing fee (Stripe)</span>
+              <span className="font-mono text-[14px] text-text-primary">${(stripeFee / 100).toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between items-center border-t border-border pt-2 mt-1">
@@ -533,6 +604,53 @@ function Step4Fees({ selectedRooms, nights, propertySettings, feesData, onFeesCh
         </div>
       )}
 
+      {/* Misc fee */}
+      <div className="border border-border rounded-[8px] p-4 flex flex-col gap-3 bg-surface">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-body font-semibold text-[15px] text-text-primary">Additional Fee</p>
+            <p className="font-body text-[13px] text-text-muted">Add a custom one-time fee (e.g. event setup, extra linens)</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch.Root
+              checked={feesData.miscFeeEnabled}
+              onCheckedChange={(v) => {
+                onFeesChange({ miscFeeEnabled: v })
+                if (!v) onFeesChange({ miscFeeEnabled: false, miscFeeCents: 0, miscFeeLabel: '' })
+              }}
+              className={cn('w-10 h-6 rounded-full transition-colors', feesData.miscFeeEnabled ? 'bg-info' : 'bg-border')}
+            >
+              <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+            </Switch.Root>
+            <span className="font-body text-[13px] text-text-secondary w-20">
+              {feesData.miscFeeEnabled ? 'Applied' : 'Not applied'}
+            </span>
+          </div>
+        </div>
+        {feesData.miscFeeEnabled && (
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Fee label"
+              placeholder="e.g. Event setup fee"
+              value={feesData.miscFeeLabel}
+              onChange={(e) => onFeesChange({ miscFeeLabel: e.target.value })}
+            />
+            <Input
+              label="Amount ($)"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={feesData.miscFeeDollars}
+              onChange={(e) => {
+                const dollars = e.target.value
+                onFeesChange({ miscFeeDollars: dollars, miscFeeCents: Math.round(parseFloat(dollars || '0') * 100) })
+              }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Tax exempt */}
       <div className="border border-border rounded-[8px] p-4 flex flex-col gap-3 bg-surface">
         <div className="flex items-center justify-between">
@@ -580,22 +698,64 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   const [emailDebounced, setEmailDebounced] = useState('')
   const [conflict, setConflict] = useState(null)
   const [submitError, setSubmitError] = useState(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [checkingConflicts, setCheckingConflicts] = useState(false)
+  const [earlyConflict, setEarlyConflict] = useState(null)
+  const [activeLink, setActiveLink] = useState(null)
   const [feesData, setFeesData] = useState({
     cleaningFeeWaived: false,
     cleaningFeeWaiveReason: '',
     petFeeApplied: false,
     taxExempt: false,
     taxExemptOrg: '',
+    miscFeeEnabled: false,
+    miscFeeCents: 0,
+    miscFeeDollars: '',
+    miscFeeLabel: '',
   })
 
   const { data: rooms = [] } = useRooms()
+  const { data: roomLinks = [] } = useRoomLinks()
   const { data: propertySettings } = usePropertyFeeSettings()
   const createReservation = useCreateReservation()
   const updateReservation = useUpdateReservation()
   const { addToast } = useToast()
 
+  const { propertyId } = useProperty()
   const isEditMode = !!reservationToEdit
   const isLoading = createReservation.isPending || updateReservation.isPending
+
+  // Early conflict check — runs when advancing from step 2 to step 3
+  const checkConflictsEarly = useCallback(async () => {
+    if (!checkIn || !checkOut || selectedRoomIds.length === 0 || !propertyId) return true
+    setCheckingConflicts(true)
+    setEarlyConflict(null)
+    try {
+      const ciStr = format(checkIn, 'yyyy-MM-dd')
+      const coStr = format(checkOut, 'yyyy-MM-dd')
+      const { data } = await supabase
+        .from('reservations')
+        .select('id, room_ids, check_in, check_out')
+        .eq('property_id', propertyId)
+        .neq('status', 'cancelled')
+        .lt('check_in', coStr)
+        .gt('check_out', ciStr)
+      const conflicting = (data ?? []).filter((r) => {
+        if (isEditMode && r.id === reservationToEdit.id) return false
+        return (r.room_ids ?? []).some((rid) => selectedRoomIds.includes(rid))
+      })
+      if (conflicting.length > 0) {
+        setEarlyConflict(conflicting.map((r) => r.id))
+        return false
+      }
+      return true
+    } catch {
+      // If check fails, allow advancing — the server will catch it on submit
+      return true
+    } finally {
+      setCheckingConflicts(false)
+    }
+  }, [checkIn, checkOut, selectedRoomIds, propertyId, isEditMode, reservationToEdit])
 
   const form = useForm({
     resolver: zodResolver(guestSchema),
@@ -610,7 +770,6 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   })
 
   // Track email for debounced guest lookup
-  // eslint-disable-next-line react-hooks/incompatible-library
   const emailWatch = form.watch('email')
 
   useEffect(() => {
@@ -622,8 +781,8 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
 
   useEffect(() => {
     if (reservationToEdit) {
-      setCheckIn(reservationToEdit.check_in ? new Date(reservationToEdit.check_in) : null)
-      setCheckOut(reservationToEdit.check_out ? new Date(reservationToEdit.check_out) : null)
+      setCheckIn(reservationToEdit.check_in ? parseISO(reservationToEdit.check_in) : null)
+      setCheckOut(reservationToEdit.check_out ? parseISO(reservationToEdit.check_out) : null)
       setSelectedRoomIds(reservationToEdit.room_ids ?? [])
       const g = reservationToEdit.guests ?? {}
       form.reset({
@@ -637,20 +796,43 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
     }
   }, [reservationToEdit, form])
 
+  function handleSelectLink(link) {
+    if (link) {
+      setActiveLink(link)
+      setSelectedRoomIds(link.linked_room_ids ?? [])
+    } else {
+      setActiveLink(null)
+      setSelectedRoomIds([])
+    }
+  }
+
   function resetModal() {
     setStep(1)
     setCheckIn(null)
     setCheckOut(null)
     setSelectedRoomIds([])
+    setActiveLink(null)
     setEmailDebounced('')
     setConflict(null)
     setSubmitError(null)
-    setFeesData({ cleaningFeeWaived: false, cleaningFeeWaiveReason: '', petFeeApplied: false, taxExempt: false, taxExemptOrg: '' })
+    setFeesData({ cleaningFeeWaived: false, cleaningFeeWaiveReason: '', petFeeApplied: false, taxExempt: false, taxExemptOrg: '', miscFeeEnabled: false, miscFeeCents: 0, miscFeeDollars: '', miscFeeLabel: '' })
     form.reset()
   }
 
+  const isDirty = step > 1 || checkIn !== null || selectedRoomIds.length > 0
+
   function handleClose() {
     if (isLoading) return
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+      return
+    }
+    resetModal()
+    onClose()
+  }
+
+  function confirmDiscard() {
+    setShowDiscardConfirm(false)
     resetModal()
     onClose()
   }
@@ -676,10 +858,15 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   }
 
   async function handleNext() {
+    if (step === 2) {
+      const ok = await checkConflictsEarly()
+      if (!ok) return // conflict found — stay on step 2
+    }
     if (step === 3) {
       const valid = await form.trigger(['email', 'first_name', 'last_name', 'num_guests'])
       if (!valid) return
     }
+    setEarlyConflict(null)
     setStep((s) => Math.min(s + 1, 5))
   }
 
@@ -705,6 +892,8 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
       pet_fee_applied: feesData.petFeeApplied,
       tax_exempt: feesData.taxExempt,
       tax_exempt_org: feesData.taxExempt ? (feesData.taxExemptOrg || null) : null,
+      misc_fee_cents: feesData.miscFeeEnabled ? feesData.miscFeeCents : 0,
+      misc_fee_label: feesData.miscFeeEnabled ? (feesData.miscFeeLabel || null) : null,
     }
 
     const mutation = isEditMode
@@ -747,11 +936,24 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
       )}
 
       {step === 2 && (
-        <Step2Rooms
-          rooms={rooms}
-          selectedRoomIds={selectedRoomIds}
-          onToggle={toggleRoom}
-        />
+        <>
+          <Step2Rooms
+            rooms={rooms}
+            roomLinks={roomLinks}
+            selectedRoomIds={selectedRoomIds}
+            onToggle={toggleRoom}
+            onSelectLink={handleSelectLink}
+            activeLink={activeLink}
+          />
+          {earlyConflict && (
+            <div className="mt-4">
+              <ConflictBanner conflictingIds={earlyConflict} />
+              <p className="font-body text-[13px] text-danger mt-2">
+                Please change your dates or room selection to resolve the conflict before continuing.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {step === 3 && (
@@ -793,7 +995,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
         <Button
           variant="secondary"
           size="md"
-          onClick={() => setStep((s) => Math.max(s - 1, 1))}
+          onClick={() => { setEarlyConflict(null); setStep((s) => Math.max(s - 1, 1)) }}
           disabled={step === 1 || isLoading}
         >
           <ArrowLeft size={16} /> Back
@@ -804,12 +1006,33 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
             variant="primary"
             size="md"
             onClick={handleNext}
-            disabled={!canAdvance() || isLoading}
+            disabled={!canAdvance() || isLoading || checkingConflicts}
+            loading={checkingConflicts}
           >
             Next <ArrowRight size={16} />
           </Button>
         )}
       </div>
+
+      {/* Discard changes confirmation */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
+          <div className="bg-surface-raised rounded-[12px] border border-border shadow-xl p-6 max-w-sm mx-4">
+            <h4 className="font-body font-semibold text-[16px] text-text-primary mb-2">Discard changes?</h4>
+            <p className="font-body text-[14px] text-text-secondary mb-6">
+              You have unsaved reservation data. Are you sure you want to close?
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" size="sm" onClick={() => setShowDiscardConfirm(false)}>
+                Keep editing
+              </Button>
+              <Button variant="destructive" size="sm" onClick={confirmDiscard}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }

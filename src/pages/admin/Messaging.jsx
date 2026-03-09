@@ -1,9 +1,16 @@
 // src/pages/admin/Messaging.jsx
-// Messaging placeholder page.
+// Messages page with tabs: Email Templates + Conversations (placeholder).
 
 import { useState } from 'react'
+import * as Tabs from '@radix-ui/react-tabs'
 import { ChatCircle, PaperPlaneTilt, Info } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/Button'
+import { EmailTemplatesTab } from './settings/EmailTemplatesTab'
+import { cn } from '@/lib/utils'
+
+// ---------------------------------------------------------------------------
+// Conversations placeholder (future feature)
+// ---------------------------------------------------------------------------
 
 const PLACEHOLDER_INQUIRIES = [
   { id: 1, name: 'Alice Johnson', subject: 'Availability inquiry', preview: 'Hi, I was wondering if the cabin is available for...', time: '2h ago', unread: true },
@@ -11,29 +18,18 @@ const PLACEHOLDER_INQUIRIES = [
   { id: 3, name: 'Carol Williams', subject: 'Early check-in request', preview: 'We are flying in early and I wanted to ask...', time: 'Yesterday', unread: false },
 ]
 
-export default function Messaging() {
+function ConversationsPlaceholder() {
   const [selected, setSelected] = useState(PLACEHOLDER_INQUIRIES[0])
-  const [, setCompose] = useState(false)
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Messaging</h1>
-        <Button variant="primary" size="md" onClick={() => setCompose(true)}>
-          <PaperPlaneTilt size={16} weight="bold" /> Compose New Message
-        </Button>
-      </div>
-
-      {/* Info callout */}
+    <div className="flex flex-col gap-4">
       <div className="bg-info-bg border border-info rounded-[8px] p-4 flex items-start gap-3">
         <Info size={18} className="text-info shrink-0 mt-0.5" />
         <p className="font-body text-[14px] text-info">
-          Full messaging integration coming soon. This preview shows placeholder inquiries.
+          Direct messaging is coming soon. This preview shows placeholder conversations.
         </p>
       </div>
 
-      {/* Two-panel layout */}
       <div className="flex gap-0 border border-border rounded-[8px] overflow-hidden min-h-[480px]">
         {/* Left panel — Inquiry list */}
         <div className="w-72 flex-shrink-0 border-r border-border flex flex-col">
@@ -47,12 +43,13 @@ export default function Messaging() {
               <button
                 key={inquiry.id}
                 onClick={() => setSelected(inquiry)}
-                className={`w-full text-left p-4 border-b border-border transition-colors hover:bg-info-bg ${
-                  selected?.id === inquiry.id ? 'bg-info-bg' : ''
-                }`}
+                className={cn(
+                  'w-full text-left p-4 border-b border-border transition-colors hover:bg-info-bg',
+                  selected?.id === inquiry.id && 'bg-info-bg'
+                )}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`font-body text-[14px] ${inquiry.unread ? 'font-semibold text-text-primary' : 'text-text-secondary'}`}>
+                  <span className={cn('font-body text-[14px]', inquiry.unread ? 'font-semibold text-text-primary' : 'text-text-secondary')}>
                     {inquiry.name}
                   </span>
                   <span className="font-mono text-[12px] text-text-muted">{inquiry.time}</span>
@@ -106,6 +103,47 @@ export default function Messaging() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Page export
+// ---------------------------------------------------------------------------
+
+export default function Messaging() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-[32px] text-text-primary">Messages</h1>
+      </div>
+
+      <Tabs.Root defaultValue="templates">
+        <Tabs.List className="flex gap-0 border-b border-border mb-6">
+          {['templates', 'conversations'].map((tab) => (
+            <Tabs.Trigger
+              key={tab}
+              value={tab}
+              className={cn(
+                'px-5 py-3 font-body text-[14px] font-medium text-text-secondary border-b-2 border-transparent whitespace-nowrap',
+                'transition-colors hover:text-text-primary',
+                'data-[state=active]:text-text-primary data-[state=active]:border-text-primary'
+              )}
+            >
+              {tab === 'templates' && 'Email Templates'}
+              {tab === 'conversations' && 'Conversations'}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+
+        <Tabs.Content value="templates">
+          <EmailTemplatesTab />
+        </Tabs.Content>
+
+        <Tabs.Content value="conversations">
+          <ConversationsPlaceholder />
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   )
 }

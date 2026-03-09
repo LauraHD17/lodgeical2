@@ -46,7 +46,8 @@ serve(async (req) => {
     .select(`
       id, confirmation_number, check_in, check_out, num_guests,
       status, origin, total_due_cents, notes, created_at,
-      room_ids, property_id,
+      room_ids, property_id, modification_count,
+      booker_email, cc_emails,
       guests!inner(id, first_name, last_name, email, phone),
       properties(name, timezone, location)
     `)
@@ -61,9 +62,12 @@ serve(async (req) => {
 
   if (resError || !reservation) return GENERIC_NOT_FOUND
 
-  // Type-safe access to guest email
+  // Type-safe access to guest email — also allow booker email to access portal
   const guest = reservation.guests as { email: string; first_name: string; last_name: string; phone: string | null }
-  if (!guest || guest.email.toLowerCase() !== parsed.data.email.toLowerCase()) {
+  const inputEmail = parsed.data.email.toLowerCase()
+  const guestEmailMatch = guest?.email.toLowerCase() === inputEmail
+  const bookerEmailMatch = reservation.booker_email?.toLowerCase() === inputEmail
+  if (!guest || (!guestEmailMatch && !bookerEmailMatch)) {
     return GENERIC_NOT_FOUND
   }
 
@@ -87,12 +91,17 @@ serve(async (req) => {
     },
   }
 
-  // Fetch rooms and payments in parallel — they are independent queries
-  const [{ data: rooms }, { data: payments }] = await Promise.all([
+  // Fetch rooms, all property rooms (for modification), and payments in parallel
+  const [{ data: rooms }, { data: allRooms }, { data: payments }] = await Promise.all([
     supabase
       .from('rooms')
       .select('id, name, type, images')
       .in('id', reservation.room_ids),
+    supabase
+      .from('rooms')
+      .select('id, name, type, base_rate_cents, max_guests')
+      .eq('property_id', reservation.property_id)
+      .eq('is_active', true),
     supabase
       .from('payments')
       .select('type, status, amount_cents, method, created_at')
@@ -102,7 +111,12 @@ serve(async (req) => {
   const paymentSummary = calculatePaymentSummary(reservation.total_due_cents, payments ?? [])
 
   return new Response(
-    JSON.stringify({ reservation: reservationWithTimes, rooms: rooms ?? [], paymentSummary }),
+    JSON.stringify({
+      reservation: { ...reservationWithTimes, modification_count: reservation.modification_count ?? 0 },
+      rooms: rooms ?? [],
+      availableRooms: allRooms ?? [],
+      paymentSummary,
+    }),
     { headers: CORS_HEADERS }
   )
 })

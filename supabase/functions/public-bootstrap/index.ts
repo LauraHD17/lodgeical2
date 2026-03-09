@@ -53,6 +53,13 @@ serve(async (req) => {
     .eq('is_active', true)
     .order('sort_order')
 
+  // Fetch active room links (linked combinations of rooms with their own rate)
+  const { data: roomLinks } = await supabase
+    .from('room_links')
+    .select('id, name, linked_room_ids, base_rate_cents, max_guests, description')
+    .eq('property_id', property.id)
+    .eq('is_active', true)
+
   // Fetch public-safe settings (strip Stripe keys)
   const { data: rawSettings } = await supabase
     .from('settings')
@@ -62,7 +69,7 @@ serve(async (req) => {
   // Note: stripe_account_id and stripe_publishable_key are NOT selected — safe by omission
 
   return new Response(
-    JSON.stringify({ property, rooms: rooms ?? [], settings: rawSettings ?? {} }),
+    JSON.stringify({ property, rooms: rooms ?? [], roomLinks: roomLinks ?? [], settings: rawSettings ?? {} }),
     { headers: CORS_HEADERS }
   )
 })

@@ -3,18 +3,16 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowLeft, SpinnerGap, WarningCircle } from '@phosphor-icons/react'
+import { ArrowLeft, SpinnerGap, WarningCircle, PencilSimple, CheckCircle } from '@phosphor-icons/react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
-import { format, parseISO } from 'date-fns'
+import { DayPicker } from 'react-day-picker'
+import 'react-day-picker/style.css'
+import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/shared/StatusChip'
-
-function formatCents(cents) {
-  if (cents == null) return '$0.00'
-  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
+import { fmtMoney as formatCents } from '@/lib/utils'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -144,7 +142,16 @@ function PaymentSection({ reservation, paymentSummary, onPaymentSuccess }) {
           {payError && (
             <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-3">
               <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
-              <p className="font-body text-[13px] text-danger">{payError}</p>
+              <div>
+                <p className="font-body text-[13px] text-danger">{payError}</p>
+                <button
+                  type="button"
+                  onClick={() => { setPayError(''); setShowPayment(false); setClientSecret(null) }}
+                  className="font-body text-[13px] text-info underline mt-1"
+                >
+                  Try again
+                </button>
+              </div>
             </div>
           )}
           {loadingIntent && (
@@ -281,8 +288,8 @@ function CancellationSection({ reservation, onCancelled }) {
 
       {step === 'previewing' && preview && (
         <div>
-          <div className="bg-warning-bg border border-warning rounded-[6px] p-4 mb-4">
-            <p className="font-body text-[14px] text-warning font-semibold mb-1">
+          <div className="bg-danger-bg border border-danger rounded-[6px] p-4 mb-4">
+            <p className="font-body text-[14px] text-danger font-semibold mb-1">
               Are you sure you want to cancel?
             </p>
             {preview.refund_cents != null && (
@@ -320,10 +327,377 @@ function CancellationSection({ reservation, onCancelled }) {
   )
 }
 
+// ─── Modification Section ─────────────────────────────────────────────────────
+
+function ModificationPaymentForm({ balanceCents, onSuccess, onError }) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [paying, setPaying] = useState(false)
+
+  async function handlePay() {
+    if (!stripe || !elements) return
+    setPaying(true)
+    const { error } = await stripe.confirmPayment({ elements, redirect: 'if_required' })
+    if (error) {
+      onError(error.message)
+      setPaying(false)
+    } else {
+      onSuccess()
+    }
+  }
+
+  return (
+    <div className="mt-4">
+      <PaymentElement />
+      <Button variant="primary" size="lg" loading={paying} onClick={handlePay} className="w-full mt-4">
+        Pay {formatCents(balanceCents)} &amp; Confirm
+      </Button>
+    </div>
+  )
+}
+
+function ModificationSection({ reservation, availableRooms, onModified }) {
+  const [step, setStep] = useState('idle') // idle | dates | review | payment | done
+  const [newCheckIn, setNewCheckIn] = useState(null)
+  const [newCheckOut, setNewCheckOut] = useState(null)
+  const [newRoomIds, setNewRoomIds] = useState(reservation.room_ids ?? [])
+  const [newNumGuests, setNewNumGuests] = useState(reservation.num_guests ?? 1)
+  const [preview, setPreview] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [clientSecret, setClientSecret] = useState(null)
+  const [paymentIntentId, setPaymentIntentId] = useState(null)
+  const [stripePromise, setStripePromise] = useState(null)
+  const [payError, setPayError] = useState('')
+
+  const guestIdentity = {
+    email: reservation.guests?.email ?? '',
+    first_name: reservation.guests?.first_name ?? '',
+    last_name: reservation.guests?.last_name ?? '',
+  }
+
+  const selectedRooms = (availableRooms ?? []).filter(r => newRoomIds.includes(r.id))
+  const maxGuests = selectedRooms.reduce((sum, r) => sum + (r.max_guests ?? 2), 0) || 10
+  const nights = newCheckIn && newCheckOut ? differenceInCalendarDays(newCheckOut, newCheckIn) : 0
+
+  // Already modified
+  if ((reservation.modification_count ?? 0) >= 1) {
+    return (
+      <div className="bg-surface-raised border border-border rounded-[8px] p-5 mb-4">
+        <h3 className="font-heading text-[16px] text-text-primary mb-2">Modify Reservation</h3>
+        <p className="font-body text-[14px] text-text-muted">
+          This reservation has already been modified. Only one modification is allowed per booking.
+        </p>
+      </div>
+    )
+  }
+
+  if (reservation.status === 'cancelled') return null
+
+  async function fetchPreview() {
+    if (!newCheckIn || !newCheckOut || newRoomIds.length === 0) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/modify-reservation`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservation_id: reservation.id,
+            preview_only: true,
+            new_check_in: format(newCheckIn, 'yyyy-MM-dd'),
+            new_check_out: format(newCheckOut, 'yyyy-MM-dd'),
+            new_room_ids: newRoomIds,
+            new_num_guests: newNumGuests,
+            ...guestIdentity,
+          }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Could not preview modification.')
+        return
+      }
+      setPreview(data)
+      setStep('review')
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function applyModification() {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/modify-reservation`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservation_id: reservation.id,
+            preview_only: false,
+            new_check_in: format(newCheckIn, 'yyyy-MM-dd'),
+            new_check_out: format(newCheckOut, 'yyyy-MM-dd'),
+            new_room_ids: newRoomIds,
+            new_num_guests: newNumGuests,
+            ...guestIdentity,
+          }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Modification failed.')
+        return
+      }
+      if (data.requires_payment) {
+        setClientSecret(data.client_secret)
+        setPaymentIntentId(data.payment_intent_id)
+        const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+        if (stripeKey) {
+          setStripePromise(loadStripe(stripeKey))
+          setStep('payment')
+        } else {
+          setError('Online payment is not available. Please contact the property.')
+        }
+      } else {
+        setStep('done')
+        onModified()
+      }
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function confirmAfterPayment() {
+    setLoading(true)
+    setPayError('')
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/confirm-modification`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reservation_id: reservation.id,
+            payment_intent_id: paymentIntentId,
+            ...guestIdentity,
+          }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        setPayError(data.error || 'Confirmation failed.')
+        return
+      }
+      setStep('done')
+      onModified()
+    } catch {
+      setPayError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selected = newCheckIn && newCheckOut ? { from: newCheckIn, to: newCheckOut } : newCheckIn ? { from: newCheckIn } : undefined
+
+  return (
+    <div className="bg-surface-raised border border-border rounded-[8px] p-5 mb-4">
+      <h3 className="font-heading text-[16px] text-text-primary mb-3">
+        <PencilSimple size={16} weight="bold" className="inline mr-2" />
+        Modify Reservation
+      </h3>
+
+      {error && (
+        <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-3">
+          <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
+          <p className="font-body text-[13px] text-danger">{error}</p>
+        </div>
+      )}
+
+      {step === 'idle' && (
+        <div>
+          <p className="font-body text-[14px] text-text-secondary mb-3">
+            You may modify this reservation once. Changes must be equal to or greater than the original booking value.
+          </p>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => {
+              setNewCheckIn(parseISO(reservation.check_in))
+              setNewCheckOut(parseISO(reservation.check_out))
+              setNewRoomIds(reservation.room_ids ?? [])
+              setNewNumGuests(reservation.num_guests ?? 1)
+              setStep('dates')
+            }}
+          >
+            Start Modification
+          </Button>
+        </div>
+      )}
+
+      {step === 'dates' && (
+        <div>
+          <p className="font-body text-[14px] text-text-secondary mb-4">Select new dates:</p>
+          <div className="flex justify-center mb-4">
+            <DayPicker
+              mode="range"
+              selected={selected}
+              onSelect={(range) => {
+                if (!range) { setNewCheckIn(null); setNewCheckOut(null); return }
+                setNewCheckIn(range.from ?? null)
+                setNewCheckOut(range.to ?? null)
+              }}
+              numberOfMonths={2}
+              disabled={[{ before: new Date() }]}
+              fromDate={new Date()}
+            />
+          </div>
+
+          {newCheckIn && newCheckOut && nights > 0 && (
+            <div className="p-3 bg-info-bg border border-info rounded-[6px] mb-4">
+              <span className="font-body text-[14px] text-info">
+                {format(newCheckIn, 'MMM d, yyyy')} → {format(newCheckOut, 'MMM d, yyyy')} ({nights} nights)
+              </span>
+            </div>
+          )}
+
+          {/* Room selection */}
+          {availableRooms && availableRooms.length > 0 && (
+            <div className="mb-4">
+              <p className="font-body text-[13px] text-text-secondary uppercase tracking-[0.06em] font-semibold mb-2">Rooms</p>
+              <div className="flex flex-col gap-2">
+                {availableRooms.map(room => {
+                  const isSelected = newRoomIds.includes(room.id)
+                  return (
+                    <button
+                      key={room.id}
+                      type="button"
+                      onClick={() => setNewRoomIds(prev => prev.includes(room.id) ? prev.filter(id => id !== room.id) : [...prev, room.id])}
+                      className={`text-left p-3 rounded-[6px] border transition-colors ${isSelected ? 'border-info bg-info-bg' : 'border-border bg-surface'}`}
+                    >
+                      <span className="font-body text-[14px] text-text-primary font-medium">{room.name}</span>
+                      <span className="font-mono text-[13px] text-text-secondary ml-2">
+                        ${((room.base_rate_cents ?? 0) / 100).toFixed(2)}/night
+                      </span>
+                      <span className="font-body text-[12px] text-text-muted ml-2">Max {room.max_guests ?? 2} guests</span>
+                      {isSelected && <CheckCircle size={14} weight="fill" className="inline ml-2 text-info" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Guest count */}
+          <div className="mb-4">
+            <Input
+              label={`Number of Guests (max ${maxGuests})`}
+              type="number"
+              min={1}
+              max={maxGuests}
+              value={newNumGuests}
+              onChange={(e) => setNewNumGuests(Math.min(maxGuests, Math.max(1, parseInt(e.target.value) || 1)))}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="secondary" size="md" onClick={() => { setStep('idle'); setError('') }}>Cancel</Button>
+            <Button
+              variant="primary"
+              size="md"
+              loading={loading}
+              disabled={!newCheckIn || !newCheckOut || nights <= 0 || newRoomIds.length === 0}
+              onClick={fetchPreview}
+            >
+              Preview Changes
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 'review' && preview && (
+        <div>
+          <p className="font-body text-[14px] text-text-secondary mb-3">Review your changes:</p>
+          <div className="bg-surface border border-border rounded-[6px] p-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <p className="font-body text-[11px] text-text-muted uppercase mb-1">Original</p>
+                <p className="font-mono text-[13px] text-text-primary">
+                  {formatDate(preview.original.check_in)} → {formatDate(preview.original.check_out)}
+                </p>
+                <p className="font-mono text-[14px] text-text-primary font-semibold">{formatCents(preview.original.total_cents)}</p>
+              </div>
+              <div>
+                <p className="font-body text-[11px] text-text-muted uppercase mb-1">Modified</p>
+                <p className="font-mono text-[13px] text-text-primary">
+                  {formatDate(preview.modified.check_in)} → {formatDate(preview.modified.check_out)}
+                </p>
+                <p className="font-mono text-[14px] text-text-primary font-semibold">{formatCents(preview.modified.total_cents)}</p>
+              </div>
+            </div>
+            {preview.balance_due_cents > 0 && (
+              <div className="pt-3 border-t border-border">
+                <div className="flex justify-between items-center">
+                  <span className="font-body text-[14px] text-text-secondary">Balance due</span>
+                  <span className="font-mono text-[16px] text-danger font-semibold">{formatCents(preview.balance_due_cents)}</span>
+                </div>
+                <p className="font-body text-[12px] text-text-muted mt-1">Payment is required to confirm this change.</p>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" size="md" onClick={() => setStep('dates')}>Back</Button>
+            <Button variant="primary" size="md" loading={loading} onClick={applyModification}>
+              {preview.requires_payment ? 'Continue to Payment' : 'Confirm Modification'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 'payment' && clientSecret && stripePromise && (
+        <div>
+          <p className="font-body text-[14px] text-text-secondary mb-3">
+            Pay the balance due to confirm your modification:
+          </p>
+          {payError && (
+            <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-3">
+              <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
+              <p className="font-body text-[13px] text-danger">{payError}</p>
+            </div>
+          )}
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <ModificationPaymentForm
+              balanceCents={preview?.balance_due_cents ?? 0}
+              onSuccess={confirmAfterPayment}
+              onError={(msg) => setPayError(msg)}
+            />
+          </Elements>
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div className="flex items-start gap-2 p-3 bg-success-bg border border-success rounded-[6px]">
+          <CheckCircle size={16} weight="fill" className="text-success shrink-0 mt-0.5" />
+          <p className="font-body text-[14px] text-success font-semibold">
+            Reservation modified successfully. You will receive an updated confirmation email.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Reservation Detail View ───────────────────────────────────────────────────
 
 function ReservationDetail({ data, onBack, onRefresh }) {
-  const { reservation, paymentSummary } = data
+  const { reservation, paymentSummary, availableRooms } = data
 
   const guestName = [
     reservation.guests?.first_name,
@@ -391,6 +765,13 @@ function ReservationDetail({ data, onBack, onRefresh }) {
           )}
         </div>
       </div>
+
+      {/* Modification */}
+      <ModificationSection
+        reservation={reservation}
+        availableRooms={availableRooms}
+        onModified={onRefresh}
+      />
 
       {/* Payment */}
       <PaymentSection
