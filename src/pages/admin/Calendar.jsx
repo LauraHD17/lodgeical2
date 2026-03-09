@@ -272,7 +272,7 @@ export default function Calendar() {
             <span key={room.id} className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body border', ROOM_COLORS_PILL[i % ROOM_COLORS_PILL.length])}>{room.name}</span>
           ))}
           {rooms.some(r => (r.buffer_days_before ?? 0) > 0 || (r.buffer_days_after ?? 0) > 0) && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body border border-dashed border-border text-text-muted bg-surface opacity-60 italic">Buffer</span>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body text-text-muted italic" style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, #888 3px, #888 5px)', opacity: 0.3 }}>Buffer</span>
           )}
         </div>
       )}
@@ -343,27 +343,25 @@ export default function Calendar() {
                       const cellPct = 100 / 7
 
                       if (bar.isBuffer) {
-                        // Buffer day bar — dashed border, lighter opacity, non-clickable
+                        // Buffer day bar — diagonal stripe pattern, non-clickable
                         const leftPct = (bar.colStart / 7) * 100
                         const widthPct = ((bar.colEnd - bar.colStart + 1) / 7) * 100
                         return (
                           <div
                             key={bIdx}
                             className={cn(
-                              'absolute h-6 flex items-center px-2 opacity-40 border border-dashed rounded-[4px]',
-                              ROOM_COLORS_BG[bar.colorIdx],
+                              'absolute h-6 rounded-[4px]',
                               ROOM_COLORS_TEXT[bar.colorIdx],
-                              'border-current',
                             )}
                             style={{
                               left: `calc(${leftPct}% + 1px)`,
                               width: `calc(${widthPct}% - 2px)`,
                               top: `${bIdx * 26}px`,
+                              opacity: 0.25,
+                              backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, currentColor 3px, currentColor 5px)',
                             }}
                             title="Buffer days"
-                          >
-                            <span className="font-body text-[10px] truncate leading-none italic">Buffer</span>
-                          </div>
+                          />
                         )
                       }
 
@@ -395,7 +393,8 @@ export default function Calendar() {
                             'absolute h-6 flex items-center gap-1 pointer-events-auto cursor-pointer transition-opacity hover:opacity-80 px-2',
                             ROOM_COLORS_BG[bar.colorIdx],
                             ROOM_COLORS_TEXT[bar.colorIdx],
-                            isPending && 'border border-dashed border-current opacity-80',
+                            'border border-dashed border-current',
+                            isPending && 'opacity-80',
                             // Rounded ends: arrival day = left rounded, departure day = right rounded
                             bar.isStart ? 'rounded-l-[4px]' : 'rounded-l-none',
                             bar.isEnd   ? 'rounded-r-[4px]' : 'rounded-r-none',
