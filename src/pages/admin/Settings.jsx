@@ -227,12 +227,15 @@ export default function Settings() {
               value={property.name}
               onChange={(e) => setProperty((p) => ({ ...p, name: e.target.value }))}
             />
-            <Input
-              label="Slug"
-              value={property.slug}
-              onChange={(e) => setProperty((p) => ({ ...p, slug: e.target.value }))}
-              placeholder="my-property"
-            />
+            <div className="flex flex-col">
+              <Input
+                label="URL Name"
+                value={property.slug}
+                onChange={(e) => setProperty((p) => ({ ...p, slug: e.target.value }))}
+                placeholder="my-property"
+              />
+              <p className="mt-1 font-body text-[12px] text-text-muted">A short, URL-friendly name for your property (e.g. &quot;sunrise-lodge&quot;). Used in booking links and public pages.</p>
+            </div>
             <Input
               label="Location"
               value={property.location}

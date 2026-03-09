@@ -759,8 +759,8 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
           const isPending = r.status === 'pending'
           return (
             <td key={idx} colSpan={span.span} className="py-1 px-0.5">
-              <div className={cn(
-                'rounded-[4px] px-2 py-1 h-8 flex items-center overflow-hidden',
+              <Link to="/reservations" className={cn(
+                'rounded-[4px] px-2 py-1 h-8 flex items-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity block',
                 isPending
                   ? 'bg-warning-bg border border-dashed border-warning'
                   : 'bg-info-bg border-l-[3px] border-l-info border border-info/30'
@@ -768,7 +768,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
                 <span className={cn('font-mono text-[11px] truncate', isPending ? 'text-warning italic' : 'text-info')}>
                   {r.guests?.last_name ?? '—'}
                 </span>
-              </div>
+              </Link>
             </td>
           )
         }
