@@ -340,7 +340,6 @@ export default function Calendar() {
                   {/* Reservation + buffer bars (absolute over the cells) */}
                   <div className="absolute inset-0 top-[36px] pointer-events-none">
                     {weekBars.map((bar, bIdx) => {
-                      const multiCell = bar.colEnd > bar.colStart
                       const cellPct = 100 / 7
 
                       if (bar.isBuffer) {
@@ -372,10 +371,18 @@ export default function Calendar() {
                       const guest     = res.guests ?? {}
                       const isPending = res.status === 'pending'
 
-                      // Time-of-day offsets: only when bar spans >1 column
-                      // (prevents negative-width bars on single-night stays)
-                      const arrivalOffset  = (bar.isStart && multiCell) ? (CHECK_IN_HOUR  / 24) * cellPct : 0
-                      const departureOffset= (bar.isEnd   && multiCell) ? ((24 - CHECK_OUT_HOUR) / 24) * cellPct : 0
+                      // Time-of-day offsets: shift bar start/end to reflect check-in/check-out times.
+                      // Arrival at 3 PM ≈ bar starts 63% into the check-in cell.
+                      // Departure at 11 AM ≈ bar ends 46% into the check-out cell.
+                      // Applied consistently; scale down if bar would become too narrow.
+                      const rawArrival   = bar.isStart ? (CHECK_IN_HOUR / 24) * cellPct : 0
+                      const rawDeparture = bar.isEnd   ? ((24 - CHECK_OUT_HOUR) / 24) * cellPct : 0
+                      const totalBarPct  = ((bar.colEnd - bar.colStart + 1) / 7) * 100
+                      const minBarPct    = cellPct * 0.3
+                      const shrink       = rawArrival + rawDeparture
+                      const scale        = (totalBarPct - shrink) < minBarPct ? Math.max(0, (totalBarPct - minBarPct) / (shrink || 1)) : 1
+                      const arrivalOffset   = rawArrival * scale
+                      const departureOffset = rawDeparture * scale
 
                       const leftPct  = (bar.colStart / 7) * 100 + arrivalOffset
                       const widthPct = ((bar.colEnd - bar.colStart + 1) / 7) * 100 - arrivalOffset - departureOffset
