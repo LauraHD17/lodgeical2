@@ -6,8 +6,6 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageLoader } from '@/components/shared/PageLoader'
 import { enterSandbox } from '@/lib/sandbox/useSandbox'
-import { activateSandbox } from '@/lib/supabaseClient'
-import { installSandboxFetch } from '@/lib/sandbox/sandboxFetch'
 
 export default function Demo() {
   const navigate = useNavigate()
@@ -16,7 +14,17 @@ export default function Demo() {
     let cancelled = false
 
     async function activate() {
-      const { supabase: mockClient } = await import('@/mocks/supabaseMock.js')
+      // Dynamic imports bypass the Vite alias (@/lib/supabaseClient → supabaseMock)
+      // so we get the real module's activateSandbox export.
+      const [
+        { supabase: mockClient },
+        { activateSandbox },
+        { installSandboxFetch },
+      ] = await Promise.all([
+        import('@/mocks/supabaseMock.js'),
+        import(/* @vite-ignore */ '../../lib/supabaseClient.js'),
+        import('@/lib/sandbox/sandboxFetch'),
+      ])
       if (cancelled) return
 
       activateSandbox(mockClient)
