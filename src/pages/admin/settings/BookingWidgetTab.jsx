@@ -1,11 +1,13 @@
 // src/pages/admin/settings/BookingWidgetTab.jsx
-// Iframe embed snippet for embedding the booking widget on external websites.
+// Iframe embed snippet + seasonal closure settings.
 
 import { useState } from 'react'
 import { Copy, Check, Code } from '@phosphor-icons/react'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
 import { SectionHeader } from './EmailTemplatesTab'
 
-export function BookingWidgetTab({ property }) {
+export function BookingWidgetTab({ property, onSaveClosure }) {
   const [copied, setCopied] = useState(false)
   const slug = property?.slug ?? 'your-property'
   const origin = window.location.origin
@@ -69,6 +71,104 @@ export function BookingWidgetTab({ property }) {
           Open widget preview in new tab →
         </a>
       </div>
+
+      {/* Seasonal Closure */}
+      <SeasonalClosure property={property} onSave={onSaveClosure} />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal Closure sub-component
+// ---------------------------------------------------------------------------
+
+function SeasonalClosure({ property, onSave }) {
+  const hasExisting = !!property?.seasonal_closure_start
+  const [enabled, setEnabled] = useState(hasExisting)
+  const [start, setStart] = useState(property?.seasonal_closure_start ?? '')
+  const [end, setEnd] = useState(property?.seasonal_closure_end ?? '')
+  const [message, setMessage] = useState(
+    property?.seasonal_closure_message ??
+    'We haven\'t opened these dates yet. Send an inquiry and we\'ll reach out when availability opens up!'
+  )
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!onSave) return
+    setSaving(true)
+    try {
+      await onSave({
+        seasonal_closure_start: enabled ? start || null : null,
+        seasonal_closure_end: enabled ? end || null : null,
+        seasonal_closure_message: enabled ? message : null,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-border pt-6 mt-2">
+      <SectionHeader>Seasonal Closure</SectionHeader>
+      <p className="font-body text-[14px] text-text-secondary -mt-2 mb-4">
+        Block a date range on the booking widget and show an inquiry form instead.
+        Guests can express interest for those dates and you&apos;ll see their inquiries on the Inquiries page.
+      </p>
+
+      <label className="flex items-center gap-3 cursor-pointer mb-4">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => setEnabled(e.target.checked)}
+          className="accent-info w-4 h-4"
+        />
+        <span className="font-body text-[14px] text-text-primary font-medium">
+          Enable seasonal closure
+        </span>
+      </label>
+
+      {enabled && (
+        <div className="flex flex-col gap-4 pl-7">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Closure start"
+              type="date"
+              value={start}
+              onChange={e => setStart(e.target.value)}
+            />
+            <Input
+              label="Closure end"
+              type="date"
+              value={end}
+              onChange={e => setEnd(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="closure-msg" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 block">
+              Message shown to guests
+            </label>
+            <textarea
+              id="closure-msg"
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              rows={3}
+              maxLength={500}
+              className="w-full border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-none"
+            />
+          </div>
+          <Button variant="primary" size="md" onClick={handleSave} disabled={saving} className="self-start">
+            {saving ? 'Saving...' : 'Save Closure Settings'}
+          </Button>
+        </div>
+      )}
+
+      {!enabled && hasExisting && (
+        <div className="pl-7">
+          <Button variant="ghost" size="sm" onClick={handleSave} disabled={saving}>
+            {saving ? 'Clearing...' : 'Clear closure settings'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

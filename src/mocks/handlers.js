@@ -10,6 +10,7 @@ import {
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
   MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY, MOCK_ROOM_LINKS,
   MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES, MOCK_ADMIN_ACTIVITY,
+  MOCK_INQUIRIES,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -255,7 +256,12 @@ export const handlers = [
       return new HttpResponse(null, { status: 404 })
     }
     return HttpResponse.json({
-      property: MOCK_PROPERTY,
+      property: {
+        ...MOCK_PROPERTY,
+        seasonal_closure_start: null,
+        seasonal_closure_end: null,
+        seasonal_closure_message: 'We haven\'t opened these dates yet. Send an inquiry and we\'ll reach out when availability opens up!',
+      },
       rooms:    MOCK_ROOMS.filter(r => r.is_active),
       roomLinks: MOCK_ROOM_LINKS.filter(l => l.is_active),
       settings: { ...MOCK_SETTINGS, currency: 'USD', min_stay_nights: 1, require_payment_at_booking: false, allow_partial_payment: true },
@@ -559,6 +565,34 @@ export const handlers = [
 
   http.get(`${BASE}/rest/v1/admin_activity`, ({ request }) =>
     pgRespond(request, MOCK_ADMIN_ACTIVITY),
+  ),
+
+  // -------------------------------------------------------------------------
+  // inquiries
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/inquiries`, ({ request }) =>
+    pgRespond(request, MOCK_INQUIRIES),
+  ),
+
+  http.post(`${BASE}/rest/v1/inquiries`, async ({ request }) => {
+    const body = await request.json()
+    const newInq = { id: `inq-new-${Date.now()}`, ...body, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    return pgRespond(request, newInq)
+  }),
+
+  http.patch(`${BASE}/rest/v1/inquiries`, async ({ request }) => {
+    const body = await request.json()
+    const url = new URL(request.url)
+    const idFilter = url.searchParams.get('id')
+    const id = idFilter?.replace('eq.', '')
+    const inq = MOCK_INQUIRIES.find(i => i.id === id) ?? MOCK_INQUIRIES[0]
+    return pgRespond(request, { ...inq, ...body })
+  }),
+
+  // Submit inquiry (public edge function)
+  http.post(`${BASE}/functions/v1/submit-inquiry`, () =>
+    HttpResponse.json({ success: true }),
   ),
 
 ]

@@ -31,6 +31,7 @@ const Reports         = lazy(() => import('@/pages/admin/Reports'))
 const Settings        = lazy(() => import('@/pages/admin/Settings'))
 const Import          = lazy(() => import('@/pages/admin/Import'))
 const Calendar        = lazy(() => import('@/pages/admin/Calendar'))
+const Inquiries       = lazy(() => import('@/pages/admin/Inquiries'))
 const Help            = lazy(() => import('@/pages/admin/Help'))
 
 // Public pages (lazy-loaded)
@@ -60,6 +61,7 @@ const pageMap = {
   Settings,
   Import,
   Calendar,
+  Inquiries,
   Help,
   Login,
   Widget,

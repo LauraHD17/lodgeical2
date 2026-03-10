@@ -15,8 +15,16 @@ const paymentVariants = {
   failed: 'bg-danger-bg text-danger',
 }
 
+const inquiryVariants = {
+  new: 'bg-info-bg text-info',
+  reviewed: 'bg-warning-bg text-warning',
+  contacted: 'bg-warning-bg text-warning',
+  converted: 'bg-success-bg text-success',
+  declined: 'bg-danger-bg text-danger',
+}
+
 export function StatusChip({ status, type = 'reservation' }) {
-  const variants = type === 'payment' ? paymentVariants : reservationVariants
+  const variants = type === 'payment' ? paymentVariants : type === 'inquiry' ? inquiryVariants : reservationVariants
   const colorClass = variants[status] ?? 'bg-surface text-text-secondary'
 
   const label = status ? status.replace(/_/g, ' ') : ''

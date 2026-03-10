@@ -9,7 +9,7 @@ import { RoomCard } from './RoomCard'
 import { MultiSelectRoomCard } from './MultiSelectRoomCard'
 import { RoomLinkCard } from './RoomLinkCard'
 
-export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onBack }) {
+export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onBack, onInquiry }) {
   const [multiMode, setMultiMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
 
@@ -50,6 +50,17 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
           No rooms are available for {format(new Date(checkIn + 'T12:00:00'), 'MMM d')} – {format(new Date(checkOut + 'T12:00:00'), 'MMM d, yyyy')}.
         </p>
         <Button variant="secondary" size="md" onClick={onBack}>Change dates</Button>
+
+        {onInquiry && (
+          <div className="mt-8 border-t border-border pt-6">
+            <p className="font-body text-[13px] text-text-secondary mb-3">
+              Still interested? Send an inquiry and we&apos;ll reach out if availability opens up.
+            </p>
+            <Button variant="ghost" size="sm" onClick={onInquiry}>
+              Send an inquiry &rarr;
+            </Button>
+          </div>
+        )}
       </div>
     )
   }

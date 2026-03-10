@@ -63,6 +63,11 @@ export const queryKeys = {
     staff: (propertyId) => ['contacts', 'staff', propertyId],
   },
 
+  inquiries: {
+    all: ['inquiries'],
+    list: (propertyId, filters) => ['inquiries', 'list', propertyId, filters],
+  },
+
   weather: {
     current: (lat, lon) => ['weather', 'current', lat, lon],
   },

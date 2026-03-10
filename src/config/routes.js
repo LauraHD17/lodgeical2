@@ -14,6 +14,7 @@ export const ROUTES = [
   { path: '/messaging',            pageName: 'Messaging',           permission: 'manage_messaging',    isPublic: false },
   { path: '/documents',            pageName: 'Documents',           permission: 'manage_documents',    isPublic: false, navHidden: true },
   { path: '/maintenance',          pageName: 'Maintenance',         permission: 'manage_maintenance',  isPublic: false },
+  { path: '/inquiries',            pageName: 'Inquiries',           permission: 'manage_reservations', isPublic: false },
   { path: '/contacts',             pageName: 'Contacts',            permission: 'manage_contacts',     isPublic: false, navLabel: 'Admin Contacts' },
   { path: '/reports',              pageName: 'Reports',             permission: 'view_reports',        isPublic: false, navLabel: 'Reports & Financials' },
   { path: '/settings',             pageName: 'Settings',            permission: 'manage_settings',     isPublic: false },

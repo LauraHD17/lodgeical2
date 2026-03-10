@@ -1,5 +1,5 @@
 // src/components/widget/BookingWidget.jsx
-// 4-step public booking flow. No auth required.
+// 4-step public booking flow + inquiry mode. No auth required.
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -9,8 +9,26 @@ import { DateStep } from './DateStep'
 import { RoomStep } from './RoomStep'
 import { GuestStep } from './GuestStep'
 import { ReviewStep } from './ReviewStep'
+import { InquiryStep } from './InquiryStep'
 
 const STEPS = ['Dates', 'Room', 'Your Info', 'Review & Pay']
+
+/**
+ * Check if a date range overlaps with the seasonal closure window.
+ * @param {string} checkIn  YYYY-MM-DD
+ * @param {string} checkOut YYYY-MM-DD
+ * @param {object} property  property object with seasonal_closure_start/end
+ * @returns {boolean}
+ */
+function isSeasonalClosure(checkIn, checkOut, property) {
+  if (!property?.seasonal_closure_start || !property?.seasonal_closure_end) return false
+  const ci = new Date(checkIn + 'T12:00:00')
+  const co = new Date(checkOut + 'T12:00:00')
+  const cs = new Date(property.seasonal_closure_start + 'T00:00:00')
+  const ce = new Date(property.seasonal_closure_end + 'T23:59:59')
+  // Overlap: checkIn < closureEnd AND checkOut > closureStart
+  return ci <= ce && co >= cs
+}
 
 export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   const navigate = useNavigate()
@@ -20,6 +38,42 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   const [guestInfo, setGuestInfo] = useState(null)
   const [isBooking, setIsBooking] = useState(false)
   const [bookingError, setBookingError] = useState(null)
+
+  // Inquiry mode
+  const [inquiryMode, setInquiryMode] = useState(false)
+  const [closureMessage, setClosureMessage] = useState(null)
+
+  function handleDateNext(d) {
+    setDates(d)
+    // Check seasonal closure before proceeding to room step
+    if (isSeasonalClosure(d.checkIn, d.checkOut, property)) {
+      setClosureMessage(property.seasonal_closure_message || null)
+      setInquiryMode(true)
+    } else {
+      setStep(1)
+    }
+  }
+
+  function handleInquiryFromDateStep() {
+    setClosureMessage(null)
+    setInquiryMode(true)
+  }
+
+  function handleInquiryFromRoomStep() {
+    setClosureMessage(null)
+    setInquiryMode(true)
+  }
+
+  function handleInquiryBack() {
+    setInquiryMode(false)
+    setClosureMessage(null)
+    // Return to wherever they came from: step 0 if seasonal closure, step 1 if from room step
+    // If dates overlap closure they came from step 0, otherwise they came from step 1
+    if (dates.checkIn && isSeasonalClosure(dates.checkIn, dates.checkOut, property)) {
+      setStep(0)
+    }
+    // Otherwise stay on step 1 (RoomStep) — step is already 1
+  }
 
   async function handleBook(_paymentData) {
     setIsBooking(true)
@@ -68,74 +122,91 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
         )}
       </div>
 
-      {/* Progress bar */}
-      <div className="flex items-center justify-between mb-8 px-2">
-        {STEPS.map((label, i) => (
-          <div key={label} className="flex items-center flex-1 last:flex-none">
-            <div className="flex flex-col items-center">
-              <div className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold font-body transition-colors',
-                i < step ? 'bg-success text-white' :
-                i === step ? 'bg-text-primary text-white' :
-                'bg-border text-text-muted'
-              )}>
-                {i < step ? <CheckCircle size={16} weight="bold" /> : i + 1}
+      {/* Progress bar — hidden during inquiry mode */}
+      {!inquiryMode && (
+        <div className="flex items-center justify-between mb-8 px-2">
+          {STEPS.map((label, i) => (
+            <div key={label} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center">
+                <div className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold font-body transition-colors',
+                  i < step ? 'bg-success text-white' :
+                  i === step ? 'bg-text-primary text-white' :
+                  'bg-border text-text-muted'
+                )}>
+                  {i < step ? <CheckCircle size={16} weight="bold" /> : i + 1}
+                </div>
+                <span className={cn(
+                  'mt-1 text-[11px] font-body whitespace-nowrap',
+                  i === step ? 'text-info font-semibold underline' :
+                  i < step ? 'text-success' : 'text-text-muted'
+                )}>{label}</span>
               </div>
-              <span className={cn(
-                'mt-1 text-[11px] font-body whitespace-nowrap',
-                i === step ? 'text-info font-semibold underline' :
-                i < step ? 'text-success' : 'text-text-muted'
-              )}>{label}</span>
+              {i < STEPS.length - 1 && (
+                <div className={cn('flex-1 h-[1px] mx-2 mt-[-12px]', i < step ? 'bg-success' : 'bg-border')} />
+              )}
             </div>
-            {i < STEPS.length - 1 && (
-              <div className={cn('flex-1 h-[1px] mx-2 mt-[-12px]', i < step ? 'bg-success' : 'bg-border')} />
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Step content */}
       <div className="bg-surface-raised border border-border rounded-[12px] p-6 md:p-8">
-        {step === 0 && (
-          <DateStep
-            settings={settings}
+        {inquiryMode ? (
+          <InquiryStep
+            checkIn={dates.checkIn}
+            checkOut={dates.checkOut}
             propertyId={property.id}
             rooms={rooms}
-            initialDates={dates}
-            onNext={(d) => { setDates(d); setStep(1) }}
+            closureMessage={closureMessage}
+            onBack={handleInquiryBack}
           />
-        )}
-        {step === 1 && (
-          <RoomStep
-            rooms={rooms}
-            roomLinks={roomLinks}
-            checkIn={dates.checkIn}
-            checkOut={dates.checkOut}
-            onNext={(room) => { setSelectedRoom(room); setStep(2) }}
-            onBack={() => setStep(0)}
-          />
-        )}
-        {step === 2 && (
-          <GuestStep
-            room={selectedRoom}
-            checkIn={dates.checkIn}
-            checkOut={dates.checkOut}
-            onNext={(info) => { setGuestInfo(info); setStep(3) }}
-            onBack={() => setStep(1)}
-          />
-        )}
-        {step === 3 && (
-          <ReviewStep
-            property={property}
-            room={selectedRoom}
-            dates={dates}
-            guestInfo={guestInfo}
-            settings={settings}
-            onBook={handleBook}
-            onBack={() => setStep(2)}
-            isLoading={isBooking}
-            error={bookingError}
-          />
+        ) : (
+          <>
+            {step === 0 && (
+              <DateStep
+                settings={settings}
+                propertyId={property.id}
+                rooms={rooms}
+                initialDates={dates}
+                onNext={handleDateNext}
+                onInquiry={handleInquiryFromDateStep}
+              />
+            )}
+            {step === 1 && (
+              <RoomStep
+                rooms={rooms}
+                roomLinks={roomLinks}
+                checkIn={dates.checkIn}
+                checkOut={dates.checkOut}
+                onNext={(room) => { setSelectedRoom(room); setStep(2) }}
+                onBack={() => setStep(0)}
+                onInquiry={handleInquiryFromRoomStep}
+              />
+            )}
+            {step === 2 && (
+              <GuestStep
+                room={selectedRoom}
+                checkIn={dates.checkIn}
+                checkOut={dates.checkOut}
+                onNext={(info) => { setGuestInfo(info); setStep(3) }}
+                onBack={() => setStep(1)}
+              />
+            )}
+            {step === 3 && (
+              <ReviewStep
+                property={property}
+                room={selectedRoom}
+                dates={dates}
+                guestInfo={guestInfo}
+                settings={settings}
+                onBook={handleBook}
+                onBack={() => setStep(2)}
+                isLoading={isBooking}
+                error={bookingError}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

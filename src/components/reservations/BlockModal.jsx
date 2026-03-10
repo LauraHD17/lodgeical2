@@ -6,7 +6,7 @@
 import { useState, createElement } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import * as Switch from '@radix-ui/react-switch'
-import { Wrench, HouseSimple } from '@phosphor-icons/react'
+import { Wrench, HouseSimple, CalendarX } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 const BLOCK_TYPES = [
   { value: 'maintenance', label: 'Maintenance', icon: Wrench, description: 'HVAC, plumbing, cleaning, repairs' },
   { value: 'owner_block', label: 'Owner Block', icon: HouseSimple, description: 'Owner stay, personal use, family visit' },
+  { value: 'seasonal', label: 'Seasonal Closure', icon: CalendarX, description: 'Off-season closure, renovation period' },
 ]
 
 const BLOCK_EMAIL = 'blocked@lodge-ical.internal'
@@ -99,7 +100,7 @@ export function BlockModal({ open, onClose }) {
         {/* Block type selector */}
         <div className="flex flex-col gap-2">
           <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Block Type</span>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {BLOCK_TYPES.map(({ value, label, icon, description }) => (
               <button
                 key={value}

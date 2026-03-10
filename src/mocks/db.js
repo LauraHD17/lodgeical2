@@ -471,3 +471,60 @@ export const MOCK_ONBOARDING_STATE = {
 export const MOCK_IMPORT_BATCHES = []
 
 export const MOCK_ADMIN_ACTIVITY = []
+
+// ---------------------------------------------------------------------------
+// Inquiries (guest interest submissions from the booking widget)
+// ---------------------------------------------------------------------------
+
+export const MOCK_INQUIRIES = [
+  {
+    id: 'inq-001', property_id: PROPERTY_ID,
+    check_in: daysFromNow(45), check_out: daysFromNow(49),
+    guest_first_name: 'Hannah', guest_last_name: 'Park',
+    guest_email: 'hannah.park@example.com', guest_phone: '+1 828 555 0401',
+    num_guests_range: '1-2', room_ids: ['room-001'],
+    notes: 'Looking for a quiet getaway with my partner. Is there a fire pit?',
+    status: 'new',
+    created_at: daysFromNow(-1) + 'T09:30:00Z', updated_at: daysFromNow(-1) + 'T09:30:00Z',
+  },
+  {
+    id: 'inq-002', property_id: PROPERTY_ID,
+    check_in: daysFromNow(60), check_out: daysFromNow(67),
+    guest_first_name: 'Marcus', guest_last_name: 'Chen',
+    guest_email: 'marcus.chen@example.com', guest_phone: '+1 828 555 0402',
+    num_guests_range: '5-6', room_ids: ['room-001', 'room-002'],
+    notes: 'Family reunion — need space for 6 adults. Is there a group discount?',
+    status: 'contacted',
+    created_at: daysFromNow(-5) + 'T14:15:00Z', updated_at: daysFromNow(-3) + 'T11:00:00Z',
+  },
+  {
+    id: 'inq-003', property_id: PROPERTY_ID,
+    check_in: daysFromNow(30), check_out: daysFromNow(33),
+    guest_first_name: 'Lily', guest_last_name: 'Rosenberg',
+    guest_email: 'lily.r@example.com', guest_phone: null,
+    num_guests_range: '3-4', room_ids: ['room-003'],
+    notes: null,
+    status: 'reviewed',
+    created_at: daysFromNow(-8) + 'T18:45:00Z', updated_at: daysFromNow(-6) + 'T09:00:00Z',
+  },
+  {
+    id: 'inq-004', property_id: PROPERTY_ID,
+    check_in: daysFromNow(90), check_out: daysFromNow(95),
+    guest_first_name: 'Kevin', guest_last_name: 'Watts',
+    guest_email: 'kevin.watts@example.com', guest_phone: '+1 828 555 0404',
+    num_guests_range: '1-2', room_ids: null,
+    notes: 'Honeymoon trip — looking for something special.',
+    status: 'converted',
+    created_at: daysFromNow(-14) + 'T12:00:00Z', updated_at: daysFromNow(-10) + 'T15:00:00Z',
+  },
+  {
+    id: 'inq-005', property_id: PROPERTY_ID,
+    check_in: daysFromNow(20), check_out: daysFromNow(22),
+    guest_first_name: 'Nora', guest_last_name: 'Blake',
+    guest_email: 'nora.blake@example.com', guest_phone: '+1 828 555 0405',
+    num_guests_range: '7+', room_ids: ['room-001', 'room-002', 'room-003'],
+    notes: 'Large group retreat. Do you allow pets? We have two dogs.',
+    status: 'declined',
+    created_at: daysFromNow(-12) + 'T08:00:00Z', updated_at: daysFromNow(-11) + 'T10:30:00Z',
+  },
+]

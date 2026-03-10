@@ -476,7 +476,7 @@ export default function Settings() {
 
         {/* Booking Widget Tab */}
         <Tabs.Content value="widget">
-          <BookingWidgetTab property={settings} />
+          <BookingWidgetTab property={settings} onSaveClosure={saveTab} />
         </Tabs.Content>
 
         {/* Team Tab */}

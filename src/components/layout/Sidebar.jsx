@@ -19,6 +19,7 @@ import {
   ChartBar,
   Gear,
   UploadSimple,
+  Tray,
   SignOut,
   ArrowSquareOut,
 } from '@phosphor-icons/react'
@@ -39,6 +40,7 @@ const ICON_MAP = {
   Payments:         CurrencyDollar,
   'Reports & Financials': TrendUp,
   Maintenance:      Wrench,
+  Inquiries:        Tray,
   'Admin Contacts': AddressBook,
   Contacts:         AddressBook,
   Messaging:        ChatText,
