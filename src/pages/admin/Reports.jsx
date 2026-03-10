@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { DataTable } from '@/components/shared/DataTable'
 import { CHART_COLORS, CHART_AXIS_TICK, CHART_AXIS_TICK_MONO, CHART_GRID_STROKE } from '@/config/chartTokens'
-import { cn } from '@/lib/utils'
+import { cn, fmtMoney } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
 // Data hooks
@@ -68,7 +68,7 @@ function useFinancialData() {
 function useRangedData(dateFrom, dateTo) {
   const { propertyId } = useProperty()
   return useQuery({
-    queryKey: ['reports-ranged', propertyId, dateFrom, dateTo],
+    queryKey: queryKeys.reports.ranged(propertyId, dateFrom, dateTo),
     queryFn: async () => {
       if (!propertyId) return { reservations: [], payments: [] }
       const [resResult, payResult] = await Promise.all([
@@ -85,12 +85,6 @@ function useRangedData(dateFrom, dateTo) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fmt$(cents) {
-  if (!cents) return '$0'
-  const v = cents / 100
-  if (v >= 1000) return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
-  return '$' + v.toFixed(2)
-}
 
 function nightsOf(reservations) {
   return reservations.reduce((sum, r) => {
@@ -186,7 +180,7 @@ function InsightsPanel({ metrics }) {
     else if (occupancyPct > 0 && occupancyPct < 35) actionable.push({ icon: TrendDown, color: 'text-warning', text: `Occupancy is ${occupancyPct}% so far this year. Consider dropping a 2-night minimum or running a weeknight promo.` })
 
     // ADR
-    if (adr > 0 && adr < 10000) actionable.push({ icon: Lightbulb, color: 'text-info', text: `Average nightly rate is ${fmt$(adr)}. A small increase during high-demand periods can add up quickly.` })
+    if (adr > 0 && adr < 10000) actionable.push({ icon: Lightbulb, color: 'text-info', text: `Average nightly rate is ${fmtMoney(adr)}. A small increase during high-demand periods can add up quickly.` })
 
     // Booking lead time
     if (avgLeadTime > 0) {
@@ -220,7 +214,7 @@ function InsightsPanel({ metrics }) {
     }
 
     // Best month
-    if (bestMonth.total > 0) informational.push({ icon: Lightbulb, color: 'text-info', text: `${bestMonth.name} was your strongest month this year (${fmt$(bestMonth.total)}). Consider pricing that month higher next year.` })
+    if (bestMonth.total > 0) informational.push({ icon: Lightbulb, color: 'text-info', text: `${bestMonth.name} was your strongest month this year (${fmtMoney(bestMonth.total)}). Consider pricing that month higher next year.` })
 
     // Not enough data
     if (actionable.length === 0 && informational.length === 0 && thisYearEarnings === 0) {
@@ -284,8 +278,8 @@ function RoomPerformanceTable({ roomPerf, daysElapsed }) {
                     <span className="font-mono text-[13px] text-text-secondary">{row.occupancy}%</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 font-mono text-[14px] text-text-secondary">{row.adr > 0 ? fmt$(row.adr) : '—'}</td>
-                <td className="px-4 py-3 font-mono text-[14px] text-text-secondary">{row.revenue > 0 ? fmt$(row.revenue) : '—'}</td>
+                <td className="px-4 py-3 font-mono text-[14px] text-text-secondary">{row.adr > 0 ? fmtMoney(row.adr) : '—'}</td>
+                <td className="px-4 py-3 font-mono text-[14px] text-text-secondary">{row.revenue > 0 ? fmtMoney(row.revenue) : '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -308,7 +302,7 @@ function RevenueTooltip({ active, payload, label }) {
   return (
     <div className="bg-surface-raised border border-border rounded-[6px] p-3">
       <p className="font-body text-[13px] font-semibold text-text-primary mb-1">{item.payload?.yearMonth ?? label}</p>
-      <p className="font-mono text-[13px] text-text-secondary">{fmt$(item.value * 100)}</p>
+      <p className="font-mono text-[13px] text-text-secondary">{fmtMoney(item.value * 100)}</p>
     </div>
   )
 }
@@ -486,24 +480,24 @@ export default function Reports() {
               <MetricCard
                 abbr="Revenue"
                 label={`earned this month (${metrics.thisMonthLabel})`}
-                value={fmt$(metrics.thisMonthEarnings)}
+                value={fmtMoney(metrics.thisMonthEarnings)}
                 plain={metrics.lastMonthEarnings > 0
-                  ? `${metrics.thisMonthEarnings >= metrics.lastMonthEarnings ? '↑' : '↓'} ${fmt$(Math.abs(metrics.thisMonthEarnings - metrics.lastMonthEarnings))} vs. last month`
+                  ? `${metrics.thisMonthEarnings >= metrics.lastMonthEarnings ? '↑' : '↓'} ${fmtMoney(Math.abs(metrics.thisMonthEarnings - metrics.lastMonthEarnings))} vs. last month`
                   : `${metrics.totalNightsYTD} nights booked so far this year`}
               />
               <MetricCard
                 abbr="YTD"
                 label={`Year to Date — total earned in ${metrics.thisYearLabel}`}
-                value={fmt$(metrics.thisYearEarnings)}
-                plain={metrics.lastYearEarnings > 0 ? `Last year same period: ${fmt$(metrics.lastYearEarnings)}` : `All payments received in ${metrics.thisYearLabel}`}
-                math={metrics.lastYearEarnings > 0 ? `This year: ${fmt$(metrics.thisYearEarnings)} · Last year: ${fmt$(metrics.lastYearEarnings)} · Diff: ${metrics.thisYearEarnings >= metrics.lastYearEarnings ? '+' : ''}${fmt$(metrics.thisYearEarnings - metrics.lastYearEarnings)}` : null}
+                value={fmtMoney(metrics.thisYearEarnings)}
+                plain={metrics.lastYearEarnings > 0 ? `Last year same period: ${fmtMoney(metrics.lastYearEarnings)}` : `All payments received in ${metrics.thisYearLabel}`}
+                math={metrics.lastYearEarnings > 0 ? `This year: ${fmtMoney(metrics.thisYearEarnings)} · Last year: ${fmtMoney(metrics.lastYearEarnings)} · Diff: ${metrics.thisYearEarnings >= metrics.lastYearEarnings ? '+' : ''}${fmtMoney(metrics.thisYearEarnings - metrics.lastYearEarnings)}` : null}
               />
               <MetricCard
                 abbr="ADR"
                 label="Average Daily Rate — what you earn per booked night"
-                value={fmt$(metrics.adr)}
+                value={fmtMoney(metrics.adr)}
                 plain="Revenue ÷ total nights booked."
-                math={metrics.totalNightsYTD > 0 ? `${fmt$(metrics.thisYearEarnings)} ÷ ${metrics.totalNightsYTD} nights = ${fmt$(metrics.adr)}/night` : 'Not enough bookings yet.'}
+                math={metrics.totalNightsYTD > 0 ? `${fmtMoney(metrics.thisYearEarnings)} ÷ ${metrics.totalNightsYTD} nights = ${fmtMoney(metrics.adr)}/night` : 'Not enough bookings yet.'}
               />
               <MetricCard
                 abbr="Occupancy"
@@ -516,14 +510,14 @@ export default function Reports() {
               <MetricCard
                 abbr="RevPAR"
                 label="Revenue Per Available Room"
-                value={fmt$(metrics.revpar)}
+                value={fmtMoney(metrics.revpar)}
                 plain="ADR × occupancy rate. Best single number to track growth."
-                math={`${fmt$(metrics.adr)} ADR × ${metrics.occupancyPct}% occupancy = ${fmt$(metrics.revpar)}`}
+                math={`${fmtMoney(metrics.adr)} ADR × ${metrics.occupancyPct}% occupancy = ${fmtMoney(metrics.revpar)}`}
               />
               <MetricCard
                 abbr="Avg/Mo"
                 label="Average monthly revenue (completed months)"
-                value={metrics.avgPerMonth > 0 ? fmt$(metrics.avgPerMonth) : '—'}
+                value={metrics.avgPerMonth > 0 ? fmtMoney(metrics.avgPerMonth) : '—'}
                 plain={metrics.avgPerMonth > 0 ? 'Based on completed months this year' : 'Not enough months completed yet'}
               />
             </>

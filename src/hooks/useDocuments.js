@@ -22,6 +22,7 @@ export function useDocuments() {
         `)
         .eq('property_id', propertyId)
         .order('uploaded_at', { ascending: false })
+        .limit(200)
       if (error) return []
       return data ?? []
     },
@@ -39,6 +40,7 @@ export function useDocumentsByGuest(guestId) {
         .select('id, filename, file_url, file_size, mime_type, uploaded_at')
         .eq('guest_id', guestId)
         .order('uploaded_at', { ascending: false })
+        .limit(20)
       if (error) return []
       return data ?? []
     },

@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/useDocuments'
 import { queryKeys } from '@/config/queryKeys'
+import { formatFileSize } from '@/lib/utils'
 import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -19,12 +20,6 @@ import { useToast } from '@/components/ui/useToast'
 const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.doc,.docx'
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
-function formatFileSize(bytes) {
-  if (!bytes) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 export default function Documents() {
   const { propertyId } = useProperty()

@@ -193,16 +193,16 @@ serve(async (req) => {
 
       if (emailRes.ok) {
         totalSent += recipientEmails.length
-        // Log email
-        for (const email of recipientEmails) {
-          await supabase.from('email_logs').insert({
+        // Log emails in parallel (fire-and-forget)
+        Promise.all(recipientEmails.map(email =>
+          supabase.from('email_logs').insert({
             property_id: property.id,
             guest_email: email,
             template_type: 'daily_digest',
             subject,
             status: 'sent',
-          }).then(() => {}).catch(() => {})
-        }
+          })
+        )).catch(() => {})
       } else {
         console.error('[daily-digest] Failed to send for', property.name, await emailRes.text())
       }

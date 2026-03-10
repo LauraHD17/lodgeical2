@@ -16,3 +16,11 @@ export function fmtMoney(cents) {
   if (cents == null) return '$0.00'
   return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
+
+/** Format a byte count as a human-readable file size, e.g. 1536 → "1.5 KB" */
+export function formatFileSize(bytes) {
+  if (!bytes) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}

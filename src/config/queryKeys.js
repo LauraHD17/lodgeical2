@@ -118,4 +118,9 @@ export const queryKeys = {
     all: ['reconciliation'],
     list: (propertyId) => ['reconciliation', 'list', propertyId],
   },
+
+  reports: {
+    all: ['reports'],
+    ranged: (propertyId, dateFrom, dateTo) => ['reports', 'ranged', propertyId, dateFrom, dateTo],
+  },
 }

@@ -70,12 +70,15 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
   // Policy acceptance state
   const [policiesAccepted, setPoliciesAccepted] = useState(false)
   const [marketingAccepted, setMarketingAccepted] = useState(false)
-  const [policyModal, setPolicyModal] = useState({ open: false, title: '', content: '' })
+  const [selectedPolicy, setSelectedPolicy] = useState(null)
 
-  const activePolicies = []
-  if (settings?.terms_and_conditions) activePolicies.push({ type: 'terms', label: 'Terms & Conditions', content: settings.terms_and_conditions })
-  if (settings?.cancellation_policy_text) activePolicies.push({ type: 'cancellation', label: 'Cancellation Policy', content: settings.cancellation_policy_text })
-  if (settings?.incidental_policy) activePolicies.push({ type: 'incidental', label: 'Incidental Policy', content: settings.incidental_policy })
+  const activePolicies = useMemo(() => {
+    const policies = []
+    if (settings?.terms_and_conditions) policies.push({ type: 'terms', label: 'Terms & Conditions', content: settings.terms_and_conditions })
+    if (settings?.cancellation_policy_text) policies.push({ type: 'cancellation', label: 'Cancellation Policy', content: settings.cancellation_policy_text })
+    if (settings?.incidental_policy) policies.push({ type: 'incidental', label: 'Incidental Policy', content: settings.incidental_policy })
+    return policies
+  }, [settings?.terms_and_conditions, settings?.cancellation_policy_text, settings?.incidental_policy])
   const hasRequiredPolicies = activePolicies.length > 0
   const hasMarketingPolicy = !!settings?.marketing_policy
 
@@ -318,7 +321,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
                   {i > 0 && (i === activePolicies.length - 1 ? ', and ' : ', ')}
                   <button
                     type="button"
-                    onClick={() => setPolicyModal({ open: true, title: p.label, content: p.content })}
+                    onClick={() => setSelectedPolicy({ title: p.label, content: p.content })}
                     className="text-info hover:underline font-medium"
                   >
                     {p.label}
@@ -340,7 +343,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
                 I&apos;d like to receive marketing communications.{' '}
                 <button
                   type="button"
-                  onClick={() => setPolicyModal({ open: true, title: 'Marketing Policy', content: settings.marketing_policy })}
+                  onClick={() => setSelectedPolicy({ title: 'Marketing Policy', content: settings.marketing_policy })}
                   className="text-info hover:underline"
                 >
                   Learn more
@@ -360,10 +363,10 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
       )}
 
       <PolicyModal
-        open={policyModal.open}
-        onOpenChange={(open) => setPolicyModal((m) => ({ ...m, open }))}
-        title={policyModal.title}
-        content={policyModal.content}
+        open={selectedPolicy !== null}
+        onOpenChange={(open) => { if (!open) setSelectedPolicy(null) }}
+        title={selectedPolicy?.title ?? ''}
+        content={selectedPolicy?.content ?? ''}
       />
     </div>
   )

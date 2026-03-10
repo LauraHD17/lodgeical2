@@ -72,29 +72,11 @@ export function BookingWidgetTab({ property, onSaveClosure }) {
         </a>
       </div>
 
-      <SectionHeader>Embed Code</SectionHeader>
+      <SectionHeader>Rooms Page</SectionHeader>
       <p className="font-body text-[14px] text-text-secondary -mt-3">
-        Copy this snippet to embed the booking widget on your website.
+        Share a direct link to your public rooms gallery.
       </p>
       <div className="bg-surface border border-border rounded-[8px] p-4">
-        <p className="font-body text-[12px] text-text-muted uppercase tracking-[0.06em] font-semibold mb-2">Booking Widget (iframe)</p>
-        <div className="bg-text-primary rounded-[6px] p-3 overflow-x-auto">
-          <code className="font-mono text-[13px] text-surface-raised break-all">
-            {`<iframe src="${origin}/widget?slug=${slug}&embed=true" width="100%" height="700" frameBorder="0" style="border:none;border-radius:8px;"></iframe>`}
-          </code>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard.writeText(`<iframe src="${origin}/widget?slug=${slug}&embed=true" width="100%" height="700" frameBorder="0" style="border:none;border-radius:8px;"></iframe>`)
-          }}
-          className="mt-2 font-body text-[13px] text-info hover:underline"
-        >
-          Copy to clipboard
-        </button>
-      </div>
-
-      <div className="bg-surface border border-border rounded-[8px] p-4 mt-4">
         <p className="font-body text-[12px] text-text-muted uppercase tracking-[0.06em] font-semibold mb-2">Rooms Page (link)</p>
         <div className="bg-text-primary rounded-[6px] p-3 overflow-x-auto">
           <code className="font-mono text-[13px] text-surface-raised break-all">

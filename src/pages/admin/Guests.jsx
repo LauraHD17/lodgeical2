@@ -10,6 +10,8 @@ import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight, File, UploadSimpl
 import { useGuests, useUpdateGuest } from '@/hooks/useGuests'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/config/queryKeys'
+import { useDocumentsByGuest } from '@/hooks/useDocuments'
+import { formatFileSize } from '@/lib/utils'
 import { DataTable } from '@/components/shared/DataTable'
 import { StatusChip } from '@/components/shared/StatusChip'
 import { Button } from '@/components/ui/Button'
@@ -242,27 +244,7 @@ function TagEditor({ guest }) {
 // ─── Guest Documents ──────────────────────────────────────────────────────────
 
 function GuestDocuments({ guestId }) {
-  const { data: docs = [], isLoading: docsLoading } = useQuery({
-    queryKey: queryKeys.documents.byGuest(guestId),
-    queryFn: async () => {
-      if (!guestId) return []
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, filename, file_url, storage_path, file_size, mime_type, uploaded_at')
-        .eq('guest_id', guestId)
-        .order('uploaded_at', { ascending: false })
-      if (error) return []
-      return data ?? []
-    },
-    enabled: !!guestId,
-  })
-
-  function formatSize(bytes) {
-    if (!bytes) return ''
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+  const { data: docs = [], isLoading: docsLoading } = useDocumentsByGuest(guestId)
 
   return (
     <div>
@@ -289,7 +271,7 @@ function GuestDocuments({ guestId }) {
               <div className="flex-1 min-w-0">
                 <p className="font-body text-[13px] text-text-primary truncate">{doc.filename}</p>
                 <p className="font-body text-[11px] text-text-muted">
-                  {formatSize(doc.file_size)} · {doc.uploaded_at ? format(parseISO(doc.uploaded_at), 'MMM d, yyyy') : ''}
+                  {formatFileSize(doc.file_size)} · {doc.uploaded_at ? format(parseISO(doc.uploaded_at), 'MMM d, yyyy') : ''}
                 </p>
               </div>
               {doc.file_url && (
