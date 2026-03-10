@@ -1,32 +1,35 @@
 // src/config/roomPalette.js
-// 18 room colors for calendar bars and room identity.
-// Bold + muted mix — punchy, legible, fun.
+// 20 room colors for calendar bars and room identity.
 // Each entry: { name, bg (bar fill), text (dark label), border (mid accent) }
 
 export const ROOM_PALETTE = [
-  // ── Bold & punchy ──
-  { name: 'Poppy',      bg: '#E85028', text: '#FFFFFF', border: '#C23A16' },
-  { name: 'Marigold',   bg: '#E8A817', text: '#3A2800', border: '#C48E10' },
-  { name: 'Electric',   bg: '#2563EB', text: '#FFFFFF', border: '#1D4FBF' },
-  { name: 'Magenta',    bg: '#C026D3', text: '#FFFFFF', border: '#9B1FAA' },
-  { name: 'Chartreuse', bg: '#84CC16', text: '#1A3300', border: '#65A30D' },
-  { name: 'Tangerine',  bg: '#F97316', text: '#FFFFFF', border: '#D4610F' },
+  // ── Row 1 ──
+  { name: 'Fiery Terracotta',  bg: '#F4442E', text: '#FFFFFF', border: '#D03520' },
+  { name: 'Dark Raspberry',    bg: '#830A48', text: '#FFFFFF', border: '#6A0839' },
+  { name: 'Light Cyan',        bg: '#D4F5F5', text: '#1A3333', border: '#B0D8D8' },
+  { name: 'Honey Bronze',      bg: '#F6AE2D', text: '#3A2800', border: '#D49520' },
+  { name: 'Cerulean',          bg: '#007090', text: '#FFFFFF', border: '#005A74' },
 
-  // ── Rich & saturated ──
-  { name: 'Indigo',     bg: '#4338CA', text: '#FFFFFF', border: '#3730A3' },
-  { name: 'Crimson',    bg: '#BE123C', text: '#FFFFFF', border: '#9F1239' },
-  { name: 'Teal',       bg: '#0D9488', text: '#FFFFFF', border: '#0F766E' },
-  { name: 'Violet',     bg: '#7C3AED', text: '#FFFFFF', border: '#6D28D9' },
-  { name: 'Forest',     bg: '#15803D', text: '#FFFFFF', border: '#166534' },
-  { name: 'Cobalt',     bg: '#1E40AF', text: '#FFFFFF', border: '#1E3A8A' },
+  // ── Row 2 ──
+  { name: 'Emerald',           bg: '#86CB92', text: '#1A3320', border: '#6BB078' },
+  { name: 'Midnight Violet',   bg: '#361134', text: '#FFFFFF', border: '#280D28' },
+  { name: 'Cotton Rose',       bg: '#F7C1BB', text: '#3E1A14', border: '#D8A49E' },
+  { name: 'Orchid Mist',       bg: '#B96AC9', text: '#FFFFFF', border: '#9C52AA' },
+  { name: 'Laser Blue',        bg: '#2B59C3', text: '#FFFFFF', border: '#2248A0' },
 
-  // ── Muted & earthy ──
-  { name: 'Sage',       bg: '#A3B898', text: '#1A2E14', border: '#8CA37C' },
-  { name: 'Clay',       bg: '#C09474', text: '#3E2410', border: '#A87C5C' },
-  { name: 'Denim',      bg: '#8498B8', text: '#0E1830', border: '#6B80A4' },
-  { name: 'Rust',       bg: '#C48C58', text: '#3C2008', border: '#A87040' },
-  { name: 'Slate',      bg: '#96A0AD', text: '#1A2030', border: '#78869A' },
-  { name: 'Sand',       bg: '#C2B48E', text: '#3A3018', border: '#A89A70' },
+  // ── Row 3 ──
+  { name: 'Sage Green',        bg: '#679436', text: '#FFFFFF', border: '#537A2B' },
+  { name: 'Lime Moss',         bg: '#A5BE00', text: '#2A3000', border: '#8AA000' },
+  { name: 'Dusty Lavender',    bg: '#995D81', text: '#FFFFFF', border: '#7E4A6A' },
+  { name: 'Blue Bell',         bg: '#5998C5', text: '#FFFFFF', border: '#4880A8' },
+  { name: 'Almond Silk',       bg: '#E6CCBE', text: '#3A2E24', border: '#C8AE9E' },
+
+  // ── Row 4 ──
+  { name: 'Yale Blue',         bg: '#003D5B', text: '#FFFFFF', border: '#002E44' },
+  { name: 'Bright Gold',       bg: '#FDE12D', text: '#3A3000', border: '#D8C020' },
+  { name: 'Mauve Shadow',      bg: '#673C4F', text: '#FFFFFF', border: '#52303F' },
+  { name: 'Wisteria Blue',     bg: '#89A6FB', text: '#0E1830', border: '#6E8CE0' },
+  { name: 'Vibrant Coral',     bg: '#FE5F55', text: '#FFFFFF', border: '#D84E44' },
 ]
 
 /** Look up a palette entry by name. Falls back to first entry. */
