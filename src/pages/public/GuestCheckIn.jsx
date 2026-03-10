@@ -3,7 +3,7 @@
 // URL: /check-in?c=CONFIRMATION_NUMBER
 // Steps: Lookup → Review → Policies → Done
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
@@ -58,6 +58,13 @@ function StepLookup({ prefillConfirmation, onFound }) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const emailRef = useRef(null)
+
+  useEffect(() => {
+    if (prefillConfirmation) {
+      emailRef.current?.focus()
+    }
+  }, [prefillConfirmation])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -99,6 +106,7 @@ function StepLookup({ prefillConfirmation, onFound }) {
           <label htmlFor="checkin-email" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Email Address</label>
           <input
             id="checkin-email"
+            ref={emailRef}
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}

@@ -1,4 +1,4 @@
-import { CaretUpDown, CaretUp, CaretDown } from '@phosphor-icons/react'
+import { CaretUpDown, CaretUp, CaretDown, CaretRight } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 function SkeletonRow({ columnCount }) {
@@ -63,18 +63,19 @@ export function DataTable({
                 </span>
               </th>
             ))}
+            {onRowClick && <th className="w-8" />}
           </tr>
         </thead>
         <tbody>
           {loading ? (
             <>
-              <SkeletonRow columnCount={columns.length} />
-              <SkeletonRow columnCount={columns.length} />
-              <SkeletonRow columnCount={columns.length} />
+              <SkeletonRow columnCount={columns.length + (onRowClick ? 1 : 0)} />
+              <SkeletonRow columnCount={columns.length + (onRowClick ? 1 : 0)} />
+              <SkeletonRow columnCount={columns.length + (onRowClick ? 1 : 0)} />
             </>
           ) : isEmpty ? (
             <tr>
-              <td colSpan={columns.length} className="px-4 py-12 text-center">
+              <td colSpan={columns.length + (onRowClick ? 1 : 0)} className="px-4 py-12 text-center">
                 {emptyState ?? (
                   <span className="text-text-muted font-body text-[15px]">
                     No data found
@@ -91,7 +92,7 @@ export function DataTable({
                 tabIndex={onRowClick ? 0 : undefined}
                 role={onRowClick ? 'button' : undefined}
                 className={cn(
-                  'transition-colors duration-150 hover:bg-info-bg',
+                  'group transition-colors duration-150 hover:bg-info-bg',
                   rowIndex % 2 === 0 ? 'bg-white' : 'bg-tableAlt',
                   onRowClick && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-info'
                 )}
@@ -100,13 +101,18 @@ export function DataTable({
                   <td
                     key={col.key}
                     className={cn(
-                      'px-4 py-3 font-body text-[15px] text-text-primary',
+                      'px-4 py-3.5 font-body text-[15px] text-text-primary',
                       col.numeric && 'font-mono text-right'
                     )}
                   >
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>
                 ))}
+                {onRowClick && (
+                  <td className="w-8 px-2 py-3.5">
+                    <CaretRight size={14} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </td>
+                )}
               </tr>
             ))
           )}

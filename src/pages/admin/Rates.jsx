@@ -4,6 +4,7 @@
 // tax, and optional Stripe fee pass-through.
 
 import { useState, useCallback } from 'react'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { PencilSimple, Check, X, Plus, Trash, Calculator, CalendarBlank, Tag, CaretDown, CaretUp } from '@phosphor-icons/react'
@@ -442,6 +443,7 @@ function OverrideList({ overrides, rooms, propertyId }) {
   const queryClient = useQueryClient()
   const [editTarget, setEditTarget] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [confirmState, setConfirmState] = useState(null)
   const roomMap = Object.fromEntries(rooms.map(r => [r.id, r.name]))
 
   const deleteMutation = useMutation({
@@ -469,9 +471,10 @@ function OverrideList({ overrides, rooms, propertyId }) {
       </p>
 
       {overrides.length === 0 ? (
-        <div className="border border-border rounded-[8px] py-10 text-center">
-          <p className="font-body text-[15px] text-text-muted">No seasonal overrides yet.</p>
-          <Button variant="secondary" size="sm" className="mt-3" onClick={() => setAddOpen(true)}><Plus size={14} /> Add your first override</Button>
+        <div className="flex flex-col items-center gap-3 py-12">
+          <CalendarBlank size={40} weight="light" className="text-text-muted" />
+          <p className="font-body text-[15px] text-text-muted">No seasonal overrides yet</p>
+          <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)}><Plus size={14} /> Add your first override</Button>
         </div>
       ) : (
         <div className="border border-border rounded-[8px] overflow-x-auto">
@@ -499,7 +502,7 @@ function OverrideList({ overrides, rooms, propertyId }) {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <button onClick={() => setEditTarget(ov)} className="text-info hover:opacity-70" title="Edit"><PencilSimple size={15} /></button>
-                      <button onClick={() => { if (confirm('Remove this override?')) deleteMutation.mutate(ov.id) }} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
+                      <button onClick={() => setConfirmState({ title: 'Remove this override?', description: 'This seasonal rate override will be permanently deleted.', onConfirm: () => deleteMutation.mutate(ov.id) })} className="text-danger hover:opacity-70" title="Delete"><Trash size={15} /></button>
                     </div>
                   </td>
                 </tr>
@@ -511,6 +514,16 @@ function OverrideList({ overrides, rooms, propertyId }) {
 
       {addOpen && <OverrideModal open onClose={() => setAddOpen(false)} rooms={rooms} existing={null} propertyId={propertyId} />}
       {editTarget && <OverrideModal open onClose={() => setEditTarget(null)} rooms={rooms} existing={editTarget} propertyId={propertyId} />}
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        description={confirmState?.description}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

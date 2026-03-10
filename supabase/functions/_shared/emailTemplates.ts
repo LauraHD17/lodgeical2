@@ -11,6 +11,7 @@ export type TemplateType =
   | 'payment_failed'
   | 'check_in_reminder'
   | 'check_out_reminder'
+  | 'invoice'
   | 'custom'
 
 export interface TemplateVars {
@@ -162,6 +163,30 @@ function defaultTemplate(type: TemplateType, v: TemplateVars): { subject: string
             <tr><td style="padding:8px 0;color:#555">New Total</td><td><strong>${v.total_due}</strong></td></tr>
           </table>
           <p>If you have questions, please contact us through your guest portal.</p>
+        `),
+      }
+
+    case 'invoice':
+      return {
+        subject: `Invoice — ${v.confirmation_number} — ${v.property_name}`,
+        html: wrap('Invoice', `
+          <p>Hi ${v.guest_first_name},</p>
+          <p>Here is the invoice for your stay at <strong>${v.property_name}</strong>.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr><td style="padding:8px 0;color:#555">Confirmation</td><td><strong>${v.confirmation_number}</strong></td></tr>
+            <tr><td style="padding:8px 0;color:#555">Room(s)</td><td>${v.room_names}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-in</td><td>${v.check_in_date}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-out</td><td>${v.check_out_date}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Nights</td><td>${v.num_nights}</td></tr>
+          </table>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0;border-top:2px solid #1A1A1A">
+            <tr><td style="padding:8px 0;color:#555">Total Due</td><td style="text-align:right"><strong>${v.total_due}</strong></td></tr>
+            <tr><td style="padding:8px 0;color:#555">Amount Paid</td><td style="text-align:right">${v.net_paid}</td></tr>
+            <tr style="border-top:1px solid #e5e7eb"><td style="padding:8px 0;color:#555"><strong>Balance Due</strong></td><td style="text-align:right"><strong>${v.balance_due}</strong></td></tr>
+          </table>
+          <p>Payment Status: <strong>${v.payment_status}</strong></p>
+          ${v.invoice_url ? `<p style="margin:24px 0"><a href="${v.invoice_url}" style="background:#1A1A1A;color:#fff;padding:12px 24px;text-decoration:none;font-size:14px">View Invoice Online</a></p>` : ''}
+          <p style="color:#555;font-size:13px">If you have questions about this invoice, please contact us.</p>
         `),
       }
   }

@@ -14,6 +14,11 @@ export function RoomCard({ room, nights, onSelect }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-body font-semibold text-[18px] text-text-primary">{room.name}</h3>
+            {room.base_rate_cents > 0 && (
+              <p className="font-mono text-[14px] text-text-secondary">
+                From ${(room.base_rate_cents / 100).toFixed(2)}/night
+              </p>
+            )}
             <div className="flex items-center gap-3 mt-1 flex-wrap">
               <span className="flex items-center gap-1 font-body text-[13px] text-text-secondary">
                 <Users size={13} /> Up to {room.max_guests} guest{room.max_guests !== 1 ? 's' : ''}

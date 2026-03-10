@@ -16,6 +16,13 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext }) 
   const [bookedRanges, setBookedRanges] = useState([])
   const minStay = settings?.min_stay_nights ?? 1
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   // Fetch booked dates and expand with buffer days
   useEffect(() => {
     if (!propertyId) return
@@ -82,7 +89,7 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext }) 
           selected={range}
           onSelect={setRange}
           disabled={[{ before: new Date() }, ...bookedRanges]}
-          numberOfMonths={2}
+          numberOfMonths={isMobile ? 1 : 2}
           className="!font-body"
         />
       </div>

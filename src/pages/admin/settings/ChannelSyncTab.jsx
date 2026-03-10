@@ -8,6 +8,7 @@ import { ArrowsClockwise, Link, CalendarPlus } from '@phosphor-icons/react'
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/useToast'
@@ -60,6 +61,7 @@ export function ChannelSyncTab() {
   const [newLabel, setNewLabel] = useState('')
   const [newUrl, setNewUrl] = useState('')
   const [syncing, setSyncing] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
 
   const feedRoomIds = new Set(feeds.map(f => f.room_id))
   const availableRooms = rooms.filter(r => !feedRoomIds.has(r.id))
@@ -123,18 +125,23 @@ export function ChannelSyncTab() {
     }
   }
 
-  async function handleDelete(feed) {
-    if (!confirm(`Remove external feed for "${feed.rooms?.name}"?`)) return
-    const { error } = await supabase
-      .from('room_external_feeds')
-      .delete()
-      .eq('id', feed.id)
-    if (error) {
-      addToast({ message: 'Failed to remove feed', variant: 'error' })
-    } else {
-      addToast({ message: 'Feed removed', variant: 'success' })
-      queryClient.invalidateQueries({ queryKey: ['external-feeds', propertyId] })
-    }
+  function handleDelete(feed) {
+    setConfirmState({
+      title: `Remove external feed for "${feed.rooms?.name}"?`,
+      description: 'This feed will stop syncing and its blocked dates will no longer update.',
+      onConfirm: async () => {
+        const { error } = await supabase
+          .from('room_external_feeds')
+          .delete()
+          .eq('id', feed.id)
+        if (error) {
+          addToast({ message: 'Failed to remove feed', variant: 'error' })
+        } else {
+          addToast({ message: 'Feed removed', variant: 'success' })
+          queryClient.invalidateQueries({ queryKey: ['external-feeds', propertyId] })
+        }
+      },
+    })
   }
 
   return (
@@ -238,6 +245,16 @@ export function ChannelSyncTab() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        description={confirmState?.description}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+        confirmLabel="Remove"
+        variant="danger"
+      />
     </div>
   )
 }

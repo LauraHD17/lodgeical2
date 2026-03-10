@@ -28,7 +28,7 @@ export function Input({
           'h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised',
           'placeholder:text-text-muted',
           'focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2',
-          error && 'border-danger',
+          error && 'border-danger bg-danger-bg/30',
           className
         )}
         {...rest}

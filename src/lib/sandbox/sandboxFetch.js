@@ -56,6 +56,8 @@ const EDGE_RESPONSES = {
 
   'confirm-modification': () => ({ success: true }),
 
+  'send-invoice': () => ({ success: true }),
+
   'merge-guests': () => ({ success: true, merged_id: 'guest-001' }),
 
   'guest-portal-update': () => ({ success: true }),

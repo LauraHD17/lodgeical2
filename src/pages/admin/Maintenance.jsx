@@ -3,6 +3,7 @@
 // Uses maintenance_logs table (not the old tickets/ticket-system).
 
 import { useState, useMemo } from 'react'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { format, parseISO, addDays } from 'date-fns'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -110,7 +111,7 @@ const EMPTY_FORM = {
 function LogForm({ log, rooms, onClose }) {
   const { propertyId } = useProperty()
   const qc = useQueryClient()
-  const { toast } = useToast()
+  const { addToast } = useToast()
   const [form, setForm] = useState(log
     ? {
         completed_date:    log.completed_date ?? '',
@@ -130,7 +131,7 @@ function LogForm({ log, rooms, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.description.trim()) {
-      toast({ title: 'Description required', variant: 'error' })
+      addToast({ message: 'Description required', variant: 'error' })
       return
     }
     setSaving(true)
@@ -153,8 +154,8 @@ function LogForm({ log, rooms, onClose }) {
       ;({ error } = await supabase.from('maintenance_logs').insert(payload))
     }
     setSaving(false)
-    if (error) { toast({ title: 'Save failed', description: error.message, variant: 'error' }); return }
-    toast({ title: log?.id ? 'Log entry updated' : 'Work logged' })
+    if (error) { addToast({ message: 'Save failed', variant: 'error' }); return }
+    addToast({ message: log?.id ? 'Log entry updated' : 'Work logged', variant: 'success' })
     qc.invalidateQueries({ queryKey: ['maintenance-logs'] })
     onClose()
   }
@@ -163,11 +164,11 @@ function LogForm({ log, rooms, onClose }) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Date completed *</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Date completed *</span>
           <Input type="date" value={form.completed_date} onChange={e => set('completed_date', e.target.value)} required />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Category</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Category</span>
           <Select value={form.category} onValueChange={v => set('category', v)}>
             {LOG_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
           </Select>
@@ -175,7 +176,7 @@ function LogForm({ log, rooms, onClose }) {
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">What was done *</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">What was done *</span>
         <textarea
           rows={3}
           value={form.description}
@@ -188,21 +189,21 @@ function LogForm({ log, rooms, onClose }) {
 
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Room (optional)</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Room (optional)</span>
           <Select value={form.room_id} onValueChange={v => set('room_id', v)}>
             <Select.Option value="">All / Common area</Select.Option>
             {rooms.map(r => <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>)}
           </Select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Performed by</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Performed by</span>
           <Input value={form.performed_by} onChange={e => set('performed_by', e.target.value)} placeholder="Name or company" />
         </label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Cost ($)</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Cost ($)</span>
           <Input
             type="number"
             min="0"
@@ -213,13 +214,13 @@ function LogForm({ log, rooms, onClose }) {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Remind me on</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Remind me on</span>
           <Input type="date" value={form.next_reminder_date} onChange={e => set('next_reminder_date', e.target.value)} />
         </label>
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Notes</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Notes</span>
         <textarea
           rows={2}
           value={form.notes}
@@ -317,7 +318,7 @@ function LogRow({ log, onEdit, onDelete }) {
 export default function Maintenance() {
   const { propertyId } = useProperty()
   const qc = useQueryClient()
-  const { toast } = useToast()
+  const { addToast } = useToast()
   const { data: logs = [], isLoading } = useMaintenanceLogs()
   const { data: rooms = [] } = useRooms()
 
@@ -325,6 +326,7 @@ export default function Maintenance() {
   const [editingLog, setEditingLog] = useState(null)
   const [filterRoom, setFilterRoom] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+  const [confirmState, setConfirmState] = useState(null)
 
   // Upcoming reminders (within 7 days or overdue)
   const upcomingReminders = useMemo(() => {
@@ -340,12 +342,17 @@ export default function Maintenance() {
     })
   }, [logs, filterRoom, filterCategory])
 
-  async function handleDelete(id) {
-    if (!confirm('Delete this log entry?')) return
-    const { error } = await supabase.from('maintenance_logs').delete().eq('id', id)
-    if (error) { toast({ title: 'Delete failed', variant: 'error' }); return }
-    toast({ title: 'Entry deleted' })
-    qc.invalidateQueries({ queryKey: ['maintenance-logs', propertyId] })
+  function handleDelete(id) {
+    setConfirmState({
+      title: 'Delete this log entry?',
+      description: 'This maintenance log entry will be permanently deleted.',
+      onConfirm: async () => {
+        const { error } = await supabase.from('maintenance_logs').delete().eq('id', id)
+        if (error) { addToast({ message: 'Delete failed', variant: 'error' }); return }
+        addToast({ message: 'Entry deleted', variant: 'success' })
+        qc.invalidateQueries({ queryKey: ['maintenance-logs', propertyId] })
+      },
+    })
   }
 
   function openNew() { setEditingLog(null); setDrawerOpen(true) }
@@ -398,12 +405,17 @@ export default function Maintenance() {
           {LOG_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
         </Select>
         {(filterRoom || filterCategory) && (
-          <button
-            onClick={() => { setFilterRoom(''); setFilterCategory('') }}
-            className="font-body text-[13px] text-text-muted hover:text-text-primary underline"
-          >
-            Clear filters
-          </button>
+          <>
+            <span className="bg-info-bg text-info text-[12px] font-mono px-2 py-0.5 rounded-full">
+              {(filterRoom ? 1 : 0) + (filterCategory ? 1 : 0)}
+            </span>
+            <button
+              onClick={() => { setFilterRoom(''); setFilterCategory('') }}
+              className="font-body text-[13px] text-text-muted hover:text-text-primary underline"
+            >
+              Clear filters
+            </button>
+          </>
         )}
       </div>
 
@@ -415,11 +427,11 @@ export default function Maintenance() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <Wrench size={32} weight="thin" className="text-text-muted" />
+        <div className="flex flex-col items-center gap-3 py-12">
+          <Wrench size={40} weight="light" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">
             {logs.length === 0
-              ? 'No maintenance entries yet. Log your first completed task.'
+              ? 'No maintenance logs yet'
               : 'No entries match your filters.'}
           </p>
           {logs.length === 0 && (
@@ -435,9 +447,19 @@ export default function Maintenance() {
       )}
 
       {/* Drawer */}
-      <Drawer open={drawerOpen} onClose={closeDrawer} title={editingLog ? 'Edit log entry' : 'Log completed work'}>
+      <Drawer open={drawerOpen} onClose={closeDrawer} title={editingLog ? 'Edit Log' : 'New Log'}>
         <LogForm log={editingLog} rooms={rooms} onClose={closeDrawer} />
       </Drawer>
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        description={confirmState?.description}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

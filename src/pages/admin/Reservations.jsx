@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
-import { Plus, X, FunnelSimple, CalendarBlank, Wrench } from '@phosphor-icons/react'
+import { Plus, X, FunnelSimple, CalendarBlank, Wrench, EnvelopeSimple, FileText } from '@phosphor-icons/react'
 
 import { useReservations } from '@/hooks/useReservations'
 import { DataTable } from '@/components/shared/DataTable'
@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { BlockModal } from '@/components/reservations/BlockModal'
+import { useToast } from '@/components/ui/useToast'
+import { supabase } from '@/lib/supabaseClient'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -92,12 +94,41 @@ const COLUMNS = [
 ]
 
 function ReservationDrawer({ reservation, onClose }) {
+  const [sendingInvoice, setSendingInvoice] = useState(false)
+  const { addToast } = useToast()
+
   if (!reservation) return null
   const g = reservation.guests
   const nights =
     reservation.check_in && reservation.check_out
       ? differenceInCalendarDays(parseISO(reservation.check_out), parseISO(reservation.check_in))
       : 0
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+
+  async function handleSendInvoice() {
+    setSendingInvoice(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${supabaseUrl}/functions/v1/send-invoice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ reservation_id: reservation.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to send invoice')
+      }
+      addToast({ message: 'Invoice emailed to guest', variant: 'success' })
+    } catch (err) {
+      addToast({ message: err.message || 'Failed to send invoice', variant: 'danger' })
+    } finally {
+      setSendingInvoice(false)
+    }
+  }
 
   return (
     <>
@@ -121,7 +152,7 @@ function ReservationDrawer({ reservation, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
           <div>
-            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
               Confirmation #
             </span>
             <p className="font-mono text-[16px] text-text-primary mt-1">
@@ -130,7 +161,7 @@ function ReservationDrawer({ reservation, onClose }) {
           </div>
 
           <div>
-            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
               Status
             </span>
             <div className="mt-1">
@@ -140,7 +171,7 @@ function ReservationDrawer({ reservation, onClose }) {
 
           {g && (
             <div>
-              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
                 Guest
               </span>
               <p className="font-body text-[15px] text-text-primary mt-1">
@@ -155,7 +186,7 @@ function ReservationDrawer({ reservation, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
                 Check-in
               </span>
               <p className="font-mono text-[14px] text-text-primary mt-1">
@@ -163,7 +194,7 @@ function ReservationDrawer({ reservation, onClose }) {
               </p>
             </div>
             <div>
-              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
                 Check-out
               </span>
               <p className="font-mono text-[14px] text-text-primary mt-1">
@@ -173,21 +204,21 @@ function ReservationDrawer({ reservation, onClose }) {
           </div>
 
           <div>
-            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
               Nights
             </span>
             <p className="font-mono text-[14px] text-text-primary mt-1">{nights}</p>
           </div>
 
           <div>
-            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
               Guests
             </span>
             <p className="font-mono text-[14px] text-text-primary mt-1">{reservation.num_guests ?? '—'}</p>
           </div>
 
           <div>
-            <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+            <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
               Total Due
             </span>
             <p className="font-mono text-[20px] text-text-primary mt-1">
@@ -197,12 +228,31 @@ function ReservationDrawer({ reservation, onClose }) {
 
           {reservation.notes && (
             <div>
-              <span className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-secondary">
+              <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
                 Notes
               </span>
               <p className="font-body text-[14px] text-text-secondary mt-1">{reservation.notes}</p>
             </div>
           )}
+        </div>
+
+        {/* Sticky footer */}
+        <div className="border-t border-border p-4 flex items-center justify-end gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(`/invoice/${reservation.id}`, '_blank')}
+          >
+            <FileText size={16} /> View Invoice
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={sendingInvoice}
+            onClick={handleSendInvoice}
+          >
+            <EnvelopeSimple size={16} /> Email Invoice
+          </Button>
         </div>
       </div>
     </>
@@ -255,6 +305,11 @@ export default function Reservations() {
         <div className="flex items-center gap-2 text-text-secondary">
           <FunnelSimple size={16} />
           <span className="font-body text-[14px] font-semibold">Filters</span>
+          {Object.keys(activeFilters).length > 0 && (
+            <span className="bg-info-bg text-info text-[12px] font-mono px-2 py-0.5 rounded-full">
+              {Object.keys(activeFilters).length}
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-4 flex-1">
@@ -302,8 +357,8 @@ export default function Reservations() {
           loading={isLoading}
           onRowClick={(row) => setSelectedReservation(row)}
           emptyState={
-            <div className="flex flex-col items-center gap-3 py-8">
-              <CalendarBlank size={40} className="text-text-muted" weight="light" />
+            <div className="flex flex-col items-center gap-3 py-12">
+              <CalendarBlank size={40} weight="light" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No reservations yet</p>
               <Button variant="primary" size="sm" onClick={() => setModalOpen(true)}>
                 <Plus size={14} weight="bold" /> Create first reservation

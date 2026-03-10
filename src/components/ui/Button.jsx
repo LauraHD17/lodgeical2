@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 
 const variantClasses = {
   primary: 'bg-text-primary text-white hover:opacity-90',
-  secondary: 'bg-transparent border-[1.5px] border-text-primary text-text-primary hover:opacity-80',
+  secondary: 'bg-transparent border-[1.5px] border-text-primary text-text-primary hover:bg-surface',
   destructive: 'bg-danger text-white hover:opacity-90',
   ghost: 'bg-transparent text-text-primary hover:bg-surface',
 }

@@ -3,6 +3,7 @@
 // Drag handle reorders rooms (persisted via sort_order); order reflects in calendar.
 
 import { useState, useEffect, useRef } from 'react'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, Images, Trash, ArrowLeft, ArrowRight,
@@ -152,6 +153,7 @@ function PhotoManager({ room }) {
   const { addToast } = useToast()
   const fileRef = useRef()
   const [dragIdx, setDragIdx] = useState(null)
+  const [confirmState, setConfirmState] = useState(null)
 
   async function handleFiles(e) {
     const files = Array.from(e.target.files ?? [])
@@ -169,10 +171,15 @@ function PhotoManager({ room }) {
     e.target.value = ''
   }
 
-  async function handleDelete(photo) {
-    if (!confirm('Remove this photo?')) return
-    await deletePhoto.mutateAsync({ photo })
-    addToast({ message: 'Photo removed', variant: 'success' })
+  function handleDelete(photo) {
+    setConfirmState({
+      title: 'Remove this photo?',
+      description: 'This photo will be permanently removed from the room.',
+      onConfirm: async () => {
+        await deletePhoto.mutateAsync({ photo })
+        addToast({ message: 'Photo removed', variant: 'success' })
+      },
+    })
   }
 
   function handleDragStart(idx) { setDragIdx(idx) }
@@ -264,6 +271,16 @@ function PhotoManager({ room }) {
         </div>
       )}
       <p className="font-body text-[12px] text-text-muted">Drag to reorder. First photo is the cover image.</p>
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        description={confirmState?.description}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+        confirmLabel="Remove"
+        variant="danger"
+      />
     </div>
   )
 }
@@ -679,6 +696,7 @@ function RoomLinksSection({ rooms }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ name: '', linkedRoomIds: [], baseRateDollars: '', maxGuests: '2', description: '' })
+  const [confirmState, setConfirmState] = useState(null)
 
   const linkableRooms = rooms.filter(r => r.linkable)
   if (linkableRooms.length < 2 && links.length === 0) return null
@@ -738,11 +756,16 @@ function RoomLinksSection({ rooms }) {
     }
   }
 
-  async function handleDelete(linkId) {
-    if (!confirm('Delete this room link?')) return
-    await supabase.from('room_links').delete().eq('id', linkId)
-    qc.invalidateQueries({ queryKey: ['room-links'] })
-    addToast({ message: 'Room link deleted', variant: 'success' })
+  function handleDelete(linkId) {
+    setConfirmState({
+      title: 'Delete this room link?',
+      description: 'This room link will be permanently removed.',
+      onConfirm: async () => {
+        await supabase.from('room_links').delete().eq('id', linkId)
+        qc.invalidateQueries({ queryKey: ['room-links'] })
+        addToast({ message: 'Room link deleted', variant: 'success' })
+      },
+    })
   }
 
   function roomName(id) {
@@ -864,6 +887,16 @@ function RoomLinksSection({ rooms }) {
           Mark at least 2 rooms as "Linkable" to create combined listings.
         </p>
       )}
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        description={confirmState?.description}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

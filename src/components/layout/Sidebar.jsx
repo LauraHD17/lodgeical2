@@ -98,7 +98,7 @@ export function Sidebar({ onClose }) {
 
         {/* Quick Links — preview guest-facing pages */}
         <div className="mt-4 pt-4 border-t border-border">
-          <p className="px-3 mb-1.5 font-body text-[11px] uppercase tracking-[0.08em] font-semibold text-text-muted">
+          <p className="px-3 mb-1.5 font-body text-[11px] uppercase tracking-[0.06em] font-semibold text-text-muted">
             Quick Links
           </p>
           <ul className="flex flex-col gap-0.5">

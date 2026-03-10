@@ -242,6 +242,11 @@ export const handlers = [
     HttpResponse.json({ success: true, imported: 0, skipped: 0, errors: [] }),
   ),
 
+  // Send invoice
+  http.post(`${BASE}/functions/v1/send-invoice`, () =>
+    HttpResponse.json({ success: true }),
+  ),
+
   // Public booking widget bootstrap
   http.get(`${BASE}/functions/v1/public-bootstrap`, ({ request }) => {
     const url  = new URL(request.url)

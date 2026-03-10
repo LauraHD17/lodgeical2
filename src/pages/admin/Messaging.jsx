@@ -70,12 +70,9 @@ function EmailLogSection() {
 
   if (!logs?.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <EnvelopeSimple size={48} className="text-text-muted" weight="light" />
-        <p className="font-body text-[15px] text-text-muted">No emails have been sent yet.</p>
-        <p className="font-body text-[13px] text-text-secondary">
-          Emails are sent automatically when reservations are created, modified, or cancelled.
-        </p>
+      <div className="flex flex-col items-center gap-3 py-12">
+        <EnvelopeSimple size={40} weight="light" className="text-text-muted" />
+        <p className="font-body text-[15px] text-text-muted">No emails sent yet</p>
       </div>
     )
   }

@@ -236,6 +236,32 @@ export async function sendPaymentFailedAlert(
   await logEmail(supabase, reservation.property_id, undefined, guest.email, 'payment_failed', subject, ok ? 'sent' : 'failed')
 }
 
+/** Send an invoice email with payment summary details. */
+export async function sendInvoice(
+  guest: Guest,
+  reservation: Reservation,
+  reservationId: string,
+  balanceDue: string,
+  netPaid: string,
+  paymentStatus: string,
+  invoiceUrl: string,
+  supabase: SupabaseClient
+): Promise<void> {
+  if (!reservation.property_id) {
+    console.error('[email] sendInvoice called without a property_id — skipping')
+    return
+  }
+  const vars = await buildVars(supabase, guest, reservation, {
+    balance_due: balanceDue,
+    net_paid: netPaid,
+    payment_status: paymentStatus,
+    invoice_url: invoiceUrl,
+  })
+  const { subject, html } = await renderTemplate(supabase, reservation.property_id, 'invoice', vars)
+  const ok = await sendEmail(guest.email, subject, html, undefined, vars.property_name)
+  await logEmail(supabase, reservation.property_id, reservationId, guest.email, 'invoice', subject, ok ? 'sent' : 'failed')
+}
+
 /** Send automated check-in reminder (called from a scheduled job or manually).
  *  CC'd to reservation.cc_emails if provided (booker does NOT get check-in info). */
 export async function sendCheckInReminder(

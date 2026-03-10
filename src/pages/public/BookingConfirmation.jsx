@@ -26,6 +26,7 @@ export default function BookingConfirmation() {
 
   const [status, setStatus] = useState('loading') // 'loading' | 'error' | 'ready'
   const [reservation, setReservation] = useState(null)
+  const [roomNames, setRoomNames] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
 
   async function fetchReservation() {
@@ -50,6 +51,18 @@ export default function BookingConfirmation() {
       }
 
       setReservation(data)
+
+      // Fetch room names if room_ids are available
+      if (data.room_ids?.length > 0) {
+        const { data: roomData } = await supabase
+          .from('rooms')
+          .select('name')
+          .in('id', data.room_ids)
+        if (roomData?.length > 0) {
+          setRoomNames(roomData.map(r => r.name).join(', '))
+        }
+      }
+
       setStatus('ready')
     } catch (err) {
       setErrorMessage(err.message || 'Could not load reservation.')
@@ -114,6 +127,13 @@ export default function BookingConfirmation() {
               <div className="flex justify-between">
                 <span className="font-body text-[14px] text-text-secondary">Guest</span>
                 <span className="font-body text-[14px] text-text-primary">{guestName}</span>
+              </div>
+            )}
+
+            {roomNames && (
+              <div className="flex justify-between">
+                <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Room</span>
+                <span className="font-body text-[15px] text-text-primary">{roomNames}</span>
               </div>
             )}
 

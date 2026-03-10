@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as Switch from '@radix-ui/react-switch'
 import {
-  Plus, Phone, EnvelopeSimple, UserCircle, Copy, Check,
+  Plus, Phone, EnvelopeSimple, AddressBook, Copy, Check,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -190,7 +190,7 @@ const EMPTY_FORM = {
 
 function ContactDrawer({ contact, onClose, onSaved }) {
   const { propertyId } = useProperty()
-  const { toast } = useToast()
+  const { addToast } = useToast()
   const isEdit = !!contact?.id
 
   const [form, setForm] = useState(() => {
@@ -205,8 +205,8 @@ function ContactDrawer({ contact, onClose, onSaved }) {
   function set(field, value) { setForm(f => ({ ...f, [field]: value })) }
 
   async function handleSave() {
-    if (!form.first_name.trim()) { toast({ title: 'First name required', variant: 'error' }); return }
-    if (!form.last_name.trim())  { toast({ title: 'Last name required',  variant: 'error' }); return }
+    if (!form.first_name.trim()) { addToast({ message: 'First name required', variant: 'error' }); return }
+    if (!form.last_name.trim())  { addToast({ message: 'Last name required',  variant: 'error' }); return }
 
     setSaving(true)
     const payload = {
@@ -230,8 +230,8 @@ function ContactDrawer({ contact, onClose, onSaved }) {
       ;({ error } = await supabase.from('contacts').insert(payload))
     }
     setSaving(false)
-    if (error) { toast({ title: 'Save failed', description: error.message, variant: 'error' }); return }
-    toast({ title: isEdit ? 'Contact updated' : 'Contact added' })
+    if (error) { addToast({ message: 'Save failed', variant: 'error' }); return }
+    addToast({ message: isEdit ? 'Contact updated' : 'Contact added', variant: 'success' })
     onSaved()
   }
 
@@ -239,22 +239,22 @@ function ContactDrawer({ contact, onClose, onSaved }) {
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">First name *</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">First name *</span>
           <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Last name *</span>
+          <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Last name *</span>
           <Input value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" />
         </label>
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Company</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Company</span>
         <Input value={form.company ?? ''} onChange={e => set('company', e.target.value)} placeholder="e.g. Blue Ridge Plumbing" />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Category</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Category</span>
         <Select
           value={form.category}
           onValueChange={v => set('category', v)}
@@ -264,22 +264,22 @@ function ContactDrawer({ contact, onClose, onSaved }) {
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Role / Specialty</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Role / Specialty</span>
         <Input value={form.role ?? ''} onChange={e => set('role', e.target.value)} placeholder="e.g. Licensed Electrician" />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Phone</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Phone</span>
         <Input type="tel" value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} placeholder="+1 800 555 0100" />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Email</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Email</span>
         <Input type="email" value={form.email ?? ''} onChange={e => set('email', e.target.value)} placeholder="contact@example.com" />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[12px] text-text-muted font-semibold uppercase tracking-wider">Notes</span>
+        <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Notes</span>
         <textarea
           value={form.notes ?? ''}
           onChange={e => set('notes', e.target.value)}
@@ -391,6 +391,11 @@ export default function Contacts() {
           options={[{ value: '', label: 'All categories' }, ...VENDOR_CATEGORIES.map(c => ({ value: c, label: c }))]}
           placeholder="All categories"
         />
+        {filterCategory && (
+          <span className="bg-info-bg text-info text-[12px] font-mono px-2 py-0.5 rounded-full">
+            1
+          </span>
+        )}
         {(search || filterCategory) && (
           <button
             onClick={() => { setSearch(''); setFilterCategory('') }}
@@ -409,12 +414,9 @@ export default function Contacts() {
           ))}
         </div>
       ) : displayed.length === 0 && contacts.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16">
-          <UserCircle size={40} className="text-text-muted" weight="light" />
+        <div className="flex flex-col items-center gap-3 py-12">
+          <AddressBook size={40} weight="light" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">No contacts yet</p>
-          <p className="font-body text-[13px] text-text-muted max-w-xs text-center">
-            Add your plumber, insurance agent, alarm company, and other important contacts your staff may need.
-          </p>
           <Button variant="primary" size="sm" onClick={openNew}>
             <Plus size={14} weight="bold" /> Add first contact
           </Button>
@@ -455,7 +457,7 @@ export default function Contacts() {
         </p>
       )}
 
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'Edit contact' : 'Add contact'}>
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'Edit Contact' : 'New Contact'}>
         <ContactDrawer
           key={editing?.id ?? 'new'}
           contact={editing}

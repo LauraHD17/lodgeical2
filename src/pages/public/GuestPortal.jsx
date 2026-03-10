@@ -395,6 +395,13 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
   const [stripePromise, setStripePromise] = useState(null)
   const [payError, setPayError] = useState('')
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   const guestIdentity = {
     email: reservation.guests?.email ?? '',
     first_name: reservation.guests?.first_name ?? '',
@@ -579,7 +586,7 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
                 setNewCheckIn(range.from ?? null)
                 setNewCheckOut(range.to ?? null)
               }}
-              numberOfMonths={2}
+              numberOfMonths={isMobile ? 1 : 2}
               disabled={[{ before: new Date() }]}
               fromDate={new Date()}
             />
@@ -818,7 +825,7 @@ function UpcomingTab({ reservation, rooms, availableRooms, paymentSummary, onRef
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <EnvelopeSimple size={48} className="text-text-muted" weight="light" />
-        <p className="font-body text-[15px] text-text-muted">No upcoming reservations found.</p>
+        <p className="font-body text-[15px] text-text-muted">No reservations found. Try the email address on your confirmation, or check the History tab.</p>
       </div>
     )
   }
@@ -851,6 +858,17 @@ function UpcomingTab({ reservation, rooms, availableRooms, paymentSummary, onRef
       {/* Cancellation */}
       <div data-print-hide>
         <CancellationSection reservation={reservation} onCancelled={onRefresh} />
+      </div>
+
+      <div className="mt-4 mb-2">
+        <a
+          href={`/invoice/${reservation.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-body text-[13px] text-info hover:underline"
+        >
+          View Invoice
+        </a>
       </div>
 
       <PrintButton label="Print Reservation" />
@@ -1298,14 +1316,19 @@ function LookupForm({ initialConfirmation, onFound }) {
             onChange={(e) => setConfirmationNumber(e.target.value.toUpperCase())}
             maxLength={12}
           />
-          <Input
-            label="Email Address"
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <div>
+            <Input
+              label="Email Address"
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <p className="font-body text-[13px] text-text-muted mt-1">
+              Use the email from your booking confirmation
+            </p>
+          </div>
 
           {error && (
             <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px]">

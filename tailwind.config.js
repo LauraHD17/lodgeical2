@@ -29,7 +29,7 @@ export default {
       'danger-bg': '#FFE4E6',
       info: '#1D4ED8',
       'info-bg': '#DBEAFE',
-      tableAlt: '#F8FAFC',
+      tableAlt: '#ECEEF1',
     },
     extend: {
       fontFamily: {

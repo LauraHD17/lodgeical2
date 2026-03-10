@@ -432,9 +432,16 @@ export default function Guests() {
           loading={isLoading}
           onRowClick={(row) => setSelectedGuest(row)}
           emptyState={
-            <p className="font-body text-[15px] text-text-muted py-8">
-              {debouncedSearch ? `No guests matching "${debouncedSearch}"` : 'No guests yet'}
-            </p>
+            debouncedSearch ? (
+              <p className="font-body text-[15px] text-text-muted py-12">
+                No guests matching &quot;{debouncedSearch}&quot;
+              </p>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-12">
+                <UserCircle size={40} weight="light" className="text-text-muted" />
+                <p className="font-body text-[15px] text-text-muted">No guests yet</p>
+              </div>
+            )
           }
         />
       </div>

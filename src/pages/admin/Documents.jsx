@@ -1,6 +1,7 @@
 // src/pages/admin/Documents.jsx
 // Documents management page.
 
+import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { UploadSimple, DownloadSimple, Trash, File, Info } from '@phosphor-icons/react'
@@ -9,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/useToast'
 
 function useDocuments() {
@@ -53,15 +55,21 @@ export default function Documents() {
   const { data: documents = [], isLoading } = useDocuments()
   const deleteDocument = useDeleteDocument()
   const { addToast } = useToast()
+  const [confirmState, setConfirmState] = useState(null)
 
-  async function handleDelete(doc) {
-    if (!confirm(`Delete "${doc.filename}"?`)) return
-    try {
-      await deleteDocument.mutateAsync(doc.id)
-      addToast({ message: 'Document deleted', variant: 'success' })
-    } catch {
-      addToast({ message: 'Failed to delete document', variant: 'error' })
-    }
+  function handleDelete(doc) {
+    setConfirmState({
+      title: `Delete "${doc.filename}"?`,
+      description: 'This document will be permanently deleted.',
+      onConfirm: async () => {
+        try {
+          await deleteDocument.mutateAsync(doc.id)
+          addToast({ message: 'Document deleted', variant: 'success' })
+        } catch {
+          addToast({ message: 'Failed to delete document', variant: 'error' })
+        }
+      },
+    })
   }
 
   function handleUpload() {
@@ -164,9 +172,9 @@ export default function Documents() {
           data={documents}
           loading={isLoading}
           emptyState={
-            <div className="flex flex-col items-center gap-3 py-8">
-              <File size={40} className="text-text-muted" weight="light" />
-              <p className="font-body text-[15px] text-text-muted">No documents uploaded yet</p>
+            <div className="flex flex-col items-center gap-3 py-12">
+              <File size={40} weight="light" className="text-text-muted" />
+              <p className="font-body text-[15px] text-text-muted">No documents yet</p>
               <Button variant="secondary" size="sm" onClick={handleUpload}>
                 <UploadSimple size={14} /> Upload first document
               </Button>
@@ -174,6 +182,16 @@ export default function Documents() {
           }
         />
       </div>
+
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        description={confirmState?.description}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null) }}
+        onCancel={() => setConfirmState(null)}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }
