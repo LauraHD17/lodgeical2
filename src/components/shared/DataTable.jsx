@@ -88,9 +88,9 @@ export function DataTable({
               <tr
                 key={row.id ?? rowIndex}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onRowClick(row) } : undefined}
+                onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(row) } } : undefined}
                 tabIndex={onRowClick ? 0 : undefined}
-                role={onRowClick ? 'button' : undefined}
+                aria-label={onRowClick ? `View details` : undefined}
                 className={cn(
                   'group transition-colors duration-150 hover:bg-info-bg',
                   rowIndex % 2 === 0 ? 'bg-white' : 'bg-tableAlt',

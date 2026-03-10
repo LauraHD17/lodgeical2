@@ -8,6 +8,7 @@ import { isSandboxMode } from '@/lib/sandbox/useSandbox'
 const variantClasses = {
   success: 'bg-success-bg border border-success text-success',
   error: 'bg-danger-bg border border-danger text-danger',
+  danger: 'bg-danger-bg border border-danger text-danger',
   info: 'bg-info-bg border border-info text-info',
 }
 

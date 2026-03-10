@@ -100,7 +100,7 @@ export function InquiryStep({ checkIn, checkOut, propertyId, rooms = [], closure
   // ── Success state ──────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-8" role="status" aria-live="polite">
         <CheckCircle size={32} weight="fill" className="text-success mx-auto mb-3" />
         <h2 className="font-heading text-[24px] text-text-primary mb-2">Inquiry sent!</h2>
         <p className="font-body text-[15px] text-text-secondary max-w-sm mx-auto mb-6">
@@ -168,7 +168,7 @@ export function InquiryStep({ checkIn, checkOut, propertyId, rooms = [], closure
       </div>
 
       {/* Guest info */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="inq-first" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 block">
             First name *

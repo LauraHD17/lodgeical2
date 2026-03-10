@@ -25,6 +25,8 @@ export function Select({
       <RadixSelect.Root value={value} onValueChange={onValueChange}>
         <RadixSelect.Trigger
           id={id}
+          aria-describedby={error ? `${id}-error` : undefined}
+          aria-invalid={error ? 'true' : undefined}
           className={cn(
             'h-11 border-[1.5px] border-border rounded-[6px] px-3 text-[15px] text-text-primary bg-surface-raised w-full',
             'flex items-center justify-between gap-2',
@@ -71,7 +73,7 @@ export function Select({
       </RadixSelect.Root>
 
       {error && (
-        <span className="mt-1 flex items-center gap-1 text-danger text-[13px]">
+        <span id={`${id}-error`} className="mt-1 flex items-center gap-1 text-danger text-[13px]" role="alert">
           <WarningCircle size={14} weight="fill" className="shrink-0" />
           {error}
         </span>

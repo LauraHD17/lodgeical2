@@ -143,6 +143,7 @@ export function Sidebar({ onClose }) {
         ) : (
           <button
             onClick={logout}
+            aria-label="Sign out"
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-text-secondary hover:bg-danger-bg hover:text-danger transition-colors duration-100"
           >
             <SignOut size={12} weight="fill" className="shrink-0" />

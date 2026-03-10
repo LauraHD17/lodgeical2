@@ -20,7 +20,7 @@ export default {
       border: '#D1D0CB',
       'text-primary': '#1A1A1A',
       'text-secondary': '#555555',
-      'text-muted': '#888888',
+      'text-muted': '#767676',
       success: '#15803D',
       'success-bg': '#DCFCE7',
       warning: '#B45309',

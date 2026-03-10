@@ -98,7 +98,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
   // Loading state while pricing is fetched
   if (pricingLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
+      <div className="flex flex-col items-center justify-center py-12" role="status" aria-live="polite">
         <SpinnerGap size={24} className="animate-spin text-info mb-3" />
         <p className="font-body text-[14px] text-text-muted">Calculating pricing…</p>
       </div>
@@ -273,8 +273,8 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
         </div>
       )}
 
-      {/* Back button shown alongside stripe */}
-      {showStripe && !stripeError && (
+      {/* Back button shown alongside stripe (only when stripe form is visible — no duplicate) */}
+      {showStripe && stripeReady && clientSecret && (
         <Button variant="ghost" size="md" onClick={onBack} type="button" disabled={isLoading} className="text-text-secondary mt-3">
           ← Back
         </Button>
