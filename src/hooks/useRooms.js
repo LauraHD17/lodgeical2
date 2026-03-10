@@ -48,7 +48,7 @@ export function useRoomLinks() {
   const { propertyId } = useProperty()
 
   return useQuery({
-    queryKey: ['room-links', propertyId],
+    queryKey: queryKeys.roomLinks.list(propertyId),
     queryFn: async () => {
       if (!propertyId) return []
       const { data, error } = await supabase

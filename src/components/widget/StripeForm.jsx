@@ -13,15 +13,20 @@ export function StripeForm({ totalCents, onSuccess, onError }) {
   async function handlePay() {
     if (!stripe || !elements) return
     setPaying(true)
-    const { error } = await stripe.confirmPayment({
-      elements,
-      redirect: 'if_required',
-    })
-    if (error) {
-      onError(error.message)
+    try {
+      const { error } = await stripe.confirmPayment({
+        elements,
+        redirect: 'if_required',
+      })
+      if (error) {
+        onError(error.message)
+        setPaying(false)
+      } else {
+        onSuccess()
+      }
+    } catch (err) {
+      onError(err?.message ?? 'Payment failed. Please try again.')
       setPaying(false)
-    } else {
-      onSuccess()
     }
   }
 

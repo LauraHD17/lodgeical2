@@ -452,8 +452,7 @@ export default function Contacts() {
 
       {inactiveCount > 0 && (
         <p className="font-body text-[13px] text-text-muted">
-          {inactiveCount} inactive contact{inactiveCount !== 1 ? 's' : ''} hidden.{' '}
-          <button onClick={() => { /* show inactive */ }} className="underline">Show all</button>
+          {inactiveCount} inactive contact{inactiveCount !== 1 ? 's' : ''} hidden.
         </p>
       )}
 

@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { queryKeys } from '@/config/queryKeys'
 import { Button } from '@/components/ui/Button'
+import { CHART_COLORS, CHART_AXIS_TICK, CHART_AXIS_TICK_MONO, CHART_GRID_STROKE } from '@/config/chartTokens'
 import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
@@ -546,13 +547,13 @@ export default function Reports() {
             <div style={{ minWidth: 480 }}>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={earningsChartData} margin={{ top: 0, right: 0, bottom: 0, left: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#D1D0CB" />
-                  <XAxis dataKey="month" tick={{ fontFamily: 'IBM Plex Sans', fontSize: 12, fill: '#555555' }} />
-                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 11, fill: '#888888' }} tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} width={48} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+                  <XAxis dataKey="month" tick={CHART_AXIS_TICK} />
+                  <YAxis tick={CHART_AXIS_TICK_MONO} tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} width={48} />
                   <Tooltip content={<RevenueTooltip />} />
                   <Bar dataKey="revenue" radius={[3, 3, 0, 0]} maxBarSize={48}>
                     {earningsChartData.map(entry => (
-                      <Cell key={entry.month} fill={entry.isCurrent ? '#DBEAFE' : '#1D4ED8'} />
+                      <Cell key={entry.month} fill={entry.isCurrent ? CHART_COLORS.infoBg : CHART_COLORS.info} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -598,11 +599,11 @@ export default function Reports() {
               </div>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={revenueByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
-                  <XAxis dataKey="month" tick={{ fontFamily: 'IBM Plex Sans', fontSize: 12, fill: '#555555' }} />
-                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#555555' }} tickFormatter={v => `$${v}`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+                  <XAxis dataKey="month" tick={CHART_AXIS_TICK} />
+                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={v => `$${v}`} />
                   <Tooltip content={<RangeTooltip />} />
-                  <Bar dataKey="revenue" fill="#1D4ED8" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" fill={CHART_COLORS.info} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -619,11 +620,11 @@ export default function Reports() {
               </div>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={occupancyByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
-                  <XAxis dataKey="month" tick={{ fontFamily: 'IBM Plex Sans', fontSize: 12, fill: '#555555' }} />
-                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#555555' }} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
+                  <XAxis dataKey="month" tick={CHART_AXIS_TICK} />
+                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={v => `${v}%`} domain={[0, 100]} />
                   <Tooltip content={<RangeTooltip />} />
-                  <Bar dataKey="occupancy" fill="#15803D" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="occupancy" fill={CHART_COLORS.success} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

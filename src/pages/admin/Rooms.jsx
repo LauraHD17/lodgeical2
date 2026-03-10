@@ -14,6 +14,7 @@ import * as Switch from '@radix-ui/react-switch'
 import { supabase } from '@/lib/supabaseClient'
 import { useRooms, useCreateRoom, useUpdateRoom } from '@/hooks/useRooms'
 import { useProperty } from '@/lib/property/useProperty'
+import { queryKeys } from '@/config/queryKeys'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -715,7 +716,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
 function useRoomLinks() {
   const { propertyId } = useProperty()
   return useQuery({
-    queryKey: ['room-links', propertyId],
+    queryKey: queryKeys.roomLinks.list(propertyId),
     queryFn: async () => {
       if (!propertyId) return []
       const { data } = await supabase.from('room_links').select('*').eq('property_id', propertyId).order('created_at')
@@ -786,7 +787,7 @@ function RoomLinksSection({ rooms }) {
         await supabase.from('room_links').insert(payload)
         addToast({ message: 'Room link created', variant: 'success' })
       }
-      qc.invalidateQueries({ queryKey: ['room-links'] })
+      qc.invalidateQueries({ queryKey: queryKeys.roomLinks.all })
       resetForm()
     } catch (err) {
       addToast({ message: err?.message ?? 'Failed to save', variant: 'error' })
@@ -799,7 +800,7 @@ function RoomLinksSection({ rooms }) {
       description: 'This room link will be permanently removed.',
       onConfirm: async () => {
         await supabase.from('room_links').delete().eq('id', linkId)
-        qc.invalidateQueries({ queryKey: ['room-links'] })
+        qc.invalidateQueries({ queryKey: queryKeys.roomLinks.all })
         addToast({ message: 'Room link deleted', variant: 'success' })
       },
     })

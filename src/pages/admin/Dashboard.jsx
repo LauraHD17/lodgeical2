@@ -671,7 +671,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
         if (span.type === 'maintenance') {
           return (
             <td key={idx} colSpan={span.span} className="py-1 px-1"
-              style={{ background: 'repeating-linear-gradient(135deg,#D1D0CB 0px,#D1D0CB 2px,#F2F1ED 2px,#F2F1ED 9px)' }}>
+              style={{ background: 'var(--stripe-diagonal-wide)' }}>
               <span className="font-body text-[11px] text-text-muted">Maintenance</span>
             </td>
           )

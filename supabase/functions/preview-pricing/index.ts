@@ -55,6 +55,17 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Property not found' }), { status: 404, headers: CORS_HEADERS })
   }
 
+  // Verify all room_ids belong to this property
+  const { data: validRooms, error: roomError } = await supabase
+    .from('rooms')
+    .select('id')
+    .in('id', input.room_ids)
+    .eq('property_id', input.property_id)
+
+  if (roomError || !validRooms || validRooms.length !== input.room_ids.length) {
+    return new Response(JSON.stringify({ error: 'One or more rooms not found for this property' }), { status: 400, headers: CORS_HEADERS })
+  }
+
   try {
     const pricing = await calculatePricing(supabase, {
       propertyId: input.property_id,

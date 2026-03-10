@@ -92,6 +92,11 @@ export const queryKeys = {
     byProperty: (propertyId) => ['onboarding', 'byProperty', propertyId],
   },
 
+  roomLinks: {
+    all: ['roomLinks'],
+    list: (propertyId) => ['roomLinks', 'list', propertyId],
+  },
+
   importBatches: {
     all: ['importBatches'],
     latest: (propertyId) => ['importBatches', 'latest', propertyId],

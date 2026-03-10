@@ -21,6 +21,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
   const [pricing, setPricing] = useState(null)
   const [pricingLoading, setPricingLoading] = useState(true)
   const [pricingError, setPricingError] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -45,14 +46,14 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
         const data = await res.json()
         if (!cancelled) setPricing(data)
       } catch {
-        if (!cancelled) setPricingError('Could not load pricing. Please go back and try again.')
+        if (!cancelled) setPricingError('Could not load pricing.')
       } finally {
         if (!cancelled) setPricingLoading(false)
       }
     }
     fetchPricing()
     return () => { cancelled = true }
-  }, [property.id, room.room_ids, dates.checkIn, dates.checkOut])
+  }, [property.id, room.room_ids, dates.checkIn, dates.checkOut, retryCount])
 
   const requirePayment = settings?.require_payment_at_booking
   const stripeKey = settings?.stripe_publishable_key || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
@@ -108,7 +109,10 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
     return (
       <div className="text-center py-8">
         <p className="font-body text-[14px] text-danger mb-4">{pricingError}</p>
-        <Button variant="secondary" size="md" onClick={onBack}>← Back</Button>
+        <div className="flex items-center justify-center gap-3">
+          <Button variant="secondary" size="md" onClick={onBack}>← Back</Button>
+          <Button variant="primary" size="md" onClick={() => setRetryCount(c => c + 1)}>Try Again</Button>
+        </div>
       </div>
     )
   }

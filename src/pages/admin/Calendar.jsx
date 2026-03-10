@@ -499,13 +499,13 @@ export default function Calendar() {
           )}
           {blockedRoomIds.size > 0 && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body relative overflow-hidden">
-              <span className="absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, #D1D0CB 3px, #D1D0CB 5px)' }} />
+              <span className="absolute inset-0" style={{ backgroundImage: 'var(--stripe-diagonal)' }} />
               <span className="relative font-semibold text-text-secondary">Maintenance</span>
             </span>
           )}
           {closureStart && closureEnd && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-body relative overflow-hidden">
-              <span className="absolute inset-0 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, #D1D0CB 3px, #D1D0CB 5px)' }} />
+              <span className="absolute inset-0 opacity-30" style={{ backgroundImage: 'var(--stripe-diagonal)' }} />
               <span className="relative font-semibold text-text-secondary">Seasonal Closure</span>
             </span>
           )}
@@ -560,7 +560,7 @@ export default function Calendar() {
                           {isClosed && inMonth && (
                             <div
                               className="absolute inset-0 opacity-30 pointer-events-none"
-                              style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, #D1D0CB 3px, #D1D0CB 5px)' }}
+                              style={{ backgroundImage: 'var(--stripe-diagonal)' }}
                             />
                           )}
                           {day && (
@@ -623,7 +623,7 @@ export default function Calendar() {
                               left: '1px',
                               width: 'calc(100% - 2px)',
                               top: `${rowIdx * 26}px`,
-                              backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, #D1D0CB 3px, #D1D0CB 5px)',
+                              backgroundImage: 'var(--stripe-diagonal)',
                             }}
                             title={`${bar.roomName} — Maintenance (blocks booking)`}
                           >

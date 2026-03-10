@@ -484,9 +484,6 @@ export default function Settings() {
           <div className="flex flex-col gap-5">
             <div className="flex items-center justify-between">
               <SectionHeader>Team Members</SectionHeader>
-              <Button variant="secondary" size="sm" disabled>
-                Invite (coming soon)
-              </Button>
             </div>
             <div className="border border-border rounded-[8px] overflow-hidden">
               <DataTable
