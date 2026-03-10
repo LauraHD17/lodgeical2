@@ -73,14 +73,39 @@ class MockQueryBuilder {
 
   // Resolve the accumulated operations to { data, error }
   _resolve() {
-    if (this._method === 'delete') return { data: null, error: null }
+    if (this._method === 'delete') {
+      // Remove matched rows from the in-memory store
+      const table = TABLE_DATA[this._table]
+      if (table) {
+        const matched = this._filters.reduce((acc, f) => acc.filter(f), [...table])
+        const deleteIds = new Set(matched.map(r => r.id))
+        TABLE_DATA[this._table] = table.filter(r => !deleteIds.has(r.id))
+      }
+      return { data: null, error: null }
+    }
 
     let rows = this._method === 'insert'
-      ? this._data                                              // already set by insert()
+      ? this._data
       : this._filters.reduce((acc, f) => acc.filter(f), this._data)
+
+    // Persist inserts to the in-memory store
+    if (this._method === 'insert') {
+      const table = TABLE_DATA[this._table]
+      if (table) table.push(...this._data)
+    }
 
     if (this._method === 'update' && this._body) {
       rows = rows.map(r => ({ ...r, ...this._body }))
+      // Persist updates back to the in-memory store
+      const table = TABLE_DATA[this._table]
+      if (table) {
+        const updatedIds = new Set(rows.map(r => r.id))
+        for (let i = 0; i < table.length; i++) {
+          if (updatedIds.has(table[i].id)) {
+            Object.assign(table[i], this._body)
+          }
+        }
+      }
     }
 
     if (this._limitN != null) rows = rows.slice(0, this._limitN)
