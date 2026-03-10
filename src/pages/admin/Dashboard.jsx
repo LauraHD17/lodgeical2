@@ -18,6 +18,7 @@ import {
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { queryKeys } from '@/config/queryKeys'
+import { getPaletteColor, getPaletteByIndex } from '@/config/roomPalette'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist'
 import { Button } from '@/components/ui/Button'
@@ -103,7 +104,7 @@ function useRoomsForCalendar() {
       if (!propertyId) return []
       const { data } = await supabase
         .from('rooms')
-        .select('id, name')
+        .select('id, name, color')
         .eq('property_id', propertyId)
         .eq('is_active', true)
         .order('name')
@@ -600,6 +601,7 @@ function RoomCalendar({ rooms, reservations, maintenanceTickets }) {
               <RoomRow
                 key={room.id}
                 room={room}
+                roomIndex={ri}
                 days={days}
                 reservations={ressByRoom[room.id] ?? []}
                 tickets={ticketsByRoom[room.id] ?? []}
@@ -613,7 +615,8 @@ function RoomCalendar({ rooms, reservations, maintenanceTickets }) {
   )
 }
 
-function RoomRow({ room, days, reservations, tickets, isLast }) {
+function RoomRow({ room, roomIndex, days, reservations, tickets, isLast }) {
+  const pal = room.color ? getPaletteColor(room.color) : getPaletteByIndex(roomIndex)
   const openTickets    = tickets.filter(t => t.status !== 'resolved')
   const blockingTicket = tickets.find(t => t.blocks_booking && t.status !== 'resolved')
 
@@ -683,11 +686,14 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
             <td key={idx} colSpan={span.span} className="py-1 px-0.5">
               <Link to="/reservations" className={cn(
                 'rounded-[4px] px-2 py-1 h-8 flex items-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity block',
-                isPending
-                  ? 'bg-warning-bg border border-dashed border-warning'
-                  : 'bg-info-bg border-l-[3px] border-l-info border border-info/30'
-              )}>
-                <span className={cn('font-mono text-[11px] truncate', isPending ? 'text-warning italic' : 'text-info')}>
+                isPending && 'border border-dashed border-warning'
+              )}
+                style={isPending
+                  ? { backgroundColor: 'var(--color-warning-bg)' }
+                  : { backgroundColor: pal.bg + '22', border: `1px solid ${pal.bg}40`, borderLeft: `3px solid ${pal.bg}` }
+                }
+              >
+                <span className="font-mono text-[11px] truncate" style={{ color: isPending ? undefined : pal.border ?? pal.bg }} >
                   {r.guests?.last_name ?? '—'}
                 </span>
               </Link>

@@ -21,6 +21,12 @@ const updateContactSchema = z.object({
   email: z.string().email(),
   new_email: z.string().email().optional(),
   new_phone: z.string().min(7).max(20).optional(),
+  billing_address_line1: z.string().max(200).optional(),
+  billing_address_line2: z.string().max(200).optional(),
+  billing_city: z.string().max(100).optional(),
+  billing_state: z.string().max(100).optional(),
+  billing_postal_code: z.string().max(20).optional(),
+  billing_country: z.string().max(100).optional(),
 })
 
 const attachBookerSchema = z.object({
@@ -80,10 +86,12 @@ serve(async (req) => {
 
   // ── Update Contact ───────────────────────────────────────────────────────
   if (action === 'update_contact') {
-    const { new_email, new_phone } = parsed.data
-    if (!new_email && !new_phone) {
+    const { new_email, new_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country } = parsed.data
+    const hasAddressFields = billing_address_line1 !== undefined || billing_address_line2 !== undefined || billing_city !== undefined || billing_state !== undefined || billing_postal_code !== undefined || billing_country !== undefined
+
+    if (!new_email && !new_phone && !hasAddressFields) {
       return new Response(
-        JSON.stringify({ error: 'Please provide a new email or phone number.' }),
+        JSON.stringify({ error: 'Please provide updated information.' }),
         { status: 400, headers: CORS_HEADERS }
       )
     }
@@ -100,6 +108,22 @@ serve(async (req) => {
       details.old_phone = guest.phone
       details.new_phone = new_phone
       updates.phone = new_phone
+    }
+
+    // Address fields — can be updated but not cleared to blank once set
+    const addressFields = [
+      ['billing_address_line1', billing_address_line1],
+      ['billing_address_line2', billing_address_line2],
+      ['billing_city', billing_city],
+      ['billing_state', billing_state],
+      ['billing_postal_code', billing_postal_code],
+      ['billing_country', billing_country],
+    ] as const
+    for (const [field, value] of addressFields) {
+      if (value !== undefined && value.trim() !== '') {
+        updates[field] = value.trim()
+        details[field] = value.trim()
+      }
     }
 
     if (Object.keys(updates).length === 0) {

@@ -57,7 +57,7 @@ serve(async (req) => {
       status, origin, total_due_cents, notes, created_at,
       room_ids, property_id, modification_count,
       booker_email, cc_emails,
-      guests!inner(id, first_name, last_name, email, phone),
+      guests!inner(id, first_name, last_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_postal_code, billing_country),
       properties(name, timezone, location)
     `)
     .eq('confirmation_number', parsed.data.confirmation_number)
@@ -65,7 +65,7 @@ serve(async (req) => {
 
   if (resError || !reservation) return GENERIC_NOT_FOUND
 
-  const guest = reservation.guests as { id: string; email: string; first_name: string; last_name: string; phone: string | null }
+  const guest = reservation.guests as { id: string; email: string; first_name: string; last_name: string; phone: string | null; billing_address_line1: string | null; billing_address_line2: string | null; billing_city: string | null; billing_state: string | null; billing_postal_code: string | null; billing_country: string | null }
   const guestEmailMatch = guest?.email.toLowerCase() === inputEmail
   const bookerEmailMatch = reservation.booker_email?.toLowerCase() === inputEmail
   if (!guest || (!guestEmailMatch && !bookerEmailMatch)) {
@@ -183,7 +183,12 @@ serve(async (req) => {
       paymentSummary,
       // All-reservations data (for history/payments/contact tabs)
       reservations: enrichedReservations,
-      guest: { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone },
+      guest: {
+        id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone,
+        billing_address_line1: guest.billing_address_line1, billing_address_line2: guest.billing_address_line2,
+        billing_city: guest.billing_city, billing_state: guest.billing_state,
+        billing_postal_code: guest.billing_postal_code, billing_country: guest.billing_country,
+      },
       allRooms: allResRooms ?? [],
       payments: allPayments ?? [],
     }),

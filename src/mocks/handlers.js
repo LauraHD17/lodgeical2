@@ -308,7 +308,12 @@ export const handlers = [
       availableRooms: MOCK_ROOMS.filter(r => r.is_active),
       // All-reservations data
       reservations: allReservations,
-      guest: guest ? { id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone } : null,
+      guest: guest ? {
+        id: guest.id, first_name: guest.first_name, last_name: guest.last_name, email: guest.email, phone: guest.phone,
+        billing_address_line1: guest.billing_address_line1 ?? null, billing_address_line2: guest.billing_address_line2 ?? null,
+        billing_city: guest.billing_city ?? null, billing_state: guest.billing_state ?? null,
+        billing_postal_code: guest.billing_postal_code ?? null, billing_country: guest.billing_country ?? null,
+      } : null,
       allRooms: MOCK_ROOMS.filter(r => allRoomIds.includes(r.id)),
       payments: matchingPayments,
     })

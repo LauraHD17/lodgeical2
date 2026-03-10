@@ -39,14 +39,55 @@ serve(async (req) => {
 
   // Process events
   if (event.type === 'payment_intent.succeeded') {
-    const pi = event.data.object as { id: string; charges?: { data: Array<{ id: string }> } }
-    const chargeId = pi.charges?.data?.[0]?.id ?? null
+    const pi = event.data.object as {
+      id: string
+      charges?: { data: Array<{ id: string; billing_details?: { address?: { line1?: string; line2?: string; city?: string; state?: string; postal_code?: string; country?: string } } }> }
+    }
+    const charge = pi.charges?.data?.[0]
+    const chargeId = charge?.id ?? null
 
     await supabase
       .from('payments')
       .update({ status: 'succeeded', stripe_charge_id: chargeId })
       .eq('stripe_payment_intent_id', pi.id)
       .eq('type', 'charge')
+
+    // Capture billing address from Stripe onto the guest record (best-effort)
+    try {
+      const billing = charge?.billing_details?.address
+      if (billing && (billing.line1 || billing.city || billing.postal_code)) {
+        const { data: payment } = await supabase
+          .from('payments')
+          .select('reservation_id')
+          .eq('stripe_payment_intent_id', pi.id)
+          .single()
+
+        if (payment) {
+          const { data: res } = await supabase
+            .from('reservations')
+            .select('guest_id')
+            .eq('id', payment.reservation_id)
+            .single()
+
+          if (res?.guest_id) {
+            const addressUpdate: Record<string, string> = {}
+            if (billing.line1) addressUpdate.billing_address_line1 = billing.line1
+            if (billing.line2) addressUpdate.billing_address_line2 = billing.line2
+            if (billing.city) addressUpdate.billing_city = billing.city
+            if (billing.state) addressUpdate.billing_state = billing.state
+            if (billing.postal_code) addressUpdate.billing_postal_code = billing.postal_code
+            if (billing.country) addressUpdate.billing_country = billing.country
+
+            await supabase
+              .from('guests')
+              .update(addressUpdate)
+              .eq('id', res.guest_id)
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[stripe-webhook] billing address capture error:', e)
+    }
 
   } else if (event.type === 'payment_intent.payment_failed') {
     const pi = event.data.object as { id: string; latest_charge?: string }

@@ -1002,6 +1002,12 @@ function PaymentsTab({ payments, reservations }) {
 function ContactTab({ guest, confirmationNumber, upcomingReservations, onUpdated }) {
   const [newEmail, setNewEmail] = useState(guest?.email ?? '')
   const [newPhone, setNewPhone] = useState(guest?.phone ?? '')
+  const [addressLine1, setAddressLine1] = useState(guest?.billing_address_line1 ?? '')
+  const [addressLine2, setAddressLine2] = useState(guest?.billing_address_line2 ?? '')
+  const [city, setCity] = useState(guest?.billing_city ?? '')
+  const [state, setState] = useState(guest?.billing_state ?? '')
+  const [postalCode, setPostalCode] = useState(guest?.billing_postal_code ?? '')
+  const [country, setCountry] = useState(guest?.billing_country ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -1016,6 +1022,23 @@ function ContactTab({ guest, confirmationNumber, upcomingReservations, onUpdated
     setSaving(true)
     setError('')
     setSuccess('')
+
+    // Prevent clearing address fields that already have data
+    const addrFields = [
+      { key: 'billing_address_line1', value: addressLine1, original: guest?.billing_address_line1 },
+      { key: 'billing_city', value: city, original: guest?.billing_city },
+      { key: 'billing_state', value: state, original: guest?.billing_state },
+      { key: 'billing_postal_code', value: postalCode, original: guest?.billing_postal_code },
+      { key: 'billing_country', value: country, original: guest?.billing_country },
+    ]
+    for (const f of addrFields) {
+      if (f.original && !f.value.trim()) {
+        setError(`${f.key.replace('billing_', '').replace(/_/g, ' ')} cannot be blank.`)
+        setSaving(false)
+        return
+      }
+    }
+
     try {
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/guest-portal-update`,
@@ -1028,6 +1051,12 @@ function ContactTab({ guest, confirmationNumber, upcomingReservations, onUpdated
             email: guest?.email,
             new_email: newEmail !== guest?.email ? newEmail : undefined,
             new_phone: newPhone !== guest?.phone ? newPhone : undefined,
+            billing_address_line1: addressLine1 !== (guest?.billing_address_line1 ?? '') ? addressLine1 : undefined,
+            billing_address_line2: addressLine2 !== (guest?.billing_address_line2 ?? '') ? addressLine2 : undefined,
+            billing_city: city !== (guest?.billing_city ?? '') ? city : undefined,
+            billing_state: state !== (guest?.billing_state ?? '') ? state : undefined,
+            billing_postal_code: postalCode !== (guest?.billing_postal_code ?? '') ? postalCode : undefined,
+            billing_country: country !== (guest?.billing_country ?? '') ? country : undefined,
           }),
         }
       )
@@ -1079,6 +1108,12 @@ function ContactTab({ guest, confirmationNumber, upcomingReservations, onUpdated
   }
 
   const hasContactChanges = newEmail !== (guest?.email ?? '') || newPhone !== (guest?.phone ?? '')
+    || addressLine1 !== (guest?.billing_address_line1 ?? '')
+    || addressLine2 !== (guest?.billing_address_line2 ?? '')
+    || city !== (guest?.billing_city ?? '')
+    || state !== (guest?.billing_state ?? '')
+    || postalCode !== (guest?.billing_postal_code ?? '')
+    || country !== (guest?.billing_country ?? '')
 
   return (
     <div data-tab-content="contact">
@@ -1101,6 +1136,57 @@ function ContactTab({ guest, confirmationNumber, upcomingReservations, onUpdated
             onChange={(e) => setNewPhone(e.target.value)}
             placeholder="+1 555 123 4567"
           />
+        </div>
+      </div>
+
+      {/* Billing Address */}
+      <div className="bg-surface-raised border border-border rounded-[8px] p-5 mb-4">
+        <h3 className="font-heading text-[16px] text-text-primary mb-1">Billing Address</h3>
+        <p className="font-body text-[13px] text-text-muted mb-4">
+          Auto-filled from your payment card. You can update it here.
+        </p>
+
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Address Line 1"
+            value={addressLine1}
+            onChange={(e) => setAddressLine1(e.target.value)}
+            placeholder="123 Main St"
+          />
+          <Input
+            label="Address Line 2 (optional)"
+            value={addressLine2}
+            onChange={(e) => setAddressLine2(e.target.value)}
+            placeholder="Apt, Suite, Unit"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="City"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="City"
+            />
+            <Input
+              label="State / Province"
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              placeholder="State"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Postal Code"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="12345"
+            />
+            <Input
+              label="Country"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="US"
+            />
+          </div>
 
           {error && (
             <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px]">
@@ -1216,12 +1302,12 @@ function PortalTabs({ data, onBack, onRefresh }) {
       </button>
 
       <Tabs.Root defaultValue="upcoming">
-        <Tabs.List className="flex gap-0 border-b border-border mb-6 print:hidden overflow-x-auto">
+        <Tabs.List className="flex gap-0 border-b border-border mb-6 print:hidden overflow-x-auto w-fit mx-auto">
           {[
-            { value: 'upcoming', label: 'Your Upcoming Reservation', icon: EnvelopeSimple },
+            { value: 'upcoming', label: 'Upcoming', icon: EnvelopeSimple },
             { value: 'history', label: 'History', icon: ClockCounterClockwise },
             { value: 'payments', label: 'Payments', icon: CreditCard },
-            { value: 'contact', label: 'Contact Info', icon: UserCircle },
+            { value: 'contact', label: 'Contact', icon: UserCircle },
           ].map((tab) => {
             const TabIcon = tab.icon
             return (

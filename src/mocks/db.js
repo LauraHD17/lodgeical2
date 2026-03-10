@@ -167,7 +167,7 @@ export const MOCK_ROOM_LINKS = [
 // ---------------------------------------------------------------------------
 
 export const MOCK_GUESTS = [
-  { id: 'guest-001', property_id: PROPERTY_ID, first_name: 'Alice',   last_name: 'Johnson',  email: 'alice.johnson@example.com',  phone: '+1 828 555 0101', created_at: '2024-03-01T00:00:00Z' },
+  { id: 'guest-001', property_id: PROPERTY_ID, first_name: 'Alice',   last_name: 'Johnson',  email: 'alice.johnson@example.com',  phone: '+1 828 555 0101', billing_address_line1: '42 Lakeview Dr', billing_address_line2: null, billing_city: 'Asheville', billing_state: 'NC', billing_postal_code: '28801', billing_country: 'US', created_at: '2024-03-01T00:00:00Z' },
   { id: 'guest-002', property_id: PROPERTY_ID, first_name: 'Bob',     last_name: 'Smith',    email: 'bob.smith@example.com',      phone: '+1 828 555 0102', created_at: '2024-05-15T00:00:00Z' },
   { id: 'guest-003', property_id: PROPERTY_ID, first_name: 'Carol',   last_name: 'Williams', email: 'carol.w@example.com',        phone: '+1 828 555 0103', created_at: '2024-07-20T00:00:00Z' },
   { id: 'guest-004', property_id: PROPERTY_ID, first_name: 'David',   last_name: 'Lee',      email: 'david.lee@example.com',      phone: '+1 828 555 0104', created_at: '2024-09-10T00:00:00Z' },
