@@ -428,7 +428,7 @@ export default function Maintenance() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
-          <Wrench size={32} weight="bold" className="text-text-muted" />
+          <Wrench size={18} weight="fill" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">
             {logs.length === 0
               ? 'No maintenance logs yet'

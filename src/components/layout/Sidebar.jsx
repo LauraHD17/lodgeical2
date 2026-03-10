@@ -88,7 +88,7 @@ export function Sidebar({ onClose }) {
                     )
                   }
                 >
-                  <Icon size={15} weight="bold" className="shrink-0" />
+                  <Icon size={12} weight="fill" className="shrink-0" />
                   {item.label}
                 </NavLink>
               </li>
@@ -135,7 +135,7 @@ export function Sidebar({ onClose }) {
             onClick={async () => { await leaveSandbox(); window.location.href = '/login' }}
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-warning hover:bg-warning-bg transition-colors duration-100"
           >
-            <SignOut size={15} weight="bold" className="shrink-0" />
+            <SignOut size={12} weight="fill" className="shrink-0" />
             Exit demo
           </button>
         ) : (
@@ -143,7 +143,7 @@ export function Sidebar({ onClose }) {
             onClick={logout}
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-text-secondary hover:bg-danger-bg hover:text-danger transition-colors duration-100"
           >
-            <SignOut size={15} weight="bold" className="shrink-0" />
+            <SignOut size={12} weight="fill" className="shrink-0" />
             Sign out
           </button>
         )}

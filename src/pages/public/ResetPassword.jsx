@@ -90,7 +90,7 @@ export default function ResetPassword() {
         <div className="bg-surface-raised border border-border rounded-[8px] p-8">
           {!hasRecoverySession ? (
             <div className="text-center flex flex-col items-center gap-4">
-              <Lock size={32} weight="bold" className="text-text-muted" />
+              <Lock size={18} weight="fill" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-primary">
                 This link is invalid or has expired.
               </p>

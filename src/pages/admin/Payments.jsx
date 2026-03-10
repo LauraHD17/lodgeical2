@@ -322,7 +322,7 @@ export default function Payments() {
           loading={isLoading}
           emptyState={
             <div className="flex flex-col items-center gap-3 py-12">
-              <CurrencyDollar size={32} weight="bold" className="text-text-muted" />
+              <CurrencyDollar size={18} weight="fill" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No payments yet</p>
             </div>
           }

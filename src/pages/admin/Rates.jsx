@@ -472,7 +472,7 @@ function OverrideList({ overrides, rooms, propertyId }) {
 
       {overrides.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
-          <CalendarBlank size={32} weight="bold" className="text-text-muted" />
+          <CalendarBlank size={18} weight="fill" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">No seasonal overrides yet</p>
           <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)}><Plus size={14} /> Add your first override</Button>
         </div>

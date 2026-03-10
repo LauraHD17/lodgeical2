@@ -71,7 +71,7 @@ function EmailLogSection() {
   if (!logs?.length) {
     return (
       <div className="flex flex-col items-center gap-3 py-12">
-        <EnvelopeSimple size={32} weight="bold" className="text-text-muted" />
+        <EnvelopeSimple size={18} weight="fill" className="text-text-muted" />
         <p className="font-body text-[15px] text-text-muted">No emails sent yet</p>
       </div>
     )
@@ -177,7 +177,7 @@ function EmailLogSection() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-surface-raised">
-          <EnvelopeSimple size={32} className="text-text-muted" weight="bold" />
+          <EnvelopeSimple size={28} className="text-text-muted" weight="fill" />
           <p className="font-body text-[14px] text-text-muted">Select a message to view details</p>
         </div>
       )}

@@ -190,9 +190,9 @@ The public booking widget (`src/components/widget/`) is a multi-step flow: DateS
 - **Numeric data** (prices, dates, IDs, counts): IBM Plex Mono, 14px. Always.
 
 ### Icons
-- Sidebar nav: `weight="bold" size={15}` (dense stamp glyphs)
-- Empty states: `weight="bold" size={32}`
-- Action buttons: `weight="bold"`, keep size
+- Sidebar nav: `weight="fill" size={14}` (solid filled glyphs)
+- Empty states: `weight="fill" size={28}`
+- Action buttons (Plus, Check, X): `weight="bold"`, keep size
 - Status indicators: `weight="fill"`
 - Never use `weight="light"` or `weight="regular"`.
 

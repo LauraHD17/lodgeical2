@@ -173,7 +173,7 @@ export default function Documents() {
           loading={isLoading}
           emptyState={
             <div className="flex flex-col items-center gap-3 py-12">
-              <File size={32} weight="bold" className="text-text-muted" />
+              <File size={18} weight="fill" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No documents yet</p>
               <Button variant="secondary" size="sm" onClick={handleUpload}>
                 <UploadSimple size={14} /> Upload first document

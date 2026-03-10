@@ -415,7 +415,7 @@ export default function Contacts() {
         </div>
       ) : displayed.length === 0 && contacts.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
-          <AddressBook size={32} weight="bold" className="text-text-muted" />
+          <AddressBook size={18} weight="fill" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">No contacts yet</p>
           <Button variant="primary" size="sm" onClick={openNew}>
             <Plus size={14} weight="bold" /> Add first contact

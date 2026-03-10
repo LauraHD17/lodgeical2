@@ -358,7 +358,7 @@ export default function Reservations() {
           onRowClick={(row) => setSelectedReservation(row)}
           emptyState={
             <div className="flex flex-col items-center gap-3 py-12">
-              <CalendarBlank size={32} weight="bold" className="text-text-muted" />
+              <CalendarBlank size={18} weight="fill" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No reservations yet</p>
               <Button variant="primary" size="sm" onClick={() => setModalOpen(true)}>
                 <Plus size={14} weight="bold" /> Create first reservation

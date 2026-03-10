@@ -824,7 +824,7 @@ function UpcomingTab({ reservation, rooms, availableRooms, paymentSummary, onRef
   if (!reservation) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <EnvelopeSimple size={32} className="text-text-muted" weight="bold" />
+        <EnvelopeSimple size={28} className="text-text-muted" weight="fill" />
         <p className="font-body text-[15px] text-text-muted">No reservations found. Try the email address on your confirmation, or check the History tab.</p>
       </div>
     )
@@ -886,7 +886,7 @@ function HistoryTab({ reservations, rooms }) {
   if (pastReservations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <ClockCounterClockwise size={32} className="text-text-muted" weight="bold" />
+        <ClockCounterClockwise size={28} className="text-text-muted" weight="fill" />
         <p className="font-body text-[15px] text-text-muted">No past reservations.</p>
       </div>
     )
@@ -909,7 +909,7 @@ function PaymentsTab({ payments, reservations }) {
   if (!payments || payments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <CreditCard size={32} className="text-text-muted" weight="bold" />
+        <CreditCard size={28} className="text-text-muted" weight="fill" />
         <p className="font-body text-[15px] text-text-muted">No payments recorded.</p>
       </div>
     )

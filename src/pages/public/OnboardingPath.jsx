@@ -85,7 +85,7 @@ export default function OnboardingPath() {
                       : 'border-border bg-surface-raised hover:border-text-muted'
                   )}
                 >
-                  <Icon size={18} weight="bold" className={cn('shrink-0 mt-0.5', selected ? c.text : 'text-text-secondary')} />
+                  <Icon size={12} weight="fill" className={cn('shrink-0 mt-0.5', selected ? c.text : 'text-text-secondary')} />
                   <div className="flex-1 min-w-0">
                     <div className="font-body text-[15px] font-semibold text-text-primary">{p.title}</div>
                     <div className="font-body text-[13px] text-text-secondary mt-0.5">{p.subtitle}</div>
