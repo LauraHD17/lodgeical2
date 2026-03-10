@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   # -----------------------------------------------------------------------
-  # Job 1: Lint + Unit Tests + Build
+  # Job 1: Lint + Unit Tests + Build + Security + Bundle Size
   # Always runs — no secrets required.
   # -----------------------------------------------------------------------
   test:
@@ -32,14 +32,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Security audit (production deps)
+        run: npm audit --omit=dev --audit-level=critical
+
       - name: Lint (zero warnings)
         run: npm run lint
+
+      - name: Validate routes (single source of truth)
+        run: npm run routes:check
 
       - name: Unit tests (Vitest)
         run: npm test
 
       - name: Build (Vite)
         run: npm run build
+
+      - name: Bundle size check
+        run: |
+          MAX_KB=3072
+          ACTUAL_KB=$(du -sk dist/ | cut -f1)
+          echo "Bundle size: ${ACTUAL_KB}KB (limit: ${MAX_KB}KB)"
+          if [ "$ACTUAL_KB" -gt "$MAX_KB" ]; then
+            echo "::error::Bundle size ${ACTUAL_KB}KB exceeds ${MAX_KB}KB limit"
+            exit 1
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
