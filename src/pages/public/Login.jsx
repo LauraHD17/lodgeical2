@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabaseClient'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { House } from '@phosphor-icons/react'
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -83,6 +84,25 @@ export default function Login() {
             </div>
           </form>
         </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-border" />
+          <span className="font-body text-[12px] text-text-muted">or</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        {/* Demo CTA */}
+        <Link
+          to="/demo"
+          className="flex items-center justify-center gap-3 w-full min-h-[48px] px-4 bg-surface border-[1.5px] border-border rounded-none font-body hover:bg-border transition-colors duration-100"
+        >
+          <House size={20} weight="light" className="text-text-secondary shrink-0" />
+          <div className="text-left">
+            <div className="text-[14px] font-semibold text-text-primary leading-tight">Try Sunrise Lodge</div>
+            <div className="text-[11px] text-text-muted leading-tight">No account needed — nothing is saved</div>
+          </div>
+        </Link>
       </div>
     </div>
   )

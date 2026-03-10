@@ -452,3 +452,20 @@ export const MOCK_GUEST_ACTIVITY = [
     guests: { first_name: 'Emma', last_name: 'Davis' },
   },
 ]
+
+// ---------------------------------------------------------------------------
+// Onboarding state (demo property already completed onboarding)
+// ---------------------------------------------------------------------------
+export const MOCK_ONBOARDING_STATE = {
+  id: 'onboard-001',
+  property_id: 'prop-001',
+  onboarding_path: 'fresh',
+  completed_steps: ['rooms', 'rates'],
+  created_at: daysFromNow(-30) + 'T10:00:00Z',
+  updated_at: daysFromNow(-14) + 'T10:00:00Z',
+}
+
+// ---------------------------------------------------------------------------
+// Import batches
+// ---------------------------------------------------------------------------
+export const MOCK_IMPORT_BATCHES = []

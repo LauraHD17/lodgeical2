@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { List, X } from '@phosphor-icons/react'
+import { useNavigate } from 'react-router-dom'
+import { List, X, Flask } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
+import { isSandboxMode, leaveSandbox } from '@/lib/sandbox/useSandbox'
 
 export function AdminLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const navigate = useNavigate()
+  const sandbox = isSandboxMode()
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -41,6 +45,27 @@ export function AdminLayout({ children }) {
             {mobileOpen ? <X size={22} /> : <List size={22} />}
           </button>
         </header>
+
+        {/* Sandbox banner */}
+        {sandbox && (
+          <div className="bg-warning-bg border-b-2 border-warning px-5 py-2.5 flex items-center justify-between gap-4 no-print">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Flask size={16} weight="fill" className="text-warning shrink-0" />
+              <span className="font-body text-[14px] font-semibold text-warning">
+                Exploring Sunrise Lodge
+              </span>
+              <span className="font-body text-[13px] text-text-secondary hidden sm:inline">
+                — a sample inn. Click anything. Nothing is saved.
+              </span>
+            </div>
+            <button
+              onClick={async () => { await leaveSandbox(); navigate('/login', { replace: true }) }}
+              className="shrink-0 font-body text-[13px] font-semibold px-4 py-1.5 bg-warning text-white rounded-none hover:opacity-90 transition-opacity"
+            >
+              Set up my own inn →
+            </button>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto">

@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { queryKeys } from '@/config/queryKeys'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
+import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist'
 import { Button } from '@/components/ui/Button'
 import { cn, dollars } from '@/lib/utils'
 
@@ -797,6 +798,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-8">
+      <OnboardingChecklist />
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">

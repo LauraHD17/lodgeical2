@@ -81,4 +81,14 @@ export const queryKeys = {
     all: ['guestActivity'],
     list: (propertyId) => ['guestActivity', 'list', propertyId],
   },
+
+  onboarding: {
+    all: ['onboarding'],
+    byProperty: (propertyId) => ['onboarding', 'byProperty', propertyId],
+  },
+
+  importBatches: {
+    all: ['importBatches'],
+    latest: (propertyId) => ['importBatches', 'latest', propertyId],
+  },
 }

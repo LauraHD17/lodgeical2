@@ -9,6 +9,7 @@ import {
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
   MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY, MOCK_ROOM_LINKS,
+  MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -512,6 +513,39 @@ export const handlers = [
     }
 
     return HttpResponse.json({ error: 'Unknown action' }, { status: 400 })
+  }),
+
+  // -------------------------------------------------------------------------
+  // onboarding_state
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/onboarding_state`, ({ request }) =>
+    pgRespond(request, [MOCK_ONBOARDING_STATE]),
+  ),
+
+  http.post(`${BASE}/rest/v1/onboarding_state`, async ({ request }) => {
+    const body = await request.json()
+    const row = { id: `onboard-new-${Date.now()}`, ...body, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    return pgRespond(request, row)
+  }),
+
+  http.patch(`${BASE}/rest/v1/onboarding_state`, async ({ request }) => {
+    const body = await request.json()
+    return pgRespond(request, { ...MOCK_ONBOARDING_STATE, ...body })
+  }),
+
+  // -------------------------------------------------------------------------
+  // import_batches
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/import_batches`, ({ request }) =>
+    pgRespond(request, MOCK_IMPORT_BATCHES),
+  ),
+
+  http.post(`${BASE}/rest/v1/import_batches`, async ({ request }) => {
+    const body = await request.json()
+    const row = { id: `batch-${Date.now()}`, ...body, created_at: new Date().toISOString() }
+    return pgRespond(request, row)
   }),
 
 ]

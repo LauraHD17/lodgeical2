@@ -4,12 +4,16 @@
 // import-csv edge function which handles guest upsert + reservation creation.
 
 import { useState, useRef } from 'react'
-import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning, ClockCounterClockwise } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/Button'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/components/ui/useToast'
+import { useProperty } from '@/lib/property/useProperty'
+import { queryKeys } from '@/config/queryKeys'
 import { cn } from '@/lib/utils'
 import { parseCsvToRows } from '@/lib/csv/parseRfc4180'
+import { TransferChecklist } from '@/components/import/TransferChecklist'
 
 const CSV_TEMPLATE_HEADERS = [
   'confirmation_number',
@@ -55,12 +59,32 @@ function downloadTemplate() {
 
 export default function Import() {
   const { addToast } = useToast()
+  const { propertyId } = useProperty()
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)   // { headers, previewRows, allRows }
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState(null)     // { imported, skipped, errors }
+  const [checklistRows, setChecklistRows] = useState(null) // rows for transfer checklist
+  const [showLastImport, setShowLastImport] = useState(false)
   const fileInputRef = useRef(null)
+
+  // Fetch last import batch for "View last import"
+  const { data: lastBatch } = useQuery({
+    queryKey: queryKeys.importBatches.latest(propertyId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('import_batches')
+        .select()
+        .eq('property_id', propertyId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (error && error.code !== 'PGRST116') throw error
+      return data ?? null
+    },
+    enabled: !!propertyId,
+  })
 
   function handleDrop(e) {
     e.preventDefault()
@@ -120,6 +144,20 @@ export default function Import() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Import failed')
       setResult(json)
+      // Build checklist rows from the import preview data
+      if (json.imported > 0 && preview?.allRows) {
+        setChecklistRows(preview.allRows.map((row, i) => ({
+          id: `import-${i}`,
+          confirmation_number: row.confirmation_number,
+          guest_name: `${row.guest_first_name ?? ''} ${row.guest_last_name ?? ''}`.trim(),
+          room_name: row.room_name,
+          check_in: row.check_in,
+          check_out: row.check_out,
+          total_due_cents: row.total_due_cents ? Number(row.total_due_cents) : null,
+          status: row.status,
+          notes: row.notes,
+        })))
+      }
       addToast({
         message: `Import complete: ${json.imported} created, ${json.skipped} skipped`,
         variant: 'success',
@@ -304,6 +342,40 @@ export default function Import() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Transfer Checklist — shown after a successful import */}
+      {result && result.imported > 0 && checklistRows && (
+        <TransferChecklist
+          reservations={checklistRows}
+          importResult={result}
+          importDate={new Date().toISOString()}
+        />
+      )}
+
+      {/* View last import — shown when no active import result */}
+      {!result && lastBatch && (
+        <div className="border border-border rounded-[8px] p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <ClockCounterClockwise size={18} className="text-text-muted shrink-0" />
+            <div>
+              <div className="font-body text-[14px] font-semibold text-text-primary">
+                Last import
+              </div>
+              <div className="font-body text-[12px] text-text-secondary">
+                {lastBatch.imported_count} reservations imported
+                {lastBatch.file_name && ` from ${lastBatch.file_name}`}
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowLastImport(v => !v)}
+          >
+            {showLastImport ? 'Hide' : 'View checklist'}
+          </Button>
         </div>
       )}
     </div>

@@ -28,6 +28,8 @@ export const ROUTES = [
   { path: '/booking-confirmation', pageName: 'BookingConfirmation', isPublic: true },
   { path: '/invoice/:id',          pageName: 'Invoice',             isPublic: true },
   { path: '/login',                pageName: 'Login',               isPublic: true },
+  { path: '/demo',                 pageName: 'Demo',                isPublic: true },
+  { path: '/onboarding',           pageName: 'OnboardingPath',      isPublic: true },
 ]
 
 /** Array of all public paths (used by RouteGuard to skip auth checks) */

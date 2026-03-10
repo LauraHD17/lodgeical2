@@ -1,0 +1,47 @@
+/* Print styles for transfer checklist and other printable views */
+@media print {
+  /* Hide non-printable UI */
+  .no-print,
+  aside,
+  header,
+  nav,
+  button:not(.print-keep) {
+    display: none !important;
+  }
+
+  /* Reset layout for print */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12px;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .flex.min-h-screen {
+    display: block !important;
+  }
+
+  /* Table page breaks */
+  .print-checklist table {
+    page-break-inside: auto;
+  }
+
+  .print-checklist tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .print-checklist thead {
+    display: table-header-group;
+  }
+
+  /* Force backgrounds in print */
+  .print-checklist th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

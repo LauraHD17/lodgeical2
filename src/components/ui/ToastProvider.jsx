@@ -3,6 +3,7 @@ import * as RadixToast from '@radix-ui/react-toast'
 import { X } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { ToastContext } from './toastContext'
+import { isSandboxMode } from '@/lib/sandbox/useSandbox'
 
 const variantClasses = {
   success: 'bg-success-bg border border-success text-success',
@@ -15,7 +16,10 @@ export function ToastProvider({ children }) {
 
   const addToast = useCallback(({ message, variant = 'info' }) => {
     const id = Date.now().toString()
-    setToasts((prev) => [...prev, { id, message, variant }])
+    const displayMessage = isSandboxMode()
+      ? `${message} — not saved in sandbox mode`
+      : message
+    setToasts((prev) => [...prev, { id, message: displayMessage, variant }])
   }, [])
 
   const removeToast = useCallback((id) => {

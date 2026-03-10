@@ -27,6 +27,7 @@ import { useAuth } from '@/lib/auth/useAuth'
 import { useProperty } from '@/lib/property/useProperty'
 import { NAV_ITEMS } from '@/config/routes'
 import { hasPermission } from '@/lib/auth/permissions'
+import { isSandboxMode, leaveSandbox } from '@/lib/sandbox/useSandbox'
 
 const ICON_MAP = {
   Dashboard:        SquaresFour,
@@ -127,15 +128,25 @@ export function Sidebar({ onClose }) {
         </div>
       </nav>
 
-      {/* Sign out */}
+      {/* Sign out / Exit demo */}
       <div className="px-2 py-4 border-t border-border">
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-text-secondary hover:bg-danger-bg hover:text-danger transition-colors duration-100"
-        >
-          <SignOut size={17} weight="light" className="shrink-0" />
-          Sign out
-        </button>
+        {isSandboxMode() ? (
+          <button
+            onClick={async () => { await leaveSandbox(); window.location.href = '/login' }}
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-warning hover:bg-warning-bg transition-colors duration-100"
+          >
+            <SignOut size={17} weight="light" className="shrink-0" />
+            Exit demo
+          </button>
+        ) : (
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-text-secondary hover:bg-danger-bg hover:text-danger transition-colors duration-100"
+          >
+            <SignOut size={17} weight="light" className="shrink-0" />
+            Sign out
+          </button>
+        )}
       </div>
     </aside>
   )
