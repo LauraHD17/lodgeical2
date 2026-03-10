@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/useToast'
+import { ROOM_PALETTE, getPaletteColor } from '@/config/roomPalette'
 import { cn } from '@/lib/utils'
 
 const ROOM_TYPES = [
@@ -295,6 +296,7 @@ function initForm(room) {
       allows_pets: false, linkable: false,
       cleaning_fee_dollars: '', pet_fee_dollars: '',
       buffer_days_before: '0', buffer_days_after: '0',
+      color: ROOM_PALETTE[0].name,
     }
   }
   return {
@@ -309,6 +311,7 @@ function initForm(room) {
     pet_fee_dollars: room.pet_fee_cents != null ? (room.pet_fee_cents / 100).toFixed(2) : '',
     buffer_days_before: String(room.buffer_days_before ?? 0),
     buffer_days_after: String(room.buffer_days_after ?? 0),
+    color: room.color ?? ROOM_PALETTE[0].name,
   }
 }
 
@@ -354,6 +357,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
       pet_fee_cents: form.pet_fee_dollars === '' ? null : Math.round(Number(form.pet_fee_dollars) * 100),
       buffer_days_before: Number(form.buffer_days_before) || 0,
       buffer_days_after: Number(form.buffer_days_after) || 0,
+      color: form.color,
     }
     try {
       if (isNew) {
@@ -417,6 +421,10 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
 
         {/* Room name + meta */}
         <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+          {!isNew && (() => {
+            const pal = getPaletteColor(room.color)
+            return <span className="w-3.5 h-3.5 rounded-full shrink-0 border" style={{ backgroundColor: pal.bg, borderColor: pal.border }} />
+          })()}
           <span className="font-body font-semibold text-[15px] text-text-primary truncate">
             {isNew ? 'New Room' : (room.name || 'Untitled')}
           </span>
@@ -469,6 +477,35 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
             onChange={e => set('name', e.target.value)}
             error={errors.name}
           />
+
+          {/* Calendar color */}
+          <div>
+            <p className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-2">
+              Calendar Color
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {ROOM_PALETTE.map(pal => {
+                const selected = form.color === pal.name
+                return (
+                  <button
+                    key={pal.name}
+                    type="button"
+                    onClick={() => set('color', pal.name)}
+                    title={pal.name}
+                    className={cn(
+                      'w-7 h-7 rounded-full border-2 transition-all',
+                      selected ? 'scale-110 ring-2 ring-offset-1 ring-text-primary' : 'hover:scale-105',
+                    )}
+                    style={{
+                      backgroundColor: pal.bg,
+                      borderColor: selected ? pal.text : pal.border,
+                    }}
+                  />
+                )
+              })}
+            </div>
+            <p className="font-body text-[12px] text-text-muted mt-1.5">{form.color}</p>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select

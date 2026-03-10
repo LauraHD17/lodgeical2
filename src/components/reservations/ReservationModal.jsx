@@ -701,6 +701,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [checkingConflicts, setCheckingConflicts] = useState(false)
   const [earlyConflict, setEarlyConflict] = useState(null)
+  const [skipBuffers, setSkipBuffers] = useState(false)
   const [activeLink, setActiveLink] = useState(null)
   const [feesData, setFeesData] = useState({
     cleaningFeeWaived: false,
@@ -815,6 +816,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
     setEmailDebounced('')
     setConflict(null)
     setSubmitError(null)
+    setSkipBuffers(false)
     setFeesData({ cleaningFeeWaived: false, cleaningFeeWaiveReason: '', petFeeApplied: false, taxExempt: false, taxExemptOrg: '', miscFeeEnabled: false, miscFeeCents: 0, miscFeeDollars: '', miscFeeLabel: '' })
     form.reset()
   }
@@ -858,7 +860,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   }
 
   async function handleNext() {
-    if (step === 2) {
+    if (step === 2 && !skipBuffers) {
       const ok = await checkConflictsEarly()
       if (!ok) return // conflict found — stay on step 2
     }
@@ -894,6 +896,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
       tax_exempt_org: feesData.taxExempt ? (feesData.taxExemptOrg || null) : null,
       misc_fee_cents: feesData.miscFeeEnabled ? feesData.miscFeeCents : 0,
       misc_fee_label: feesData.miscFeeEnabled ? (feesData.miscFeeLabel || null) : null,
+      skip_buffers: skipBuffers,
     }
 
     const mutation = isEditMode
@@ -917,12 +920,38 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
 
   const modalTitle = isEditMode ? 'Edit Reservation' : 'New Reservation'
 
+  const modalFooter = (
+    <div className="flex items-center justify-between">
+      <Button
+        variant="secondary"
+        size="md"
+        onClick={() => { setEarlyConflict(null); setStep((s) => Math.max(s - 1, 1)) }}
+        disabled={step === 1 || isLoading}
+      >
+        <ArrowLeft size={16} /> Back
+      </Button>
+
+      {step < 5 && (
+        <Button
+          variant="primary"
+          size="md"
+          onClick={handleNext}
+          disabled={!canAdvance() || isLoading || checkingConflicts}
+          loading={checkingConflicts}
+        >
+          Next <ArrowRight size={16} />
+        </Button>
+      )}
+    </div>
+  )
+
   return (
     <Modal
       open={open}
       onClose={handleClose}
       title={modalTitle}
-      className="max-w-[720px] w-full overflow-y-auto max-h-[90vh]"
+      footer={modalFooter}
+      className="max-w-[720px] w-full"
     >
       <StepIndicator currentStep={step} />
 
@@ -949,8 +978,19 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
             <div className="mt-4">
               <ConflictBanner conflictingIds={earlyConflict} />
               <p className="font-body text-[13px] text-danger mt-2">
-                Please change your dates or room selection to resolve the conflict before continuing.
+                This conflicts with an existing reservation or its buffer days.
               </p>
+              <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={skipBuffers}
+                  onChange={(e) => setSkipBuffers(e.target.checked)}
+                  className="w-4 h-4 accent-info"
+                />
+                <span className="font-body text-[13px] text-text-secondary">
+                  Override buffer days — book into buffered dates anyway
+                </span>
+              </label>
             </div>
           )}
         </>
@@ -989,30 +1029,6 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
           propertySettings={propertySettings}
         />
       )}
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={() => { setEarlyConflict(null); setStep((s) => Math.max(s - 1, 1)) }}
-          disabled={step === 1 || isLoading}
-        >
-          <ArrowLeft size={16} /> Back
-        </Button>
-
-        {step < 5 && (
-          <Button
-            variant="primary"
-            size="md"
-            onClick={handleNext}
-            disabled={!canAdvance() || isLoading || checkingConflicts}
-            loading={checkingConflicts}
-          >
-            Next <ArrowRight size={16} />
-          </Button>
-        )}
-      </div>
 
       {/* Discard changes confirmation */}
       {showDiscardConfirm && (

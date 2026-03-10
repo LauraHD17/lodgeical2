@@ -23,6 +23,7 @@ const inputSchema = z.object({
   num_guests: z.number().int().min(1).optional(),
   status: z.enum(['confirmed', 'pending', 'cancelled', 'no_show']).optional(),
   notes: z.string().optional(),
+  skip_buffers: z.boolean().default(false),
 })
 
 serve(async (req) => {
@@ -74,6 +75,7 @@ serve(async (req) => {
       checkIn: newCheckIn,
       checkOut: newCheckOut,
       excludeReservationId: input.reservation_id,
+      skipBuffers: input.skip_buffers,
     })
 
     if (hasConflict) {

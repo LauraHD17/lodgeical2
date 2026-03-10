@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
-export function Modal({ open, onClose, title, children, className }) {
+export function Modal({ open, onClose, title, children, footer, className }) {
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <AnimatePresence>
@@ -21,11 +21,11 @@ export function Modal({ open, onClose, title, children, className }) {
             <Dialog.Content asChild>
               <Motion.div
                 className={cn(
-                  'fixed left-1/2 top-[5vh] z-[9999]',
-                  '-translate-x-1/2',
+                  'fixed inset-x-0 top-[5vh] z-[9999]',
+                  'mx-auto',
                   'bg-surface-raised rounded-[12px]',
-                  'max-w-[560px] w-full mx-4 p-8',
-                  'max-h-[90vh] overflow-y-auto',
+                  'max-w-[560px] w-[calc(100%-2rem)]',
+                  'max-h-[90vh] flex flex-col',
                   'focus:outline-none',
                   className
                 )}
@@ -36,12 +36,19 @@ export function Modal({ open, onClose, title, children, className }) {
               >
                 {title && (
                   <Dialog.Title asChild>
-                    <h2 className="font-heading text-[24px] text-text-primary mb-6 tracking-[-0.02em]">
+                    <h2 className="font-heading text-[24px] text-text-primary tracking-[-0.02em] px-8 pt-8 pb-6 shrink-0">
                       {title}
                     </h2>
                   </Dialog.Title>
                 )}
-                {children}
+                <div className={cn('flex-1 overflow-y-auto px-8 min-h-0', footer ? 'pb-4' : 'pb-8')}>
+                  {children}
+                </div>
+                {footer && (
+                  <div className="shrink-0 px-8 pb-8 pt-4 border-t border-border">
+                    {footer}
+                  </div>
+                )}
               </Motion.div>
             </Dialog.Content>
           </Dialog.Portal>

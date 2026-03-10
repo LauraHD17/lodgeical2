@@ -517,11 +517,9 @@ function DayCards({ dayView, calReservations, rooms, payments, guestActivities, 
         />
       </div>
 
-      {/* Row 2: Guest Modified */}
-      <GuestActivityCard activities={guestActivities} loading={loading} />
-
-      {/* Row 3: Occupancy + Revenue */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Row 2: Guest Modified + Occupancy + Revenue */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <GuestActivityCard activities={guestActivities} loading={loading} />
         <OccupancyCardWrapper
           pct={occupancyPct}
           inHouse={inHouseToday.length}

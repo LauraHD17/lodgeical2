@@ -31,6 +31,7 @@ const inputSchema = z.object({
   booker_email: z.string().email().optional(),
   cc_emails: z.array(z.string().email()).max(5).default([]),
   origin: z.enum(['direct', 'widget', 'import', 'phone']).default('direct'),
+  skip_buffers: z.boolean().default(false),
 }).refine(d => d.guest_id || d.guest_email, { message: 'Either guest_id or guest_email is required' })
   .refine(d => new Date(d.check_out) > new Date(d.check_in), { message: 'check_out must be after check_in' })
 
@@ -93,6 +94,7 @@ serve(async (req) => {
     roomIds: input.room_ids,
     checkIn: input.check_in,
     checkOut: input.check_out,
+    skipBuffers: input.skip_buffers,
   })
 
   if (hasConflict) {

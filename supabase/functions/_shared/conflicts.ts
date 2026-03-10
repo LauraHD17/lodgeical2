@@ -31,6 +31,7 @@ export async function checkConflicts(
     checkIn: string
     checkOut: string
     excludeReservationId?: string
+    skipBuffers?: boolean
   }
 ): Promise<ConflictResult> {
   // 1. Fetch buffer days for the requested rooms
@@ -42,8 +43,8 @@ export async function checkConflicts(
   const roomBufferMap = new Map<string, { before: number; after: number }>()
   for (const r of (requestedRooms ?? [])) {
     roomBufferMap.set(r.id, {
-      before: r.buffer_days_before ?? 0,
-      after: r.buffer_days_after ?? 0,
+      before: opts.skipBuffers ? 0 : (r.buffer_days_before ?? 0),
+      after: opts.skipBuffers ? 0 : (r.buffer_days_after ?? 0),
     })
   }
 
@@ -85,8 +86,8 @@ export async function checkConflicts(
       .in('id', missingRoomIds)
     for (const r of (extraRooms ?? [])) {
       roomBufferMap.set(r.id, {
-        before: r.buffer_days_before ?? 0,
-        after: r.buffer_days_after ?? 0,
+        before: opts.skipBuffers ? 0 : (r.buffer_days_before ?? 0),
+        after: opts.skipBuffers ? 0 : (r.buffer_days_after ?? 0),
       })
     }
   }
