@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
-import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight } from '@phosphor-icons/react'
+import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight, File, UploadSimple, DownloadSimple, Trash } from '@phosphor-icons/react'
 
 import { useGuests, useUpdateGuest } from '@/hooks/useGuests'
 import { useQuery } from '@tanstack/react-query'
@@ -156,6 +156,160 @@ function MergeModal({ primaryGuest, onClose, onMerged }) {
   )
 }
 
+// ─── Tag Editor ──────────────────────────────────────────────────────────────
+
+function TagEditor({ guest }) {
+  const { addToast } = useToast()
+  const updateGuest = useUpdateGuest()
+  const [tagInput, setTagInput] = useState('')
+
+  const customTags = guest.tags ?? []
+
+  async function handleAddTag(raw) {
+    const normalized = raw.trim().toLowerCase()
+    if (!normalized || customTags.includes(normalized)) return
+    const newTags = [...customTags, normalized]
+    try {
+      await updateGuest.mutateAsync({ id: guest.id, tags: newTags })
+    } catch {
+      addToast({ message: 'Failed to add tag', variant: 'error' })
+    }
+  }
+
+  async function handleRemoveTag(tag) {
+    const newTags = customTags.filter((t) => t !== tag)
+    try {
+      await updateGuest.mutateAsync({ id: guest.id, tags: newTags })
+    } catch {
+      addToast({ message: 'Failed to remove tag', variant: 'error' })
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddTag(tagInput)
+      setTagInput('')
+    }
+  }
+
+  // System-derived tags
+  const systemTags = []
+  if (guest.is_tax_exempt) systemTags.push('Tax Exempt')
+
+  return (
+    <div>
+      <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary mb-2">
+        Tags
+      </h3>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {systemTags.map((tag) => (
+          <span
+            key={`sys-${tag}`}
+            className="px-2 py-0.5 rounded-full text-[12px] font-body font-semibold inline-flex items-center gap-1 bg-success-bg text-success border border-success"
+          >
+            {tag}
+          </span>
+        ))}
+        {customTags.map((tag) => (
+          <span
+            key={tag}
+            className="px-2 py-0.5 rounded-full text-[12px] font-body font-semibold inline-flex items-center gap-1 bg-info-bg text-info border border-info"
+          >
+            {tag}
+            <button
+              onClick={() => handleRemoveTag(tag)}
+              className="hover:text-danger ml-0.5"
+              aria-label={`Remove tag ${tag}`}
+            >
+              <X size={12} weight="bold" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        type="text"
+        placeholder="Add tag..."
+        value={tagInput}
+        onChange={(e) => setTagInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="border-[1.5px] border-border rounded-[6px] px-2 py-1 font-body text-[13px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 w-full"
+      />
+    </div>
+  )
+}
+
+// ─── Guest Documents ──────────────────────────────────────────────────────────
+
+function GuestDocuments({ guestId }) {
+  const { data: docs = [], isLoading: docsLoading } = useQuery({
+    queryKey: queryKeys.documents.byGuest(guestId),
+    queryFn: async () => {
+      if (!guestId) return []
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, filename, file_url, storage_path, file_size, mime_type, uploaded_at')
+        .eq('guest_id', guestId)
+        .order('uploaded_at', { ascending: false })
+      if (error) return []
+      return data ?? []
+    },
+    enabled: !!guestId,
+  })
+
+  function formatSize(bytes) {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary">
+          Documents
+        </h3>
+      </div>
+
+      {docsLoading ? (
+        <div className="animate-pulse bg-border rounded h-16 w-full" />
+      ) : docs.length === 0 ? (
+        <p className="font-body text-[13px] text-text-muted">
+          No documents attached. Upload from the Documents page.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {docs.map((doc) => (
+            <div
+              key={doc.id}
+              className="flex items-center gap-2 bg-surface border border-border rounded-[6px] p-2"
+            >
+              <File size={14} className="text-text-muted shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-body text-[13px] text-text-primary truncate">{doc.filename}</p>
+                <p className="font-body text-[11px] text-text-muted">
+                  {formatSize(doc.file_size)} · {doc.uploaded_at ? format(parseISO(doc.uploaded_at), 'MMM d, yyyy') : ''}
+                </p>
+              </div>
+              {doc.file_url && (
+                <a
+                  href={doc.file_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-info hover:text-text-primary shrink-0"
+                >
+                  <DownloadSimple size={14} />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Guest Drawer ─────────────────────────────────────────────────────────────
 
 function GuestDrawer({ guest, onClose, onMergeStart }) {
@@ -262,23 +416,7 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
           </div>
 
           {/* Tags */}
-          {guest.tags && guest.tags.length > 0 && (
-            <div>
-              <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary mb-2">
-                Tags
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {guest.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="font-body text-[12px] bg-info-bg text-info border border-info rounded-full px-3 py-1"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          <TagEditor guest={guest} />
 
           {/* Reservation History */}
           <div>
@@ -319,6 +457,9 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
               </div>
             )}
           </div>
+
+          {/* Documents */}
+          <GuestDocuments guestId={guest.id} />
 
           {/* Merge */}
           <div className="pt-2 border-t border-border">

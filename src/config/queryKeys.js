@@ -101,4 +101,21 @@ export const queryKeys = {
     all: ['importBatches'],
     latest: (propertyId) => ['importBatches', 'latest', propertyId],
   },
+
+  tags: {
+    all: ['tags'],
+    suggestions: (propertyId) => ['tags', 'suggestions', propertyId],
+  },
+
+  documents: {
+    all: ['documents'],
+    list: (propertyId) => ['documents', 'list', propertyId],
+    byGuest: (guestId) => ['documents', 'byGuest', guestId],
+    byReservation: (reservationId) => ['documents', 'byReservation', reservationId],
+  },
+
+  reconciliation: {
+    all: ['reconciliation'],
+    list: (propertyId) => ['reconciliation', 'list', propertyId],
+  },
 }

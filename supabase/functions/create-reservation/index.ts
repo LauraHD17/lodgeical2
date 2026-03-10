@@ -32,6 +32,7 @@ const inputSchema = z.object({
   cc_emails: z.array(z.string().email()).max(5).default([]),
   origin: z.enum(['direct', 'widget', 'import', 'phone']).default('direct'),
   skip_buffers: z.boolean().default(false),
+  policy_acceptances: z.array(z.object({ type: z.string(), accepted: z.boolean() })).optional(),
 }).refine(d => d.guest_id || d.guest_email, { message: 'Either guest_id or guest_email is required' })
   .refine(d => new Date(d.check_out) > new Date(d.check_in), { message: 'check_out must be after check_in' })
 
@@ -196,6 +197,18 @@ serve(async (req) => {
 
   if (!reservation) {
     return new Response(JSON.stringify({ error: 'Could not generate confirmation number' }), { status: 500, headers: CORS_HEADERS })
+  }
+
+  // 9b. Record policy acceptances (fire-and-forget)
+  if (input.policy_acceptances?.length) {
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? req.headers.get('cf-connecting-ip') ?? null
+    await supabase.from('policy_acceptances').insert({
+      property_id: propertyId,
+      reservation_id: reservation.id as string,
+      guest_email: input.guest_email ?? '',
+      ip_address: clientIp,
+      policies_accepted: input.policy_acceptances,
+    }).then(() => {}).catch(e => console.error('[create-reservation] policy acceptance log error:', e))
   }
 
   // 10. Audit log (fire-and-forget)

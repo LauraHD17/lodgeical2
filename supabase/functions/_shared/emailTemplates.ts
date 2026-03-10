@@ -12,6 +12,7 @@ export type TemplateType =
   | 'check_in_reminder'
   | 'check_out_reminder'
   | 'invoice'
+  | 'daily_digest'
   | 'custom'
 
 export interface TemplateVars {
@@ -30,6 +31,12 @@ export interface TemplateVars {
   check_out_time?: string
   cancellation_policy?: string
   refund_amount?: string
+  arriving_count?: string
+  departing_count?: string
+  in_house_count?: string
+  digest_date?: string
+  arrivals_html?: string
+  departures_html?: string
   [key: string]: string | undefined
 }
 
@@ -187,6 +194,35 @@ function defaultTemplate(type: TemplateType, v: TemplateVars): { subject: string
           <p>Payment Status: <strong>${v.payment_status}</strong></p>
           ${v.invoice_url ? `<p style="margin:24px 0"><a href="${v.invoice_url}" style="background:#1A1A1A;color:#fff;padding:12px 24px;text-decoration:none;font-size:14px">View Invoice Online</a></p>` : ''}
           <p style="color:#555;font-size:13px">If you have questions about this invoice, please contact us.</p>
+        `),
+      }
+
+    case 'daily_digest':
+      return {
+        subject: `${v.property_name} — ${v.arriving_count ?? '0'} arriving, ${v.departing_count ?? '0'} departing today`,
+        html: wrap('Good Morning', `
+          <p style="color:#555;font-size:14px;margin-bottom:24px">Daily digest for <strong>${v.property_name}</strong> — ${v.digest_date}</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr>
+              <td style="background:#DCFCE7;border-radius:8px;padding:12px 16px;text-align:center;width:33%">
+                <p style="font-size:24px;font-weight:700;margin:0;color:#15803D">${v.arriving_count ?? '0'}</p>
+                <p style="font-size:13px;color:#15803D;margin:0">Checking in</p>
+              </td>
+              <td style="background:#DBEAFE;border-radius:8px;padding:12px 16px;text-align:center;width:33%">
+                <p style="font-size:24px;font-weight:700;margin:0;color:#1D4ED8">${v.departing_count ?? '0'}</p>
+                <p style="font-size:13px;color:#1D4ED8;margin:0">Checking out</p>
+              </td>
+              <td style="background:#F2F1ED;border-radius:8px;padding:12px 16px;text-align:center;width:33%">
+                <p style="font-size:24px;font-weight:700;margin:0;color:#1A1A1A">${v.in_house_count ?? '0'}</p>
+                <p style="font-size:13px;color:#555;margin:0">In-house</p>
+              </td>
+            </tr>
+          </table>
+          ${v.arrivals_html ?? '<p style="color:#888;font-size:14px">No arrivals today.</p>'}
+          ${v.departures_html ?? '<p style="color:#888;font-size:14px">No departures today.</p>'}
+          <p style="color:#888;font-size:12px;margin-top:32px;border-top:1px solid #D1D0CB;padding-top:12px">
+            Sent by Lodge-ical. Manage this in Settings &rarr; Property &rarr; Notifications.
+          </p>
         `),
       }
   }

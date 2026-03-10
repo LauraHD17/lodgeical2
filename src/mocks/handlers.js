@@ -11,6 +11,7 @@ import {
   MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY, MOCK_ROOM_LINKS,
   MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES, MOCK_ADMIN_ACTIVITY,
   MOCK_INQUIRIES,
+  MOCK_DOCUMENTS,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -161,10 +162,15 @@ export const handlers = [
     return pgRespond(request, { ...guest, ...body })
   }),
 
-  // documents — empty list
+  // documents
   http.get(`${BASE}/rest/v1/documents`, ({ request }) =>
-    pgRespond(request, []),
+    pgRespond(request, MOCK_DOCUMENTS),
   ),
+  http.post(`${BASE}/rest/v1/documents`, async ({ request }) => {
+    const body = await request.json()
+    const newDoc = { id: `doc-new-${Date.now()}`, ...body, uploaded_at: new Date().toISOString() }
+    return pgRespond(request, newDoc)
+  }),
   http.delete(`${BASE}/rest/v1/documents`, () =>
     new HttpResponse(null, { status: 204 }),
   ),

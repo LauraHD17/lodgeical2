@@ -1,11 +1,18 @@
-/* Print styles for transfer checklist and other printable views */
+/* Print styles for daily checklist and other printable views */
 @media print {
   /* Hide non-printable UI */
   .no-print,
   aside,
   header,
   nav,
-  button:not(.print-keep) {
+  button:not(.print-keep),
+  [data-sidebar],
+  [class*="Sidebar"] {
+    display: none !important;
+  }
+
+  /* Tailwind print:hidden support */
+  .print\:hidden {
     display: none !important;
   }
 
@@ -16,6 +23,10 @@
     font-size: 12px;
   }
 
+  body::after {
+    display: none !important;
+  }
+
   main {
     padding: 0 !important;
     overflow: visible !important;
@@ -23,6 +34,13 @@
 
   .flex.min-h-screen {
     display: block !important;
+  }
+
+  /* Checklist print styling */
+  .print-checklist {
+    border: none !important;
+    background: white !important;
+    padding: 0 !important;
   }
 
   /* Table page breaks */

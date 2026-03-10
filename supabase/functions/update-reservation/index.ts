@@ -8,6 +8,7 @@ import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { logAdminAction } from '../_shared/audit.ts'
 import { checkConflicts } from '../_shared/conflicts.ts'
+import { sendModificationConfirmation } from '../_shared/email.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -24,6 +25,7 @@ const inputSchema = z.object({
   status: z.enum(['confirmed', 'pending', 'cancelled', 'no_show']).optional(),
   notes: z.string().optional(),
   skip_buffers: z.boolean().default(false),
+  send_notification: z.boolean().default(false),
 })
 
 serve(async (req) => {
@@ -53,7 +55,7 @@ serve(async (req) => {
   // Fetch existing reservation (verify ownership) — select only the fields needed for update logic
   const { data: existing, error: fetchError } = await supabase
     .from('reservations')
-    .select('id, room_ids, check_in, check_out, total_due_cents')
+    .select('id, room_ids, check_in, check_out, total_due_cents, guest_id, confirmation_number')
     .eq('id', input.reservation_id)
     .eq('property_id', propertyId)
     .single()
@@ -130,6 +132,20 @@ serve(async (req) => {
   // Audit log (fire-and-forget)
   logAdminAction(supabase, propertyId, user.id, 'update', 'reservation', input.reservation_id)
     .catch(e => console.error('[update-reservation] audit error:', e))
+
+  // Guest notification (fire-and-forget)
+  if (input.send_notification) {
+    const { data: guest } = await supabase
+      .from('guests')
+      .select('first_name, last_name, email')
+      .eq('id', existing.guest_id)
+      .single()
+
+    if (guest?.email) {
+      sendModificationConfirmation(guest, { ...updated, property_id: propertyId }, supabase)
+        .catch(e => console.error('[update-reservation] notification error:', e))
+    }
+  }
 
   return new Response(JSON.stringify({ success: true, reservation: updated }), { headers: CORS_HEADERS })
 })

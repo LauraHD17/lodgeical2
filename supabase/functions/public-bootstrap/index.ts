@@ -34,7 +34,7 @@ serve(async (req) => {
   // Validate property — slug is safe to expose in URLs
   const { data: property, error: propError } = await supabase
     .from('properties')
-    .select('id, name, slug, images, location, timezone')
+    .select('id, name, slug, images, location, timezone, terms_and_conditions, cancellation_policy_text, incidental_policy, marketing_policy')
     .eq('slug', slug)
     .eq('is_active', true)
     .eq('is_public', true)

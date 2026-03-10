@@ -8,6 +8,7 @@ import { Elements } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/Button'
 import { fmtMoney as formatCents } from '@/lib/utils'
 import { StripeForm } from './StripeForm'
+import { PolicyModal } from './PolicyModal'
 
 // ─── ReviewStep ────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,23 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
   const [clientSecret, setClientSecret] = useState(null)
   const [stripeReady, setStripeReady] = useState(false)
   const [stripeError, setStripeError] = useState('')
+
+  // Policy acceptance state
+  const [policiesAccepted, setPoliciesAccepted] = useState(false)
+  const [marketingAccepted, setMarketingAccepted] = useState(false)
+  const [policyModal, setPolicyModal] = useState({ open: false, title: '', content: '' })
+
+  const activePolicies = []
+  if (settings?.terms_and_conditions) activePolicies.push({ type: 'terms', label: 'Terms & Conditions', content: settings.terms_and_conditions })
+  if (settings?.cancellation_policy_text) activePolicies.push({ type: 'cancellation', label: 'Cancellation Policy', content: settings.cancellation_policy_text })
+  if (settings?.incidental_policy) activePolicies.push({ type: 'incidental', label: 'Incidental Policy', content: settings.incidental_policy })
+  const hasRequiredPolicies = activePolicies.length > 0
+  const hasMarketingPolicy = !!settings?.marketing_policy
+
+  function buildPolicyAcceptances() {
+    return activePolicies.map(p => ({ type: p.type, accepted: true }))
+      .concat(hasMarketingPolicy ? [{ type: 'marketing', accepted: marketingAccepted }] : [])
+  }
 
   useEffect(() => {
     if (!requirePayment || !stripeKey || !pricing) return
@@ -228,8 +246,9 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <StripeForm
                 totalCents={pricing.totalCents}
-                onSuccess={() => onBook()}
+                onSuccess={() => onBook({ policy_acceptances: buildPolicyAcceptances() })}
                 onError={(msg) => setStripeError(msg)}
+                disabled={hasRequiredPolicies && !policiesAccepted}
               />
             </Elements>
           ) : !stripeError ? (
@@ -246,8 +265,9 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
               <Button
                 variant="primary"
                 size="lg"
-                onClick={() => onBook()}
+                onClick={() => onBook({ policy_acceptances: buildPolicyAcceptances() })}
                 loading={isLoading}
+                disabled={isLoading || (hasRequiredPolicies && !policiesAccepted)}
                 className="flex-1"
               >
                 Book Now (Pay at Property)
@@ -264,8 +284,9 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
           <Button
             variant="primary"
             size="lg"
-            onClick={() => onBook()}
+            onClick={() => onBook({ policy_acceptances: buildPolicyAcceptances() })}
             loading={isLoading}
+            disabled={isLoading || (hasRequiredPolicies && !policiesAccepted)}
             className="flex-1"
           >
             Book Now
@@ -280,10 +301,70 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
         </Button>
       )}
 
-      <p className="font-body text-[12px] text-text-muted text-center mt-4">
-        By booking you agree to the property&apos;s cancellation policy.
-        {settings?.cancellation_policy && ` (${settings.cancellation_policy})`}
-      </p>
+      {/* Policy acceptance */}
+      {hasRequiredPolicies && (
+        <div className="mt-4 flex flex-col gap-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={policiesAccepted}
+              onChange={(e) => setPoliciesAccepted(e.target.checked)}
+              className="w-4 h-4 accent-info mt-0.5 shrink-0"
+            />
+            <span className="font-body text-[13px] text-text-secondary leading-relaxed">
+              I agree to the{' '}
+              {activePolicies.map((p, i) => (
+                <span key={p.type}>
+                  {i > 0 && (i === activePolicies.length - 1 ? ', and ' : ', ')}
+                  <button
+                    type="button"
+                    onClick={() => setPolicyModal({ open: true, title: p.label, content: p.content })}
+                    className="text-info hover:underline font-medium"
+                  >
+                    {p.label}
+                  </button>
+                </span>
+              ))}
+            </span>
+          </label>
+
+          {hasMarketingPolicy && (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={marketingAccepted}
+                onChange={(e) => setMarketingAccepted(e.target.checked)}
+                className="w-4 h-4 accent-info mt-0.5 shrink-0"
+              />
+              <span className="font-body text-[13px] text-text-secondary leading-relaxed">
+                I&apos;d like to receive marketing communications.{' '}
+                <button
+                  type="button"
+                  onClick={() => setPolicyModal({ open: true, title: 'Marketing Policy', content: settings.marketing_policy })}
+                  className="text-info hover:underline"
+                >
+                  Learn more
+                </button>
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {/* Fallback: no policies configured, show simple text */}
+      {!hasRequiredPolicies && (
+        <p className="font-body text-[12px] text-text-muted text-center mt-4">
+          By booking you agree to the property&apos;s cancellation policy.
+          {settings?.cancellation_policy && ` (${settings.cancellation_policy})`}
+        </p>
+      )}
+
+      <PolicyModal
+        open={policyModal.open}
+        onOpenChange={(open) => setPolicyModal((m) => ({ ...m, open }))}
+        title={policyModal.title}
+        content={policyModal.content}
+      />
     </div>
   )
 }

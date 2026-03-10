@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning,
   WarningCircle, Plus, ArrowRight, Bell, UserCircle, CaretDown, CaretUp,
-  Door,
+  Door, Printer,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -124,7 +124,7 @@ function useCalendarReservations() {
       if (!propertyId) return []
       const { data } = await supabase
         .from('reservations')
-        .select('id, room_ids, check_in, check_out, status, guests(first_name, last_name)')
+        .select('id, room_ids, check_in, check_out, status, num_guests, confirmation_number, guests(first_name, last_name)')
         .eq('property_id', propertyId)
         .lt('check_in', format(end, 'yyyy-MM-dd'))
         .gte('check_out', format(today, 'yyyy-MM-dd'))
@@ -540,6 +540,85 @@ function DayCards({ dayView, calReservations, rooms, payments, guestActivities, 
 }
 
 // ---------------------------------------------------------------------------
+// Daily Checklist — printable arrivals / departures summary
+// ---------------------------------------------------------------------------
+
+function DailyChecklist({ arriving, departing, rooms, viewDate }) {
+  const roomMap = Object.fromEntries(rooms.map(r => [r.id, r.name]))
+
+  function getRoomNames(roomIds) {
+    return (roomIds ?? []).map(id => roomMap[id] ?? '?').join(', ')
+  }
+
+  return (
+    <div className="print-checklist bg-surface border border-border rounded-[8px] p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+          Daily Checklist — {format(viewDate, 'EEEE, MMM d')}
+        </h3>
+        <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
+          <Printer size={14} weight="bold" /> Print
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Check-ins */}
+        <div>
+          <h4 className="font-body text-[13px] font-semibold text-success mb-2 uppercase tracking-[0.06em]">
+            Checking In ({arriving.length})
+          </h4>
+          {arriving.length === 0 ? (
+            <p className="font-body text-[13px] text-text-muted">No arrivals</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {arriving.map(r => (
+                <div key={r.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                  <div>
+                    <p className="font-body text-[14px] text-text-primary">
+                      {r.guests?.first_name} {r.guests?.last_name}
+                    </p>
+                    <p className="font-body text-[12px] text-text-secondary">
+                      {getRoomNames(r.room_ids)} · {r.num_guests} guest{r.num_guests !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[12px] text-text-muted">{r.confirmation_number}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Check-outs */}
+        <div>
+          <h4 className="font-body text-[13px] font-semibold text-info mb-2 uppercase tracking-[0.06em]">
+            Checking Out ({departing.length})
+          </h4>
+          {departing.length === 0 ? (
+            <p className="font-body text-[13px] text-text-muted">No departures</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {departing.map(r => (
+                <div key={r.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                  <div>
+                    <p className="font-body text-[14px] text-text-primary">
+                      {r.guests?.first_name} {r.guests?.last_name}
+                    </p>
+                    <p className="font-body text-[12px] text-text-secondary">
+                      {getRoomNames(r.room_ids)}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[12px] text-text-muted">{r.confirmation_number}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Room Calendar — 14-day horizontal Gantt
 // ---------------------------------------------------------------------------
 
@@ -723,11 +802,19 @@ export default function Dashboard() {
   const { data: payments }                  = usePaymentsSummary()
   const { data: guestActivities = [] }     = useGuestActivity()
 
+  const today    = startOfDay(new Date())
+  const viewDate = dayView === 'today' ? today : addDays(today, 1)
+  const dateStr  = format(viewDate, 'yyyy-MM-dd')
+  const arriving   = calReservations.filter(r => r.check_in  === dateStr)
+  const departing  = calReservations.filter(r => r.check_out === dateStr)
+
   return (
     <div className="flex flex-col gap-8">
-      <OnboardingChecklist />
+      <div className="print:hidden">
+        <OnboardingChecklist />
+      </div>
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 print:hidden">
         <div className="flex flex-col gap-1">
           <h1 className="font-heading text-[32px] text-text-primary uppercase">{greeting()}</h1>
           <WeatherStrip />
@@ -759,21 +846,33 @@ export default function Dashboard() {
       </div>
 
       {/* Magazine grid stat cards */}
-      <DayCards
-        dayView={dayView}
-        calReservations={calReservations}
+      <div className="print:hidden">
+        <DayCards
+          dayView={dayView}
+          calReservations={calReservations}
+          rooms={rooms}
+          payments={payments}
+          guestActivities={guestActivities}
+          loading={calLoading}
+        />
+      </div>
+
+      {/* Printable daily checklist */}
+      <DailyChecklist
+        arriving={arriving}
+        departing={departing}
         rooms={rooms}
-        payments={payments}
-        guestActivities={guestActivities}
-        loading={calLoading}
+        viewDate={viewDate}
       />
 
       {/* 14-day room calendar */}
-      <RoomCalendar
-        rooms={rooms}
-        reservations={calReservations}
-        maintenanceTickets={maintenanceTickets}
-      />
+      <div className="print:hidden">
+        <RoomCalendar
+          rooms={rooms}
+          reservations={calReservations}
+          maintenanceTickets={maintenanceTickets}
+        />
+      </div>
 
       <ReservationModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>

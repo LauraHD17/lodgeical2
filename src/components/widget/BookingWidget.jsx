@@ -33,6 +33,8 @@ function isSeasonalClosure(checkIn, checkOut, property) {
 
 export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   const navigate = useNavigate()
+  const searchParams = new URLSearchParams(window.location.search)
+  const isEmbed = searchParams.get('embed') === 'true'
   const [restored, persist] = useWidgetState(property.id)
 
   const [step, setStep] = useState(restored?.step ?? 0)
@@ -115,6 +117,9 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
         return
       }
       clearWidgetState(property.id)
+      if (isEmbed && window.parent !== window) {
+        window.parent.postMessage({ type: 'lodge-ical:booking-complete', confirmation: json.confirmation_number }, '*')
+      }
       navigate(`/booking-confirmation?confirmation=${json.confirmation_number}`)
     } catch (err) {
       setBookingError(err.message || 'Network error. Please try again.')
@@ -124,14 +129,16 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Property name */}
-      <div className="text-center mb-6">
-        <h1 className="font-heading text-[28px] text-text-primary">{property.name}</h1>
-        {property.location && (
-          <p className="font-body text-[14px] text-text-muted mt-1">{property.location}</p>
-        )}
-      </div>
+    <div className={cn(isEmbed ? 'w-full' : 'max-w-2xl mx-auto', isEmbed ? 'p-0' : '')}>
+      {/* Property name — hidden in embed mode */}
+      {!isEmbed && (
+        <div className="text-center mb-6">
+          <h1 className="font-heading text-[28px] text-text-primary">{property.name}</h1>
+          {property.location && (
+            <p className="font-body text-[14px] text-text-muted mt-1">{property.location}</p>
+          )}
+        </div>
+      )}
 
       {/* Progress bar — hidden during inquiry mode */}
       {!inquiryMode && (

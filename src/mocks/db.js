@@ -50,6 +50,11 @@ export const MOCK_PROPERTY = {
   seasonal_closure_start: null,
   seasonal_closure_end: null,
   seasonal_closure_message: "We haven't opened these dates yet. Send an inquiry and we'll reach out when availability opens up!",
+  daily_digest_enabled: false,
+  terms_and_conditions: 'By staying at Sunrise Lodge you agree to abide by all property rules and regulations. Check-in is at 3:00 PM and check-out is at 11:00 AM. Quiet hours are from 10:00 PM to 7:00 AM.',
+  cancellation_policy_text: 'Cancellations made more than 5 days before check-in receive a full refund. Cancellations within 5 days of check-in are charged for the first night. No-shows are charged in full.',
+  incidental_policy: 'A credit card is required at check-in for incidentals. Any damages beyond normal wear and tear will be charged to the card on file.',
+  marketing_policy: 'We occasionally send updates about seasonal specials and events. You can unsubscribe at any time.',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
@@ -167,12 +172,12 @@ export const MOCK_ROOM_LINKS = [
 // ---------------------------------------------------------------------------
 
 export const MOCK_GUESTS = [
-  { id: 'guest-001', property_id: PROPERTY_ID, first_name: 'Alice',   last_name: 'Johnson',  email: 'alice.johnson@example.com',  phone: '+1 828 555 0101', billing_address_line1: '42 Lakeview Dr', billing_address_line2: null, billing_city: 'Asheville', billing_state: 'NC', billing_postal_code: '28801', billing_country: 'US', created_at: '2024-03-01T00:00:00Z' },
-  { id: 'guest-002', property_id: PROPERTY_ID, first_name: 'Bob',     last_name: 'Smith',    email: 'bob.smith@example.com',      phone: '+1 828 555 0102', created_at: '2024-05-15T00:00:00Z' },
-  { id: 'guest-003', property_id: PROPERTY_ID, first_name: 'Carol',   last_name: 'Williams', email: 'carol.w@example.com',        phone: '+1 828 555 0103', created_at: '2024-07-20T00:00:00Z' },
-  { id: 'guest-004', property_id: PROPERTY_ID, first_name: 'David',   last_name: 'Lee',      email: 'david.lee@example.com',      phone: '+1 828 555 0104', created_at: '2024-09-10T00:00:00Z' },
-  { id: 'guest-005', property_id: PROPERTY_ID, first_name: 'Emma',    last_name: 'Davis',    email: 'emma.davis@example.com',     phone: '+1 828 555 0105', created_at: '2024-11-01T00:00:00Z' },
-  { id: 'guest-006', property_id: PROPERTY_ID, first_name: 'Frank',   last_name: 'Martinez', email: 'frank.m@example.com',        phone: '+1 828 555 0106', created_at: '2025-01-05T00:00:00Z' },
+  { id: 'guest-001', property_id: PROPERTY_ID, first_name: 'Alice',   last_name: 'Johnson',  email: 'alice.johnson@example.com',  phone: '+1 828 555 0101', billing_address_line1: '42 Lakeview Dr', billing_address_line2: null, billing_city: 'Asheville', billing_state: 'NC', billing_postal_code: '28801', billing_country: 'US', tags: ['vip', 'repeat-guest'], created_at: '2024-03-01T00:00:00Z' },
+  { id: 'guest-002', property_id: PROPERTY_ID, first_name: 'Bob',     last_name: 'Smith',    email: 'bob.smith@example.com',      phone: '+1 828 555 0102', tags: ['non-profit'], is_tax_exempt: true, created_at: '2024-05-15T00:00:00Z' },
+  { id: 'guest-003', property_id: PROPERTY_ID, first_name: 'Carol',   last_name: 'Williams', email: 'carol.w@example.com',        phone: '+1 828 555 0103', tags: [], created_at: '2024-07-20T00:00:00Z' },
+  { id: 'guest-004', property_id: PROPERTY_ID, first_name: 'David',   last_name: 'Lee',      email: 'david.lee@example.com',      phone: '+1 828 555 0104', tags: [], created_at: '2024-09-10T00:00:00Z' },
+  { id: 'guest-005', property_id: PROPERTY_ID, first_name: 'Emma',    last_name: 'Davis',    email: 'emma.davis@example.com',     phone: '+1 828 555 0105', tags: [], created_at: '2024-11-01T00:00:00Z' },
+  { id: 'guest-006', property_id: PROPERTY_ID, first_name: 'Frank',   last_name: 'Martinez', email: 'frank.m@example.com',        phone: '+1 828 555 0106', tags: [], created_at: '2025-01-05T00:00:00Z' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -482,6 +487,41 @@ export const MOCK_ADMIN_ACTIVITY = []
 // Inquiries (guest interest submissions from the booking widget)
 // ---------------------------------------------------------------------------
 
+export const MOCK_DOCUMENTS = [
+  {
+    id: 'doc-001',
+    property_id: PROPERTY_ID,
+    guest_id: MOCK_GUESTS[0]?.id ?? 'g1',
+    reservation_id: null,
+    filename: 'tax_exempt_certificate.pdf',
+    storage_path: `${PROPERTY_ID}/1709000000.pdf`,
+    file_url: 'https://example.com/docs/tax_exempt_certificate.pdf',
+    file_size: 245000,
+    mime_type: 'application/pdf',
+    uploaded_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+    reservations: null,
+    guests: MOCK_GUESTS[0] ? { first_name: MOCK_GUESTS[0].first_name, last_name: MOCK_GUESTS[0].last_name } : null,
+  },
+  {
+    id: 'doc-002',
+    property_id: PROPERTY_ID,
+    guest_id: MOCK_GUESTS[1]?.id ?? 'g2',
+    reservation_id: MOCK_RESERVATIONS[0]?.id ?? 'r1',
+    filename: 'event_contract_2026.docx',
+    storage_path: `${PROPERTY_ID}/1709100000.docx`,
+    file_url: 'https://example.com/docs/event_contract_2026.docx',
+    file_size: 89000,
+    mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    uploaded_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    reservations: MOCK_RESERVATIONS[0] ? { confirmation_number: MOCK_RESERVATIONS[0].confirmation_number } : null,
+    guests: MOCK_GUESTS[1] ? { first_name: MOCK_GUESTS[1].first_name, last_name: MOCK_GUESTS[1].last_name } : null,
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Inquiries (guest interest submissions from the booking widget)
+// ---------------------------------------------------------------------------
+
 export const MOCK_INQUIRIES = [
   {
     id: 'inq-001', property_id: PROPERTY_ID,
@@ -534,3 +574,4 @@ export const MOCK_INQUIRIES = [
     created_at: daysFromNow(-12) + 'T08:00:00Z', updated_at: daysFromNow(-11) + 'T10:30:00Z',
   },
 ]
+

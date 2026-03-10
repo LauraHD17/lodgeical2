@@ -32,6 +32,7 @@ export const ROUTES = [
   { path: '/demo',                 pageName: 'Demo',                isPublic: true },
   { path: '/onboarding',           pageName: 'OnboardingPath',      isPublic: true },
   { path: '/reset-password',       pageName: 'ResetPassword',       isPublic: true },
+  { path: '/browse',               pageName: 'RoomsBrowse',         isPublic: true },
 ]
 
 /** Array of all public paths (used by RouteGuard to skip auth checks) */

@@ -14,13 +14,16 @@ import {
 } from 'recharts'
 import {
   CaretDown, CaretUp, Lightbulb, TrendUp, TrendDown,
-  DownloadSimple, ChartBar,
+  DownloadSimple, ChartBar, ArrowsClockwise, CheckCircle,
+  WarningCircle, SpinnerGap,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
 import { queryKeys } from '@/config/queryKeys'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { DataTable } from '@/components/shared/DataTable'
 import { CHART_COLORS, CHART_AXIS_TICK, CHART_AXIS_TICK_MONO, CHART_GRID_STROKE } from '@/config/chartTokens'
 import { cn } from '@/lib/utils'
 
@@ -630,7 +633,204 @@ export default function Reports() {
             </div>
           </>
         )}
+
+        {/* Stripe Reconciliation */}
+        <StripeReconciliation />
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Stripe Reconciliation Section
+// ---------------------------------------------------------------------------
+
+function StripeReconciliation() {
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const thirtyDaysAgo = format(subMonths(new Date(), 1), 'yyyy-MM-dd')
+
+  const [dateFrom, setDateFrom] = useState(thirtyDaysAgo)
+  const [dateTo, setDateTo] = useState(today)
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  async function runReconciliation() {
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-reconcile`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+        }
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Reconciliation failed')
+      setResult(json)
+    } catch (err) {
+      setError(err.message || 'Failed to run reconciliation')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const DISCREPANCY_COLUMNS = [
+    {
+      key: 'type',
+      label: 'Type',
+      render: (_, row) => {
+        if (row._type === 'mismatch') return <span className="font-body text-[13px] text-warning font-semibold">Amount Mismatch</span>
+        if (row._type === 'stripeOnly') return <span className="font-body text-[13px] text-danger font-semibold">Stripe Only</span>
+        return <span className="font-body text-[13px] text-info font-semibold">Local Only</span>
+      },
+    },
+    {
+      key: 'id',
+      label: 'ID',
+      render: (_, row) => (
+        <span className="font-mono text-[13px]">
+          {row.stripeId || row.localId || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      render: (_, row) => {
+        if (row._type === 'mismatch') {
+          return (
+            <span className="font-mono text-[13px]">
+              Local: ${(row.localAmount / 100).toFixed(2)} / Stripe: ${(row.stripeAmount / 100).toFixed(2)}
+            </span>
+          )
+        }
+        return <span className="font-mono text-[13px]">${((row.amount ?? 0) / 100).toFixed(2)}</span>
+      },
+    },
+  ]
+
+  return (
+    <div className="bg-surface border border-border rounded-[8px] p-6 mt-6">
+      <div className="flex items-center gap-2 mb-4">
+        <ArrowsClockwise size={20} className="text-text-secondary" />
+        <h3 className="font-heading text-[18px] text-text-primary">Stripe Reconciliation</h3>
+      </div>
+      <p className="font-body text-[14px] text-text-secondary mb-4">
+        Compare local payment records with Stripe charges to find discrepancies.
+      </p>
+
+      <div className="flex flex-wrap items-end gap-4 mb-4">
+        <div className="min-w-[160px]">
+          <Input
+            label="From"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+        </div>
+        <div className="min-w-[160px]">
+          <Input
+            label="To"
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          loading={loading}
+          onClick={runReconciliation}
+        >
+          <ArrowsClockwise size={14} weight="bold" /> Run Reconciliation
+        </Button>
+      </div>
+
+      {error && (
+        <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-4">
+          <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
+          <p className="font-body text-[14px] text-danger">{error}</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center gap-2 py-8 justify-center">
+          <SpinnerGap size={20} className="animate-spin text-info" />
+          <span className="font-body text-[14px] text-text-muted">Fetching Stripe data and comparing...</span>
+        </div>
+      )}
+
+      {result && (
+        <div className="flex flex-col gap-4">
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-success-bg border border-success rounded-[8px] p-4 text-center">
+              <p className="font-mono text-[24px] font-bold text-success">{result.summary.matched}</p>
+              <p className="font-body text-[12px] text-success">Matched</p>
+            </div>
+            <div className={cn(
+              'border rounded-[8px] p-4 text-center',
+              result.summary.mismatches > 0 ? 'bg-warning-bg border-warning' : 'bg-surface border-border'
+            )}>
+              <p className={cn('font-mono text-[24px] font-bold', result.summary.mismatches > 0 ? 'text-warning' : 'text-text-muted')}>
+                {result.summary.mismatches}
+              </p>
+              <p className="font-body text-[12px] text-text-secondary">Mismatches</p>
+            </div>
+            <div className={cn(
+              'border rounded-[8px] p-4 text-center',
+              result.summary.stripeOnly > 0 ? 'bg-danger-bg border-danger' : 'bg-surface border-border'
+            )}>
+              <p className={cn('font-mono text-[24px] font-bold', result.summary.stripeOnly > 0 ? 'text-danger' : 'text-text-muted')}>
+                {result.summary.stripeOnly}
+              </p>
+              <p className="font-body text-[12px] text-text-secondary">Stripe Only</p>
+            </div>
+            <div className={cn(
+              'border rounded-[8px] p-4 text-center',
+              result.summary.localOnly > 0 ? 'bg-info-bg border-info' : 'bg-surface border-border'
+            )}>
+              <p className={cn('font-mono text-[24px] font-bold', result.summary.localOnly > 0 ? 'text-info' : 'text-text-muted')}>
+                {result.summary.localOnly}
+              </p>
+              <p className="font-body text-[12px] text-text-secondary">Local Only</p>
+            </div>
+          </div>
+
+          {/* Clean status */}
+          {result.summary.mismatches === 0 && result.summary.stripeOnly === 0 && result.summary.localOnly === 0 && (
+            <div className="flex items-center gap-2 p-4 bg-success-bg border border-success rounded-[8px]">
+              <CheckCircle size={18} weight="fill" className="text-success" />
+              <p className="font-body text-[14px] text-success font-semibold">
+                All {result.summary.matched} transactions match. No discrepancies found.
+              </p>
+            </div>
+          )}
+
+          {/* Discrepancy table */}
+          {(result.mismatches?.length > 0 || result.stripeOnly?.length > 0 || result.localOnly?.length > 0) && (
+            <div className="border border-border rounded-[8px] overflow-hidden">
+              <DataTable
+                columns={DISCREPANCY_COLUMNS}
+                data={[
+                  ...(result.mismatches ?? []).map(r => ({ ...r, _type: 'mismatch' })),
+                  ...(result.stripeOnly ?? []).map(r => ({ ...r, _type: 'stripeOnly' })),
+                  ...(result.localOnly ?? []).map(r => ({ ...r, _type: 'localOnly' })),
+                ]}
+                emptyState={<p className="text-text-muted font-body text-[14px] py-4">No discrepancies</p>}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

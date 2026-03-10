@@ -365,7 +365,7 @@ function Step3Guest({ form, maxGuests, emailDebounced }) {
   )
 }
 
-function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSubmit, loading, conflict, error, feesData, propertySettings }) {
+function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSubmit, loading, conflict, error, feesData, propertySettings, isEditMode, notifyGuest, onNotifyChange }) {
   const nightlyTotal = selectedRooms.reduce((sum, r) => sum + (r.base_rate_cents ?? 0), 0)
   const nightsSubtotalCents = nightlyTotal * nights
 
@@ -500,6 +500,22 @@ function Step4Review({ checkIn, checkOut, selectedRooms, guestData, nights, onSu
       {error && !conflict && (
         <div className="bg-danger-bg border border-danger rounded-[6px] p-3">
           <p className="font-body text-[14px] text-danger">{error}</p>
+        </div>
+      )}
+
+      {isEditMode && (
+        <div className="flex items-center gap-3 p-3 bg-surface border border-border rounded-[6px]">
+          <input
+            id="notify-guest-checkbox"
+            type="checkbox"
+            checked={notifyGuest}
+            onChange={(e) => onNotifyChange(e.target.checked)}
+            className="w-4 h-4 accent-info cursor-pointer"
+          />
+          <label htmlFor="notify-guest-checkbox" className="cursor-pointer">
+            <span className="font-body text-[14px] text-text-primary">Notify guest of changes</span>
+            <p className="font-body text-[12px] text-text-muted">Send an email with updated reservation details</p>
+          </label>
         </div>
       )}
 
@@ -698,6 +714,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
   const [emailDebounced, setEmailDebounced] = useState('')
   const [conflict, setConflict] = useState(null)
   const [submitError, setSubmitError] = useState(null)
+  const [notifyGuest, setNotifyGuest] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [checkingConflicts, setCheckingConflicts] = useState(false)
   const [earlyConflict, setEarlyConflict] = useState(null)
@@ -817,6 +834,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
     setConflict(null)
     setSubmitError(null)
     setSkipBuffers(false)
+    setNotifyGuest(false)
     setFeesData({ cleaningFeeWaived: false, cleaningFeeWaiveReason: '', petFeeApplied: false, taxExempt: false, taxExemptOrg: '', miscFeeEnabled: false, miscFeeCents: 0, miscFeeDollars: '', miscFeeLabel: '' })
     form.reset()
   }
@@ -900,7 +918,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
     }
 
     const mutation = isEditMode
-      ? updateReservation.mutateAsync({ ...payload, id: reservationToEdit.id })
+      ? updateReservation.mutateAsync({ ...payload, id: reservationToEdit.id, send_notification: notifyGuest })
       : createReservation.mutateAsync(payload)
 
     try {
@@ -1027,6 +1045,9 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
           error={submitError}
           feesData={feesData}
           propertySettings={propertySettings}
+          isEditMode={isEditMode}
+          notifyGuest={notifyGuest}
+          onNotifyChange={setNotifyGuest}
         />
       )}
 

@@ -1,61 +1,79 @@
 // src/pages/admin/Documents.jsx
-// Documents management page.
+// Documents management page with upload, list, and delete.
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { UploadSimple, DownloadSimple, Trash, File, Info } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { UploadSimple, DownloadSimple, Trash, File, Info, X, CloudArrowUp } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
+import { useDocuments, useUploadDocument, useDeleteDocument } from '@/hooks/useDocuments'
+import { queryKeys } from '@/config/queryKeys'
 import { DataTable } from '@/components/shared/DataTable'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/useToast'
 
-function useDocuments() {
+const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
+
+function formatFileSize(bytes) {
+  if (!bytes) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export default function Documents() {
   const { propertyId } = useProperty()
-  return useQuery({
-    queryKey: ['documents', propertyId],
+  const { data: documents = [], isLoading } = useDocuments()
+  const uploadDocument = useUploadDocument()
+  const deleteDocument = useDeleteDocument()
+  const { addToast } = useToast()
+
+  const [confirmState, setConfirmState] = useState(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [selectedGuestId, setSelectedGuestId] = useState('')
+  const [selectedReservationId, setSelectedReservationId] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
+  const fileInputRef = useRef(null)
+
+  // Fetch guests for the dropdown
+  const { data: guests = [] } = useQuery({
+    queryKey: queryKeys.guests.list(''),
     queryFn: async () => {
       if (!propertyId) return []
       const { data, error } = await supabase
-        .from('documents')
-        .select(`
-          id, filename, file_url, uploaded_at, reservation_id, guest_id,
-          reservations(confirmation_number),
-          guests(first_name, last_name)
-        `)
+        .from('guests')
+        .select('id, first_name, last_name, email')
         .eq('property_id', propertyId)
-        .order('uploaded_at', { ascending: false })
+        .order('last_name')
+        .limit(200)
       if (error) return []
       return data ?? []
     },
-    enabled: !!propertyId,
+    enabled: !!propertyId && uploadOpen,
   })
-}
 
-function useDeleteDocument() {
-  const queryClient = useQueryClient()
-  const { propertyId } = useProperty()
-  return useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from('documents').delete().eq('id', id)
-      if (error) throw error
+  // Fetch reservations for the dropdown
+  const { data: reservations = [] } = useQuery({
+    queryKey: queryKeys.reservations.list({ forDocuments: true }),
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('id, confirmation_number, check_in, guests(first_name, last_name)')
+        .eq('property_id', propertyId)
+        .order('check_in', { ascending: false })
+        .limit(100)
+      if (error) return []
+      return data ?? []
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documents', propertyId] })
-    },
+    enabled: !!propertyId && uploadOpen,
   })
-}
-
-const STORAGE_CONFIGURED = !!import.meta.env.VITE_SUPABASE_STORAGE_BUCKET
-
-export default function Documents() {
-  const { data: documents = [], isLoading } = useDocuments()
-  const deleteDocument = useDeleteDocument()
-  const { addToast } = useToast()
-  const [confirmState, setConfirmState] = useState(null)
 
   function handleDelete(doc) {
     setConfirmState({
@@ -63,7 +81,7 @@ export default function Documents() {
       description: 'This document will be permanently deleted.',
       onConfirm: async () => {
         try {
-          await deleteDocument.mutateAsync(doc.id)
+          await deleteDocument.mutateAsync({ id: doc.id, storagePath: doc.storage_path })
           addToast({ message: 'Document deleted', variant: 'success' })
         } catch {
           addToast({ message: 'Failed to delete document', variant: 'error' })
@@ -72,23 +90,73 @@ export default function Documents() {
     })
   }
 
-  function handleUpload() {
-    if (!STORAGE_CONFIGURED) {
-      addToast({ message: 'Storage not configured. Upload coming soon.', variant: 'info' })
+  function openUploadDialog() {
+    setSelectedFile(null)
+    setSelectedGuestId('')
+    setSelectedReservationId('')
+    setUploadOpen(true)
+  }
+
+  function handleFileSelect(file) {
+    if (!file) return
+    if (file.size > MAX_FILE_SIZE) {
+      addToast({ message: 'File exceeds 10 MB limit', variant: 'error' })
       return
     }
-    // Placeholder: in production, trigger file picker
-    addToast({ message: 'Upload feature coming soon', variant: 'info' })
+    setSelectedFile(file)
+  }
+
+  function handleFileInputChange(e) {
+    handleFileSelect(e.target.files?.[0])
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setIsDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    handleFileSelect(file)
+  }
+
+  async function handleUploadSubmit() {
+    if (!selectedFile) return
+    try {
+      await uploadDocument.mutateAsync({
+        file: selectedFile,
+        guestId: selectedGuestId || null,
+        reservationId: selectedReservationId || null,
+      })
+      addToast({ message: 'Document uploaded successfully', variant: 'success' })
+      setUploadOpen(false)
+    } catch {
+      addToast({ message: 'Failed to upload document', variant: 'error' })
+    }
   }
 
   const COLUMNS = [
     {
       key: 'filename',
       label: 'Filename',
-      render: (val) => (
+      render: (val, row) => (
         <div className="flex items-center gap-2">
           <File size={16} className="text-text-muted shrink-0" />
-          <span className="font-body text-[14px]">{val ?? '—'}</span>
+          <div className="flex flex-col">
+            <span className="font-body text-[14px]">{val ?? '—'}</span>
+            {row.file_size && (
+              <span className="font-mono text-[12px] text-text-muted">
+                {formatFileSize(row.file_size)}
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
@@ -150,20 +218,10 @@ export default function Documents() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-[32px] text-text-primary uppercase">Documents</h1>
-        <Button variant="primary" size="md" onClick={handleUpload}>
+        <Button variant="primary" size="md" onClick={openUploadDialog}>
           <UploadSimple size={16} weight="bold" /> Upload Document
         </Button>
       </div>
-
-      {/* Storage info banner */}
-      {!STORAGE_CONFIGURED && (
-        <div className="bg-info-bg border border-info rounded-[8px] p-4 flex items-start gap-3">
-          <Info size={18} className="text-info shrink-0 mt-0.5" />
-          <p className="font-body text-[14px] text-info">
-            Upload and signing features coming soon. Configure Supabase Storage to enable document uploads.
-          </p>
-        </div>
-      )}
 
       {/* Documents Table */}
       <div className="border border-border rounded-[8px] overflow-hidden">
@@ -175,13 +233,136 @@ export default function Documents() {
             <div className="flex flex-col items-center gap-3 py-12">
               <File size={18} weight="fill" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No documents yet</p>
-              <Button variant="secondary" size="sm" onClick={handleUpload}>
+              <Button variant="secondary" size="sm" onClick={openUploadDialog}>
                 <UploadSimple size={14} /> Upload first document
               </Button>
             </div>
           }
         />
       </div>
+
+      {/* Upload Dialog */}
+      <Modal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        title="Upload Document"
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            <Button variant="secondary" size="md" onClick={() => setUploadOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleUploadSubmit}
+              disabled={!selectedFile || uploadDocument.isPending}
+            >
+              {uploadDocument.isPending ? 'Uploading...' : 'Upload'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-5">
+          {/* Drop zone */}
+          <div
+            role="button"
+            tabIndex={0}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click() } }}
+            className={`
+              flex flex-col items-center justify-center gap-3 py-10 px-6
+              border-2 border-dashed rounded-[8px] cursor-pointer transition-colors
+              ${isDragOver
+                ? 'border-info bg-info-bg'
+                : selectedFile
+                  ? 'border-success bg-success-bg'
+                  : 'border-border hover:border-text-muted'
+              }
+            `}
+          >
+            {selectedFile ? (
+              <>
+                <File size={28} weight="fill" className="text-success" />
+                <div className="text-center">
+                  <p className="font-body text-[15px] text-text-primary">{selectedFile.name}</p>
+                  <p className="font-mono text-[13px] text-text-secondary">
+                    {formatFileSize(selectedFile.size)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSelectedFile(null) }}
+                  className="inline-flex items-center gap-1 text-danger hover:underline font-body text-[13px]"
+                >
+                  <X size={14} weight="bold" /> Remove
+                </button>
+              </>
+            ) : (
+              <>
+                <CloudArrowUp size={28} weight="fill" className="text-text-muted" />
+                <p className="font-body text-[15px] text-text-secondary text-center">
+                  Drag and drop a file here, or click to browse
+                </p>
+                <p className="font-body text-[13px] text-text-muted">
+                  PDF, JPG, PNG, DOC, DOCX — max 10 MB
+                </p>
+              </>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_TYPES}
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+          </div>
+
+          {/* Guest selector */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="doc-guest" className="font-body text-[13px] font-semibold text-text-secondary tracking-[0.08em] uppercase">
+              Guest (optional)
+            </label>
+            <select
+              id="doc-guest"
+              value={selectedGuestId}
+              onChange={(e) => setSelectedGuestId(e.target.value)}
+              className="h-[44px] border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            >
+              <option value="">None</option>
+              {guests.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.first_name} {g.last_name}{g.email ? ` (${g.email})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reservation selector */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="doc-reservation" className="font-body text-[13px] font-semibold text-text-secondary tracking-[0.08em] uppercase">
+              Reservation (optional)
+            </label>
+            <select
+              id="doc-reservation"
+              value={selectedReservationId}
+              onChange={(e) => setSelectedReservationId(e.target.value)}
+              className="h-[44px] border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            >
+              <option value="">None</option>
+              {reservations.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.confirmation_number}
+                  {r.guests ? ` — ${r.guests.first_name} ${r.guests.last_name}` : ''}
+                  {r.check_in ? ` (${r.check_in})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={!!confirmState}

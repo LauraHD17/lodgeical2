@@ -123,7 +123,7 @@ describe('Schema: migration files exist', () => {
     const { join } = await import('path')
     const migrationsDir = join(process.cwd(), 'supabase/migrations')
     const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
-    expect(files).toHaveLength(41)
+    expect(files).toHaveLength(45)
 
     const expectedFiles = [
       '001_properties.sql',
@@ -167,6 +167,10 @@ describe('Schema: migration files exist', () => {
       '035_security_hardening.sql',
       '036_guest_billing_address.sql',
       '037_fix_room_color_default.sql',
+      '038_documents.sql',
+      '039_policies.sql',
+      '040_daily_digest.sql',
+      '041_reconciliation.sql',
     ]
     for (const expected of expectedFiles) {
       expect(files).toContain(expected)

@@ -106,6 +106,15 @@ export default function Settings() {
     pet_fee_cents: 0, pet_fee_type: 'flat', pass_through_stripe_fee: false,
   })
 
+  // Policies tab state
+  const [policies, setPolicies] = useState({
+    terms_and_conditions: '', cancellation_policy_text: '',
+    incidental_policy: '', marketing_policy: '',
+  })
+
+  // Daily digest toggle (saved with property tab)
+  const [dailyDigest, setDailyDigest] = useState(false)
+
   useEffect(() => {
     if (settings) {
       setProperty({
@@ -130,6 +139,13 @@ export default function Settings() {
         pet_fee_type: settings.pet_fee_type ?? 'flat',
         pass_through_stripe_fee: settings.pass_through_stripe_fee ?? false,
       })
+      setPolicies({
+        terms_and_conditions: settings.terms_and_conditions ?? '',
+        cancellation_policy_text: settings.cancellation_policy_text ?? '',
+        incidental_policy: settings.incidental_policy ?? '',
+        marketing_policy: settings.marketing_policy ?? '',
+      })
+      setDailyDigest(settings.daily_digest_enabled ?? false)
     }
   }, [settings])
 
@@ -197,7 +213,7 @@ export default function Settings() {
 
       <Tabs.Root defaultValue="property">
         <Tabs.List className="flex gap-0 border-b border-border mb-6 overflow-x-auto">
-          {['property', 'checkin', 'tax', 'team', 'ical', 'sync', 'widget'].map((tab) => (
+          {['property', 'checkin', 'tax', 'policies', 'team', 'ical', 'sync', 'widget'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
@@ -209,7 +225,8 @@ export default function Settings() {
             >
               {tab === 'property' && 'Property'}
               {tab === 'checkin' && 'Check-in/out'}
-              {tab === 'tax' && 'Tax & Policy'}
+              {tab === 'tax' && 'Tax & Fees'}
+              {tab === 'policies' && 'Policies'}
               {tab === 'team' && 'Team'}
               {tab === 'ical' && 'iCal Feeds'}
               {tab === 'sync' && 'Channel Sync'}
@@ -295,11 +312,31 @@ export default function Settings() {
               />
             </div>
 
+            <SectionHeader>Notifications</SectionHeader>
+            <div className="flex items-center gap-3">
+              <Switch.Root
+                checked={dailyDigest}
+                onCheckedChange={setDailyDigest}
+                className={cn(
+                  'w-10 h-6 rounded-full transition-colors',
+                  dailyDigest ? 'bg-success' : 'bg-border'
+                )}
+              >
+                <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow transition-transform translate-x-1 data-[state=checked]:translate-x-5" />
+              </Switch.Root>
+              <span className="font-body text-[14px] text-text-secondary">
+                Send daily morning digest
+              </span>
+            </div>
+            <p className="font-body text-[12px] text-text-muted -mt-3">
+              Owners and managers receive a daily email summary of arrivals and departures.
+            </p>
+
             <Button
               variant="primary"
               size="md"
               loading={saving}
-              onClick={() => saveTab(property)}
+              onClick={() => saveTab({ ...property, daily_digest_enabled: dailyDigest })}
               className="self-start"
             >
               Save Property Settings
@@ -460,6 +497,91 @@ export default function Settings() {
               className="self-start"
             >
               Save Tax & Policy Settings
+            </Button>
+          </div>
+        </Tabs.Content>
+
+        {/* Policies Tab */}
+        <Tabs.Content value="policies">
+          <div className="max-w-lg flex flex-col gap-5">
+            <SectionHeader>Guest Policies</SectionHeader>
+            <p className="font-body text-[14px] text-text-secondary -mt-3">
+              Guests must accept these policies before completing a booking. Leave blank to skip a policy.
+            </p>
+
+            <div className="flex flex-col">
+              <label htmlFor="settings-terms" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Terms & Conditions
+              </label>
+              <textarea
+                id="settings-terms"
+                rows={6}
+                value={policies.terms_and_conditions}
+                onChange={(e) => setPolicies((p) => ({ ...p, terms_and_conditions: e.target.value }))}
+                placeholder="Enter your terms and conditions..."
+                className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[14px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-y"
+              />
+              <p className="mt-1 font-body text-[12px] text-text-muted">
+                {policies.terms_and_conditions.length} characters
+              </p>
+            </div>
+
+            <div className="flex flex-col">
+              <label htmlFor="settings-cancellation-text" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Cancellation Policy (Custom Text)
+              </label>
+              <textarea
+                id="settings-cancellation-text"
+                rows={4}
+                value={policies.cancellation_policy_text}
+                onChange={(e) => setPolicies((p) => ({ ...p, cancellation_policy_text: e.target.value }))}
+                placeholder="Detailed cancellation policy text shown to guests..."
+                className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[14px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-y"
+              />
+              <p className="mt-1 font-body text-[12px] text-text-muted">
+                Supplements the cancellation tier selected in Tax & Fees. {policies.cancellation_policy_text.length} characters
+              </p>
+            </div>
+
+            <div className="flex flex-col">
+              <label htmlFor="settings-incidental" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Incidental Policy
+              </label>
+              <textarea
+                id="settings-incidental"
+                rows={4}
+                value={policies.incidental_policy}
+                onChange={(e) => setPolicies((p) => ({ ...p, incidental_policy: e.target.value }))}
+                placeholder="Policy for incidental charges, damages, etc..."
+                className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[14px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-y"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label htmlFor="settings-marketing" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+                Marketing Policy
+              </label>
+              <textarea
+                id="settings-marketing"
+                rows={4}
+                value={policies.marketing_policy}
+                onChange={(e) => setPolicies((p) => ({ ...p, marketing_policy: e.target.value }))}
+                placeholder="Marketing opt-in language (optional, shown as optional checkbox to guests)..."
+                className="border-[1.5px] border-border rounded-[6px] px-3 py-2 font-body text-[14px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2 resize-y"
+              />
+              <p className="mt-1 font-body text-[12px] text-text-muted">
+                If set, guests see an optional &quot;I&apos;d like to receive marketing communications&quot; checkbox at booking.
+              </p>
+            </div>
+
+            <Button
+              variant="primary"
+              size="md"
+              loading={saving}
+              onClick={() => saveTab(policies)}
+              className="self-start"
+            >
+              Save Policies
             </Button>
           </div>
         </Tabs.Content>

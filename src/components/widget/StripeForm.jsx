@@ -5,7 +5,7 @@ import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/Button'
 import { fmtMoney as formatCents } from '@/lib/utils'
 
-export function StripeForm({ totalCents, onSuccess, onError }) {
+export function StripeForm({ totalCents, onSuccess, onError, disabled }) {
   const stripe = useStripe()
   const elements = useElements()
   const [paying, setPaying] = useState(false)
@@ -37,6 +37,7 @@ export function StripeForm({ totalCents, onSuccess, onError }) {
         variant="primary"
         size="lg"
         loading={paying}
+        disabled={disabled || paying}
         onClick={handlePay}
         className="w-full mt-4"
       >
