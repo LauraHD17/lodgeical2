@@ -33,6 +33,7 @@ const TABLE_DATA = {
 // ---------------------------------------------------------------------------
 class MockQueryBuilder {
   constructor(table) {
+    this._table   = table
     this._data    = [...(TABLE_DATA[table] ?? [])]
     this._method  = 'select'
     this._body    = null
