@@ -52,7 +52,7 @@ export function AdminLayout({ children }) {
             <div className="flex items-center gap-2.5 min-w-0">
               <Flask size={16} weight="fill" className="text-warning shrink-0" />
               <span className="font-body text-[14px] font-semibold text-warning">
-                Exploring Sunrise Lodge
+                Exploring Lodge-ical
               </span>
               <span className="font-body text-[13px] text-text-secondary hidden sm:inline">
                 — a sample inn. Click anything. Nothing is saved.

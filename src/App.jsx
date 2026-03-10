@@ -42,6 +42,7 @@ const Invoice             = lazy(() => import('@/pages/public/Invoice'))
 const GuestCheckIn        = lazy(() => import('@/pages/public/GuestCheckIn'))
 const Demo                = lazy(() => import('@/pages/public/Demo'))
 const OnboardingPath      = lazy(() => import('@/pages/public/OnboardingPath'))
+const ResetPassword       = lazy(() => import('@/pages/public/ResetPassword'))
 
 // Map pageName strings (from routes.js) to lazy-loaded components
 const pageMap = {
@@ -68,6 +69,7 @@ const pageMap = {
   GuestCheckIn,
   Demo,
   OnboardingPath,
+  ResetPassword,
 }
 
 const queryClient = new QueryClient({

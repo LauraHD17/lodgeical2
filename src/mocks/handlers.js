@@ -9,7 +9,7 @@ import {
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
   MOCK_CONTACTS, MOCK_MAINTENANCE_TICKETS, MOCK_PAYMENTS,
   MOCK_EMAIL_LOGS, MOCK_GUEST_ACTIVITY, MOCK_ROOM_LINKS,
-  MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES,
+  MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES, MOCK_ADMIN_ACTIVITY,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -547,5 +547,13 @@ export const handlers = [
     const row = { id: `batch-${Date.now()}`, ...body, created_at: new Date().toISOString() }
     return pgRespond(request, row)
   }),
+
+  // -------------------------------------------------------------------------
+  // admin_activity
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/admin_activity`, ({ request }) =>
+    pgRespond(request, MOCK_ADMIN_ACTIVITY),
+  ),
 
 ]

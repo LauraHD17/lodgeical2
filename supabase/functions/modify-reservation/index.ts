@@ -6,6 +6,7 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
+import { logAdminAction } from '../_shared/audit.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
 import { getStripe } from '../_shared/stripe.ts'
 import { sendModificationConfirmation } from '../_shared/email.ts'
@@ -220,6 +221,10 @@ serve(async (req) => {
     console.error('[modify-reservation] update error:', updateError)
     return new Response(JSON.stringify({ error: 'Failed to apply modification' }), { status: 500, headers: CORS_HEADERS })
   }
+
+  // Audit log (fire-and-forget)
+  logAdminAction(supabase, reservation.property_id, reservation.guest_id, 'modify', 'reservation', reservation_id)
+    .catch(e => console.error('[modify-reservation] audit error:', e))
 
   // Send modification confirmation email (fire-and-forget)
   sendModificationConfirmation(

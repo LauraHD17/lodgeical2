@@ -211,6 +211,18 @@ const FAQ_ITEMS = [
     q: 'How do I set seasonal pricing?',
     a: 'Go to the Rates page and click "+ Add Seasonal Rate" for any room. Set a date range and a custom nightly rate. Seasonal rates override the base rate for those specific dates — great for holidays, peak weekends, or quiet seasons.',
   },
+  {
+    q: 'How do I reset my password?',
+    a: 'Click "Forgot password?" on the login page and enter your email address. You\'ll receive a link to set a new password. The link expires after 1 hour.',
+  },
+  {
+    q: 'How do I create a new account?',
+    a: 'On the login page, click "Don\'t have an account? Create one". Enter your property name, email, and a password. You\'ll be guided through an onboarding flow to set up your property.',
+  },
+  {
+    q: 'How do I add staff members?',
+    a: 'Go to Settings → Team. Click "Invite member", enter their email address, and choose a role (manager or staff). Managers can do everything except change settings. Staff have view-only access plus guest, document, messaging, and maintenance management.',
+  },
 ]
 
 // ---------------------------------------------------------------------------

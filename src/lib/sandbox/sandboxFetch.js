@@ -59,6 +59,14 @@ const EDGE_RESPONSES = {
   'merge-guests': () => ({ success: true, merged_id: 'guest-001' }),
 
   'guest-portal-update': () => ({ success: true }),
+
+  'provision-property': (body) => ({
+    property: {
+      id: `prop-${Date.now()}`,
+      name: body?.property_name ?? 'My Inn',
+      slug: (body?.property_name ?? 'my-inn').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    },
+  }),
 }
 
 function extractFunctionName(url) {

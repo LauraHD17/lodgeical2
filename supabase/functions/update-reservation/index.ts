@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
+import { logAdminAction } from '../_shared/audit.ts'
 import { checkConflicts } from '../_shared/conflicts.ts'
 
 const CORS_HEADERS = {
@@ -27,14 +28,14 @@ const inputSchema = z.object({
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  const rateLimitError = rateLimit(req)
-  if (rateLimitError) return rateLimitError
-
   const authResult = await requireAuth(req)
   if (authResult.error) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS_HEADERS })
   }
-  const { propertyId } = authResult
+  const { propertyId, user } = authResult
+
+  const rateLimitError = await rateLimit(req, 30, 60_000, propertyId)
+  if (rateLimitError) return rateLimitError
 
   let body: unknown
   try { body = await req.json() } catch {
@@ -123,6 +124,10 @@ serve(async (req) => {
   if (updateError) {
     return new Response(JSON.stringify({ error: 'Failed to update reservation' }), { status: 500, headers: CORS_HEADERS })
   }
+
+  // Audit log (fire-and-forget)
+  logAdminAction(supabase, propertyId, user.id, 'update', 'reservation', input.reservation_id)
+    .catch(e => console.error('[update-reservation] audit error:', e))
 
   return new Response(JSON.stringify({ success: true, reservation: updated }), { headers: CORS_HEADERS })
 })

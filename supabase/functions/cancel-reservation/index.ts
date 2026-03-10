@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
+import { logAdminAction } from '../_shared/audit.ts'
 import { getStripe } from '../_shared/stripe.ts'
 import { sendCancellationNotice } from '../_shared/email.ts'
 
@@ -91,15 +92,13 @@ function getPolicyNote(policy: string, checkInDate: string, today: string = new 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  const rateLimitError = rateLimit(req)
-  if (rateLimitError) return rateLimitError
-
   // A request is a guest (unauthenticated) request if it carries no Authorization header.
   // Admin requests must supply a valid JWT; guest requests must supply identity fields in
   // the body so we can verify them against the reservation record.
   const hasAuthHeader = !!req.headers.get('authorization')
   const isGuestRequest = !hasAuthHeader
   let propertyId: string | null = null
+  let userId: string | null = null
 
   if (!isGuestRequest) {
     const authResult = await requireAuth(req)
@@ -107,7 +106,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS_HEADERS })
     }
     propertyId = authResult.propertyId
+    userId = authResult.user.id
   }
+
+  // Rate limit (property-scoped for admin, IP-only for guest)
+  const rateLimitError = await rateLimit(req, 30, 60_000, propertyId ?? undefined)
+  if (rateLimitError) return rateLimitError
 
   let body: unknown
   try { body = await req.json() } catch {
@@ -223,6 +227,12 @@ serve(async (req) => {
     .from('reservations')
     .update({ status: 'cancelled' })
     .eq('id', parsed.data.reservation_id)
+
+  // Audit log (fire-and-forget, admin requests only)
+  if (!isGuestRequest && propertyId && userId) {
+    logAdminAction(supabase, propertyId, userId, 'cancel', 'reservation', parsed.data.reservation_id)
+      .catch(e => console.error('[cancel-reservation] audit error:', e))
+  }
 
   // Send cancellation email (fire-and-forget — don't block the response)
   sendCancellationNotice(reservation.guests, reservation, refundCents, supabase).catch(e =>

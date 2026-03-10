@@ -7,7 +7,7 @@ import {
   MOCK_USER, MOCK_SESSION,
   MOCK_PROPERTY, MOCK_USER_ACCESS, MOCK_SETTINGS,
   MOCK_ROOMS, MOCK_GUESTS, MOCK_RESERVATIONS,
-  MOCK_EMAIL_LOGS, MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES,
+  MOCK_EMAIL_LOGS, MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES, MOCK_ADMIN_ACTIVITY,
 } from './db.js'
 
 // ---------------------------------------------------------------------------
@@ -25,6 +25,7 @@ const TABLE_DATA = {
   email_logs:           MOCK_EMAIL_LOGS,
   onboarding_state:     [MOCK_ONBOARDING_STATE],
   import_batches:       MOCK_IMPORT_BATCHES,
+  admin_activity:       MOCK_ADMIN_ACTIVITY,
 }
 
 // ---------------------------------------------------------------------------

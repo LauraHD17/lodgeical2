@@ -13,6 +13,7 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient }        from 'https://esm.sh/@supabase/supabase-js@2'
 import { requireAuth }         from '../_shared/auth.ts'
+import { rateLimit }           from '../_shared/rateLimit.ts'
 import { parseIcs, deriveConfirmationNumber } from '../_shared/ical.ts'
 
 const CORS_HEADERS = {
@@ -62,6 +63,10 @@ serve(async (req) => {
     })
   }
   const { propertyId } = authResult
+
+  // Rate limit (property-scoped)
+  const rateLimitError = await rateLimit(req, 30, 60_000, propertyId)
+  if (rateLimitError) return rateLimitError
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

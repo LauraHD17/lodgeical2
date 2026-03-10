@@ -469,3 +469,5 @@ export const MOCK_ONBOARDING_STATE = {
 // Import batches
 // ---------------------------------------------------------------------------
 export const MOCK_IMPORT_BATCHES = []
+
+export const MOCK_ADMIN_ACTIVITY = []

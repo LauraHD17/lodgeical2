@@ -52,3 +52,35 @@ export async function requireAuth(req: Request): Promise<AuthResult | AuthError>
 
   return { user: { id: user.id, email: user.email! }, propertyId: access.property_id }
 }
+
+export interface UserResult {
+  user: { id: string; email: string }
+  error?: never
+}
+
+/**
+ * Validate the JWT from the Authorization header.
+ * Returns user only — does NOT look up property access.
+ * Use this for endpoints where the user may not have a property yet (e.g., provisioning).
+ */
+export async function requireUser(req: Request): Promise<UserResult | AuthError> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { error: 'Missing Authorization header' }
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+
+  // Verify the JWT by calling getUser (validates signature + expiry)
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) {
+    return { error: 'Invalid or expired token' }
+  }
+
+  return { user: { id: user.id, email: user.email! } }
+}

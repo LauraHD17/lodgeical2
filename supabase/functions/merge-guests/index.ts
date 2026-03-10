@@ -5,6 +5,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { rateLimit } from '../_shared/rateLimit.ts'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,6 +89,10 @@ serve(async (req: Request) => {
       })
     }
 
+    // Rate limit (property-scoped)
+    const rateLimitError = await rateLimit(req, 30, 60_000, primaryGuest.property_id)
+    if (rateLimitError) return rateLimitError
+
     // Enforce same-property constraint — prevents cross-tenant data corruption
     if (primaryGuest.property_id !== secondaryGuest.property_id) {
       return new Response(
@@ -127,6 +133,10 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    // Audit log (fire-and-forget)
+    logAdminAction(adminClient, primaryGuest.property_id, user.id, 'merge', 'guest', primary_guest_id, { mergedIds: [secondary_guest_id] })
+      .catch(e => console.error('[merge-guests] audit error:', e))
 
     return new Response(
       JSON.stringify({

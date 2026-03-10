@@ -13,12 +13,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 export async function rateLimit(
   req: Request,
   maxRequests = 30,
-  windowMs = 60_000
+  windowMs = 60_000,
+  propertyId?: string
 ): Promise<Response | null> {
   const ip =
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
     req.headers.get('x-real-ip') ??
     'unknown'
+
+  const key = propertyId ? `${propertyId}:${ip}` : ip
 
   // Round down to the start of the current window
   const now = Date.now()
@@ -32,7 +35,7 @@ export async function rateLimit(
   // Atomically increment the counter for this (ip, window) pair.
   // The UNIQUE PRIMARY KEY (key, window_start) ensures no double-counting.
   const { data, error } = await supabase.rpc('increment_rate_limit', {
-    p_key: ip,
+    p_key: key,
     p_window_start: windowStart,
   })
 

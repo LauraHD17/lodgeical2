@@ -14,6 +14,8 @@ import { serve }        from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z }            from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth }  from '../_shared/auth.ts'
+import { rateLimit }    from '../_shared/rateLimit.ts'
+import { logAdminAction } from '../_shared/audit.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -59,7 +61,11 @@ serve(async (req) => {
       headers: CORS_HEADERS,
     })
   }
-  const { propertyId } = authResult
+  const { propertyId, user } = authResult
+
+  // Rate limit (property-scoped)
+  const rateLimitError = await rateLimit(req, 30, 60_000, propertyId)
+  if (rateLimitError) return rateLimitError
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -174,6 +180,10 @@ serve(async (req) => {
       imported++
     }
   }
+
+  // Audit log (fire-and-forget)
+  logAdminAction(supabase, propertyId, user.id, 'import', 'reservation', null, { count: imported, fileName: 'csv-import' })
+    .catch(e => console.error('[import-csv] audit error:', e))
 
   return new Response(
     JSON.stringify({ success: true, imported, skipped, errors }),

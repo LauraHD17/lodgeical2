@@ -9,6 +9,7 @@
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { rateLimit } from '../_shared/rateLimit.ts'
 import { icsEscape, toIcsDate, toIcsDateTime } from '../_shared/ical.ts'
 
 const ICAL_CONTENT_TYPE = 'text/calendar; charset=utf-8'
@@ -30,6 +31,10 @@ serve(async (req) => {
   if (!token || !/^[0-9a-f-]{36}$/.test(token)) {
     return new Response('Missing or invalid token', { status: 400 })
   }
+
+  // Rate limit (IP-only since this is token-based auth)
+  const rateLimitError = await rateLimit(req, 30, 60_000)
+  if (rateLimitError) return rateLimitError
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

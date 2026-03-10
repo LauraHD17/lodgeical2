@@ -23,7 +23,7 @@ export function exitSandbox() {
 // Shared teardown: deactivates mock client, clears session flag, removes fetch interceptor.
 // Callers handle navigation themselves after calling this.
 export async function leaveSandbox() {
-  const { deactivateSandbox } = await import('@/lib/supabaseClient')
+  const { deactivateSandbox } = await import(/* @vite-ignore */ '../supabaseClient.js')
   const { removeSandboxFetch } = await import('@/lib/sandbox/sandboxFetch')
   deactivateSandbox()
   exitSandbox()

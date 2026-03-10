@@ -22,9 +22,6 @@ const inputSchema = z.object({
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  const rateLimitError = rateLimit(req)
-  if (rateLimitError) return rateLimitError
-
   // Support admin and guest portal
   const isGuestRequest = req.headers.get('x-guest-payment') === 'true'
   let propertyId: string | null = null
@@ -36,6 +33,10 @@ serve(async (req) => {
     }
     propertyId = authResult.propertyId
   }
+
+  // Rate limit (property-scoped for admin, IP-only for guest)
+  const rateLimitError = await rateLimit(req, 30, 60_000, propertyId ?? undefined)
+  if (rateLimitError) return rateLimitError
 
   let body: unknown
   try { body = await req.json() } catch {

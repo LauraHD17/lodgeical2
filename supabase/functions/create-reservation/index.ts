@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
+import { logAdminAction } from '../_shared/audit.ts'
 import { sendBookingConfirmation } from '../_shared/email.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
 import { checkConflicts } from '../_shared/conflicts.ts'
@@ -44,16 +45,16 @@ function generateConfirmationNumber(): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  // 1. Rate limit
-  const rateLimitError = rateLimit(req)
-  if (rateLimitError) return rateLimitError
-
-  // 2. Auth
+  // 1. Auth
   const authResult = await requireAuth(req)
   if (authResult.error) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS_HEADERS })
   }
   const { propertyId, user } = authResult
+
+  // 2. Rate limit (property-scoped)
+  const rateLimitError = await rateLimit(req, 30, 60_000, propertyId)
+  if (rateLimitError) return rateLimitError
 
   // 3. Parse + validate input
   let body: unknown
@@ -195,7 +196,11 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Could not generate confirmation number' }), { status: 500, headers: CORS_HEADERS })
   }
 
-  // 10. Send confirmation email (fire-and-forget, uses property template if set)
+  // 10. Audit log (fire-and-forget)
+  logAdminAction(supabase, propertyId, user.id, 'create', 'reservation', reservation.id as string)
+    .catch(e => console.error('[create-reservation] audit error:', e))
+
+  // 11. Send confirmation email (fire-and-forget, uses property template if set)
   const resForEmail = { ...reservation, property_id: propertyId, room_ids: input.room_ids }
   sendBookingConfirmation(guestRecord, resForEmail, supabase)
     .catch(e => console.error('[create-reservation] email error:', e))
