@@ -824,7 +824,7 @@ function UpcomingTab({ reservation, rooms, availableRooms, paymentSummary, onRef
   if (!reservation) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <EnvelopeSimple size={48} className="text-text-muted" weight="light" />
+        <EnvelopeSimple size={32} className="text-text-muted" weight="bold" />
         <p className="font-body text-[15px] text-text-muted">No reservations found. Try the email address on your confirmation, or check the History tab.</p>
       </div>
     )
@@ -886,7 +886,7 @@ function HistoryTab({ reservations, rooms }) {
   if (pastReservations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <ClockCounterClockwise size={48} className="text-text-muted" weight="light" />
+        <ClockCounterClockwise size={32} className="text-text-muted" weight="bold" />
         <p className="font-body text-[15px] text-text-muted">No past reservations.</p>
       </div>
     )
@@ -909,7 +909,7 @@ function PaymentsTab({ payments, reservations }) {
   if (!payments || payments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <CreditCard size={48} className="text-text-muted" weight="light" />
+        <CreditCard size={32} className="text-text-muted" weight="bold" />
         <p className="font-body text-[15px] text-text-muted">No payments recorded.</p>
       </div>
     )
@@ -1300,7 +1300,7 @@ function LookupForm({ initialConfirmation, onFound }) {
   return (
     <div className="max-w-sm mx-auto">
       <div className="text-center mb-8">
-        <h1 className="font-heading text-[32px] text-text-primary mb-2">Manage Your Reservation</h1>
+        <h1 className="font-heading text-[32px] text-text-primary mb-2 uppercase">Manage Your Reservation</h1>
         <p className="font-body text-[15px] text-text-secondary">
           Enter your confirmation number and email address to access your reservation.
         </p>

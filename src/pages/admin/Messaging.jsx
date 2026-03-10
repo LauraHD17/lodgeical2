@@ -71,7 +71,7 @@ function EmailLogSection() {
   if (!logs?.length) {
     return (
       <div className="flex flex-col items-center gap-3 py-12">
-        <EnvelopeSimple size={40} weight="light" className="text-text-muted" />
+        <EnvelopeSimple size={32} weight="bold" className="text-text-muted" />
         <p className="font-body text-[15px] text-text-muted">No emails sent yet</p>
       </div>
     )
@@ -177,7 +177,7 @@ function EmailLogSection() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-surface-raised">
-          <EnvelopeSimple size={40} className="text-text-muted" weight="light" />
+          <EnvelopeSimple size={32} className="text-text-muted" weight="bold" />
           <p className="font-body text-[14px] text-text-muted">Select a message to view details</p>
         </div>
       )}
@@ -193,7 +193,7 @@ export default function Messaging() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Messages</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">Messages</h1>
       </div>
 
       <Tabs.Root defaultValue="messages">

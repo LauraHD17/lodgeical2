@@ -10,14 +10,14 @@ export default {
     colors: {
       transparent: 'transparent',
       current: 'currentColor',
-      white: '#FFFFFF',
+      white: '#FAFAF7',
       black: '#000000',
 
-      // Design tokens
-      background: '#E8E8E8',
-      surface: '#F4F4F4',
-      'surface-raised': '#FFFFFF',
-      border: '#D4D4D4',
+      // Design tokens — e-ink warm
+      background: '#EAEAE6',
+      surface: '#F2F1ED',
+      'surface-raised': '#FAFAF7',
+      border: '#D1D0CB',
       'text-primary': '#1A1A1A',
       'text-secondary': '#555555',
       'text-muted': '#888888',
@@ -29,12 +29,12 @@ export default {
       'danger-bg': '#FFE4E6',
       info: '#1D4ED8',
       'info-bg': '#DBEAFE',
-      tableAlt: '#ECEEF1',
+      tableAlt: '#EDECE8',
     },
     extend: {
       fontFamily: {
-        heading: ['Questrial', 'sans-serif'],
-        body: ['DM Sans', 'sans-serif'],
+        heading: ['Syne', 'sans-serif'],
+        body: ['"IBM Plex Sans"', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'monospace'],
       },
     },

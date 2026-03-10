@@ -60,10 +60,10 @@ export function Sidebar({ onClose }) {
     <aside className="flex flex-col w-64 min-h-screen bg-surface border-r border-border">
       {/* Property name */}
       <div className="px-6 py-5 border-b border-border">
-        <h2 className="font-heading text-[20px] text-text-primary leading-tight truncate">
+        <h2 className="font-heading text-[20px] text-text-primary leading-tight truncate tracking-[-0.02em] font-bold">
           {property?.name ?? 'Lodge-ical'}
         </h2>
-        <p className="font-body text-[12px] text-text-muted mt-0.5 uppercase tracking-[0.06em]">
+        <p className="font-body text-[12px] text-text-muted mt-0.5 uppercase tracking-[0.08em]">
           Admin Dashboard
         </p>
       </div>
@@ -88,7 +88,7 @@ export function Sidebar({ onClose }) {
                     )
                   }
                 >
-                  <Icon size={17} weight="light" className="shrink-0" />
+                  <Icon size={15} weight="bold" className="shrink-0" />
                   {item.label}
                 </NavLink>
               </li>
@@ -98,7 +98,7 @@ export function Sidebar({ onClose }) {
 
         {/* Quick Links — preview guest-facing pages */}
         <div className="mt-4 pt-4 border-t border-border">
-          <p className="px-3 mb-1.5 font-body text-[11px] uppercase tracking-[0.06em] font-semibold text-text-muted">
+          <p className="px-3 mb-1.5 font-body text-[11px] uppercase tracking-[0.08em] font-semibold text-text-muted">
             Quick Links
           </p>
           <ul className="flex flex-col gap-0.5">
@@ -135,7 +135,7 @@ export function Sidebar({ onClose }) {
             onClick={async () => { await leaveSandbox(); window.location.href = '/login' }}
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-warning hover:bg-warning-bg transition-colors duration-100"
           >
-            <SignOut size={17} weight="light" className="shrink-0" />
+            <SignOut size={15} weight="bold" className="shrink-0" />
             Exit demo
           </button>
         ) : (
@@ -143,7 +143,7 @@ export function Sidebar({ onClose }) {
             onClick={logout}
             className="flex items-center gap-3 px-3 py-2.5 w-full rounded-[6px] font-body text-[14px] text-text-secondary hover:bg-danger-bg hover:text-danger transition-colors duration-100"
           >
-            <SignOut size={17} weight="light" className="shrink-0" />
+            <SignOut size={15} weight="bold" className="shrink-0" />
             Sign out
           </button>
         )}

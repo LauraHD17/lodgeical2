@@ -2,11 +2,11 @@
 /* This file is the single source of truth for all design values. */
 
 :root {
-  /* Surface colors */
-  --color-background: #E8E8E8;
-  --color-surface: #F4F4F4;
-  --color-surface-raised: #FFFFFF;
-  --color-border: #D4D4D4;
+  /* Surface colors — e-ink warm */
+  --color-background: #EAEAE6;
+  --color-surface: #F2F1ED;
+  --color-surface-raised: #FAFAF7;
+  --color-border: #D1D0CB;
 
   /* Text colors */
   --color-text-primary: #1A1A1A;
@@ -24,11 +24,11 @@
   --color-info-bg: #DBEAFE;
 
   /* Table */
-  --color-table-alt: #F8FAFC;
+  --color-table-alt: #EDECE8;
 
   /* Typography */
-  --font-heading: 'Questrial', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
+  --font-heading: 'Syne', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 
   /* Font sizes */

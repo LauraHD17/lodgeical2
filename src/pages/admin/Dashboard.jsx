@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning,
   WarningCircle, Plus, ArrowRight, Bell, UserCircle, CaretDown, CaretUp,
-  Door, CurrencyDollar,
+  Door,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -21,6 +21,7 @@ import { queryKeys } from '@/config/queryKeys'
 import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { OnboardingChecklist } from '@/components/dashboard/OnboardingChecklist'
 import { Button } from '@/components/ui/Button'
+import { FolderCard } from '@/components/shared/FolderCard'
 import { cn, dollars } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
@@ -215,11 +216,8 @@ function StatCard({ id, label, count, icon: Icon, children, loading, defaultOpen
   const hasDetail = !!children
 
   return (
-    <div className="bg-surface-raised border border-border rounded-[12px] overflow-hidden flex">
-      {/* Colored left accent bar */}
-      <div className="w-[5px] shrink-0" style={{ background: accent }} />
-
-      <div className="flex flex-col flex-1 min-w-0">
+    <FolderCard tabColor={accent} tabLabel={label} bodyClassName="p-0">
+      <div className="flex flex-col">
         {/* Header row — always visible */}
         <button
           onClick={() => hasDetail && setOpen(o => !o)}
@@ -228,14 +226,6 @@ function StatCard({ id, label, count, icon: Icon, children, loading, defaultOpen
             hasDetail ? 'hover:bg-black/[0.025] cursor-pointer' : 'cursor-default',
           )}
         >
-          {/* Label chip */}
-          <span
-            className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.08em]"
-            style={{ background: accent + '35', color: '#1a1a1a' }}
-          >
-            {label}
-          </span>
-
           {/* Count / primary stat */}
           {count != null && (
             <span className="font-mono text-[26px] font-bold text-text-primary leading-none">
@@ -270,7 +260,7 @@ function StatCard({ id, label, count, icon: Icon, children, loading, defaultOpen
           </div>
         )}
       </div>
-    </div>
+    </FolderCard>
   )
 }
 
@@ -396,63 +386,6 @@ function GuestActivityCard({ activities, loading }) {
   )
 }
 
-function OccupancyCard({ pct, inHouse, total, rooms, calReservations, loading }) {
-  const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd')
-
-  // Which rooms are occupied right now
-  const occupiedRoomIds = new Set(
-    calReservations
-      .filter(r => r.check_in <= todayStr && r.check_out > todayStr)
-      .flatMap(r => r.room_ids ?? [])
-  )
-
-  return (
-    <StatCard id="occupancy" label="Occupancy" loading={loading} defaultOpen={false}>
-      {/* Always-visible primary stat in the header slot — override via children */}
-      <div className="flex items-baseline gap-2 -mt-1 pb-1">
-        <span className="font-mono text-[40px] font-bold text-text-primary leading-none">{pct}%</span>
-        <span className="font-body text-[13px] text-text-muted">{inHouse}/{total} rooms</span>
-      </div>
-      {/* Expandable room breakdown */}
-      {rooms.length > 0 && (
-        <ul className="mt-2">
-          {rooms.map(room => {
-            const occupied = occupiedRoomIds.has(room.id)
-            return (
-              <li key={room.id} className="flex items-center gap-2.5 py-1.5 border-b border-border/40 last:border-b-0">
-                <Door size={13} className={occupied ? 'text-danger' : 'text-success'} weight="bold" />
-                <span className="font-body text-[13px] text-text-primary">{room.name}</span>
-                <span className={cn(
-                  'ml-auto font-body text-[11px] font-semibold uppercase tracking-wide',
-                  occupied ? 'text-danger' : 'text-success'
-                )}>
-                  {occupied ? 'Occupied' : 'Available'}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </StatCard>
-  )
-}
-
-function RevenueCard({ thisMonth, ytd, loading }) {
-  return (
-    <StatCard id="revenue" label="Monthly Revenue" icon={CurrencyDollar} loading={loading} defaultOpen={false}>
-      <div className="flex items-baseline gap-2 -mt-1 pb-1">
-        <span className="font-mono text-[32px] font-bold text-text-primary leading-none">{dollars(thisMonth)}</span>
-      </div>
-      <p className="font-body text-[13px] text-text-muted mt-1">
-        YTD: <span className="font-mono font-semibold text-text-secondary">{dollars(ytd)}</span>
-      </p>
-    </StatCard>
-  )
-}
-
-// OccupancyCard and RevenueCard show their primary stat always (not inside the expand panel).
-// Wrap them to put the big number in the header instead of the children.
-
 function OccupancyCardWrapper({ pct, inHouse, total, rooms, calReservations, loading }) {
   const [open, setOpen] = useState(false)
   const accent = ACCENT.occupancy
@@ -465,19 +398,14 @@ function OccupancyCardWrapper({ pct, inHouse, total, rooms, calReservations, loa
   )
 
   return (
-    <div className="bg-surface-raised border border-border rounded-[12px] overflow-hidden flex">
-      <div className="w-[5px] shrink-0" style={{ background: accent }} />
-      <div className="flex flex-col flex-1 min-w-0">
+    <FolderCard tabColor={accent} tabLabel="Occupancy" bodyClassName="p-0">
+      <div className="flex flex-col">
         <button
           onClick={() => setOpen(o => !o)}
           className="flex items-start gap-3 px-5 pt-4 pb-4 w-full text-left hover:bg-black/[0.025] transition-colors"
         >
           <div className="flex flex-col gap-1 flex-1 min-w-0">
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.08em] self-start"
-              style={{ background: accent + '35', color: '#1a1a1a' }}>
-              Occupancy
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
+            <div className="flex items-baseline gap-2">
               <span className="font-mono text-[36px] font-bold text-text-primary leading-none">{pct}%</span>
               <span className="font-body text-[12px] text-text-muted">{inHouse}/{total}</span>
             </div>
@@ -510,7 +438,7 @@ function OccupancyCardWrapper({ pct, inHouse, total, rooms, calReservations, loa
           </div>
         )}
       </div>
-    </div>
+    </FolderCard>
   )
 }
 
@@ -519,19 +447,14 @@ function RevenueCardWrapper({ thisMonth, ytd, loading }) {
   const accent = ACCENT.revenue
 
   return (
-    <div className="bg-surface-raised border border-border rounded-[12px] overflow-hidden flex">
-      <div className="w-[5px] shrink-0" style={{ background: accent }} />
-      <div className="flex flex-col flex-1 min-w-0">
+    <FolderCard tabColor={accent} tabLabel="Monthly Revenue" bodyClassName="p-0">
+      <div className="flex flex-col">
         <button
           onClick={() => setOpen(o => !o)}
           className="flex items-start gap-3 px-5 pt-4 pb-4 w-full text-left hover:bg-black/[0.025] transition-colors"
         >
           <div className="flex flex-col gap-1 flex-1 min-w-0">
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.08em] self-start"
-              style={{ background: accent + '35', color: '#1a1a1a' }}>
-              Monthly Revenue
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
+            <div className="flex items-baseline gap-2">
               <span className="font-mono text-[32px] font-bold text-text-primary leading-none">{dollars(thisMonth)}</span>
             </div>
           </div>
@@ -552,7 +475,7 @@ function RevenueCardWrapper({ thisMonth, ytd, loading }) {
           </div>
         )}
       </div>
-    </div>
+    </FolderCard>
   )
 }
 
@@ -750,7 +673,7 @@ function RoomRow({ room, days, reservations, tickets, isLast }) {
         if (span.type === 'maintenance') {
           return (
             <td key={idx} colSpan={span.span} className="py-1 px-1"
-              style={{ background: 'repeating-linear-gradient(135deg,#D4D4D4 0px,#D4D4D4 2px,#F4F4F4 2px,#F4F4F4 9px)' }}>
+              style={{ background: 'repeating-linear-gradient(135deg,#D1D0CB 0px,#D1D0CB 2px,#F2F1ED 2px,#F2F1ED 9px)' }}>
               <span className="font-body text-[11px] text-text-muted">Maintenance</span>
             </td>
           )
@@ -802,7 +725,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="font-heading text-[32px] text-text-primary">{greeting()}</h1>
+          <h1 className="font-heading text-[32px] text-text-primary uppercase">{greeting()}</h1>
           <WeatherStrip />
         </div>
 
@@ -816,7 +739,7 @@ export default function Dashboard() {
                 className={cn(
                   'px-4 py-1.5 rounded-[6px] font-body font-semibold text-[12px] uppercase tracking-[0.08em] transition-all',
                   dayView === d
-                    ? 'bg-text-primary text-white shadow-sm'
+                    ? 'bg-text-primary text-white'
                     : 'text-text-secondary hover:text-text-primary'
                 )}
               >

@@ -100,7 +100,7 @@ export default function BookingConfirmation() {
         {/* Success icon + heading */}
         <div className="text-center mb-8">
           <CheckCircle size={64} weight="fill" className="text-success mx-auto mb-4" />
-          <h1 className="font-heading text-[32px] text-text-primary mb-2">Booking Confirmed!</h1>
+          <h1 className="font-heading text-[32px] text-text-primary mb-2 uppercase">Booking Confirmed!</h1>
           <p className="font-body text-[15px] text-text-secondary">
             Your reservation has been successfully created.
           </p>

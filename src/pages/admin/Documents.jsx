@@ -149,7 +149,7 @@ export default function Documents() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Documents</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">Documents</h1>
         <Button variant="primary" size="md" onClick={handleUpload}>
           <UploadSimple size={16} weight="bold" /> Upload Document
         </Button>
@@ -173,7 +173,7 @@ export default function Documents() {
           loading={isLoading}
           emptyState={
             <div className="flex flex-col items-center gap-3 py-12">
-              <File size={40} weight="light" className="text-text-muted" />
+              <File size={32} weight="bold" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No documents yet</p>
               <Button variant="secondary" size="sm" onClick={handleUpload}>
                 <UploadSimple size={14} /> Upload first document

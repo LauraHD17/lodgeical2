@@ -34,7 +34,7 @@ export function ConfirmDialog({
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
               >
-                <Dialog.Title className="font-heading text-[24px] text-text-primary mb-2">
+                <Dialog.Title className="font-heading text-[24px] text-text-primary mb-2 tracking-[-0.02em]">
                   {title}
                 </Dialog.Title>
                 {description && (

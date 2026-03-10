@@ -195,7 +195,7 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
   return (
     <>
       <div className="fixed inset-0 z-[9990] bg-black opacity-30" role="presentation" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[440px] max-w-full z-[9991] bg-surface-raised shadow-xl flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-[440px] max-w-full z-[9991] bg-surface-raised flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <UserCircle size={32} className="text-text-muted" />
@@ -398,7 +398,7 @@ export default function Guests() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Guests</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">Guests</h1>
       </div>
 
       {/* Search */}
@@ -438,7 +438,7 @@ export default function Guests() {
               </p>
             ) : (
               <div className="flex flex-col items-center gap-3 py-12">
-                <UserCircle size={40} weight="light" className="text-text-muted" />
+                <UserCircle size={32} weight="bold" className="text-text-muted" />
                 <p className="font-body text-[15px] text-text-muted">No guests yet</p>
               </div>
             )

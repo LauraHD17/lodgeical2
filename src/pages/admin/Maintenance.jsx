@@ -364,7 +364,7 @@ export default function Maintenance() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-[32px] text-text-primary">Maintenance Log</h1>
+          <h1 className="font-heading text-[32px] text-text-primary uppercase">Maintenance Log</h1>
           <p className="font-body text-[14px] text-text-secondary mt-1">
             Track completed work, repairs, and recurring tasks.
           </p>
@@ -428,7 +428,7 @@ export default function Maintenance() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
-          <Wrench size={40} weight="light" className="text-text-muted" />
+          <Wrench size={32} weight="bold" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">
             {logs.length === 0
               ? 'No maintenance logs yet'

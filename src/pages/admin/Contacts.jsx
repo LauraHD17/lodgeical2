@@ -108,7 +108,7 @@ function VendorCard({ contact, onEdit }) {
     <button
       type="button"
       className={cn(
-        'bg-surface-raised border border-border rounded-[8px] p-5 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow text-left w-full',
+        'bg-surface-raised border border-border rounded-[8px] p-5 flex flex-col gap-3 cursor-pointer text-left w-full',
         !contact.is_active && 'opacity-60'
       )}
       onClick={() => onEdit(contact)}
@@ -365,7 +365,7 @@ export default function Contacts() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-[32px] text-text-primary">Admin Contacts</h1>
+          <h1 className="font-heading text-[32px] text-text-primary uppercase">Admin Contacts</h1>
           <p className="font-body text-[14px] text-text-secondary mt-1">
             Service providers, emergency contacts, and key vendors.
           </p>
@@ -415,7 +415,7 @@ export default function Contacts() {
         </div>
       ) : displayed.length === 0 && contacts.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12">
-          <AddressBook size={40} weight="light" className="text-text-muted" />
+          <AddressBook size={32} weight="bold" className="text-text-muted" />
           <p className="font-body text-[15px] text-text-muted">No contacts yet</p>
           <Button variant="primary" size="sm" onClick={openNew}>
             <Plus size={14} weight="bold" /> Add first contact

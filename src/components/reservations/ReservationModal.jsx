@@ -1017,7 +1017,7 @@ export function ReservationModal({ open, onClose, reservationToEdit, defaultChec
       {/* Discard changes confirmation */}
       {showDiscardConfirm && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30">
-          <div className="bg-surface-raised rounded-[12px] border border-border shadow-xl p-6 max-w-sm mx-4">
+          <div className="bg-surface-raised rounded-[12px] border border-border p-6 max-w-sm mx-4">
             <h4 className="font-body font-semibold text-[16px] text-text-primary mb-2">Discard changes?</h4>
             <p className="font-body text-[14px] text-text-secondary mb-6">
               You have unsaved reservation data. Are you sure you want to close?

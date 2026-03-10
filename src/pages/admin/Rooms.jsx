@@ -395,8 +395,8 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
   return (
     <div
       className={cn(
-        'border border-border rounded-[10px] overflow-hidden bg-surface-raised transition-shadow',
-        dragHandlers?.isDragging && 'opacity-50 ring-2 ring-info shadow-lg'
+        'border border-border rounded-[10px] overflow-hidden bg-surface-raised',
+        dragHandlers?.isDragging && 'opacity-50 ring-2 ring-info'
       )}
       onDragOver={dragHandlers?.onDragOver}
       onDrop={dragHandlers?.onDrop}
@@ -938,7 +938,7 @@ export default function Rooms() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-[32px] text-text-primary">Rooms</h1>
+          <h1 className="font-heading text-[32px] text-text-primary uppercase">Rooms</h1>
           {localRooms.length > 1 && (
             <p className="font-body text-[13px] text-text-muted mt-0.5">
               Drag <DotsSixVertical size={12} className="inline" /> to reorder — order reflects in the calendar.

@@ -33,7 +33,7 @@ export function Button({
       onClick={onClick}
       disabled={isDisabled}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-none font-body font-medium transition-opacity duration-150 select-none',
+        'inline-flex items-center justify-center gap-2 rounded-none font-body font-medium transition-opacity duration-150 select-none tracking-[-0.01em] active:scale-[0.98] transition-transform duration-75',
         'min-h-[44px]',
         variantClasses[variant] ?? variantClasses.primary,
         sizeClasses[size] ?? sizeClasses.md,

@@ -111,7 +111,7 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
       </div>
 
       {multiMode && selectedIds.size > 0 && multiSelection && (
-        <div className="sticky bottom-4 bg-surface-raised border border-info rounded-[8px] p-4 shadow-lg">
+        <div className="sticky bottom-4 bg-surface-raised border border-info rounded-[8px] p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-body font-semibold text-[15px] text-text-primary">

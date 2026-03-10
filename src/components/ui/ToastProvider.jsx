@@ -38,7 +38,7 @@ export function ToastProvider({ children }) {
             onOpenChange={(open) => { if (!open) removeToast(toast.id) }}
             duration={4000}
             className={cn(
-              'rounded-[8px] p-4 shadow-md flex items-start gap-3',
+              'rounded-[8px] p-4 flex items-start gap-3 animate-[toast-slide-in_0.25s_ease-out]',
               'min-w-[280px] max-w-[380px]',
               variantClasses[toast.variant] ?? variantClasses.info
             )}

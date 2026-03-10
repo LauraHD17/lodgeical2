@@ -139,7 +139,7 @@ function ReservationDrawer({ reservation, onClose }) {
         onClick={onClose}
       />
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-[420px] max-w-full z-[9991] bg-surface-raised shadow-xl flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-[420px] max-w-full z-[9991] bg-surface-raised flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="font-heading text-[20px] text-text-primary">Reservation Details</h2>
           <button
@@ -289,7 +289,7 @@ export default function Reservations() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="font-heading text-[32px] text-text-primary">Reservations</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">Reservations</h1>
         <div className="flex gap-2">
           <Button variant="secondary" size="md" onClick={() => setBlockOpen(true)}>
             <Wrench size={15} /> Block Dates
@@ -358,7 +358,7 @@ export default function Reservations() {
           onRowClick={(row) => setSelectedReservation(row)}
           emptyState={
             <div className="flex flex-col items-center gap-3 py-12">
-              <CalendarBlank size={40} weight="light" className="text-text-muted" />
+              <CalendarBlank size={32} weight="bold" className="text-text-muted" />
               <p className="font-body text-[15px] text-text-muted">No reservations yet</p>
               <Button variant="primary" size="sm" onClick={() => setModalOpen(true)}>
                 <Plus size={14} weight="bold" /> Create first reservation

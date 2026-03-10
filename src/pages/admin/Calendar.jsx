@@ -36,7 +36,7 @@ function ReservationPopup({ reservation, rooms, onClose }) {
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" role="presentation" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
-      <div className="relative z-[9999] bg-surface-raised border border-border rounded-[12px] p-6 w-full max-w-sm shadow-xl" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+      <div className="relative z-[9999] bg-surface-raised border border-border rounded-[12px] p-6 w-full max-w-sm" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="font-heading text-[18px] text-text-primary">{guest.first_name ?? ''} {guest.last_name ?? 'Guest'}</h3>
@@ -257,7 +257,7 @@ export default function Calendar() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">{format(currentMonth, 'MMMM yyyy')}</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">{format(currentMonth, 'MMMM yyyy')}</h1>
         <div className="flex items-center gap-2">
           <button onClick={() => setCurrentMonth(m => subMonths(m, 1))} className="flex items-center justify-center w-9 h-9 rounded-[6px] border border-border text-text-secondary hover:bg-border transition-colors" aria-label="Previous month"><CaretLeft size={16} /></button>
           <button onClick={() => setCurrentMonth(new Date())} className="h-9 px-3 rounded-[6px] border border-border font-body text-[14px] text-text-secondary hover:bg-border transition-colors">Today</button>

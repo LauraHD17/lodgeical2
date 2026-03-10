@@ -165,10 +165,10 @@ The public booking widget (`src/components/widget/`) is a multi-step flow: DateS
 ### Color Tokens — Use ONLY These
 | Token | Hex | Usage |
 |-------|-----|-------|
-| background | #E8E8E8 | Page/app backgrounds |
-| surface | #F4F4F4 | Cards, panels, sidebar |
-| surface-raised | #FFFFFF | Modals, dropdowns, tooltips |
-| border | #D4D4D4 | All borders and dividers |
+| background | #EAEAE6 | Page/app backgrounds (warm e-ink) |
+| surface | #F2F1ED | Cards, panels, sidebar |
+| surface-raised | #FAFAF7 | Modals, dropdowns, tooltips |
+| border | #D1D0CB | All borders and dividers |
 | text-primary | #1A1A1A | Primary readable text |
 | text-secondary | #555555 | Labels, captions, helper text |
 | text-muted | #888888 | Placeholders, disabled text |
@@ -176,24 +176,37 @@ The public booking widget (`src/components/widget/`) is a multi-step flow: DateS
 | warning / warning-bg | #B45309 / #FEF3C7 | Pending, partial, attention |
 | danger / danger-bg | #BE123C / #FFE4E6 | Error, cancelled, overdue |
 | info / info-bg | #1D4ED8 / #DBEAFE | Links, focus rings, informational |
-| tableAlt | #F8FAFC | Alternating table row backgrounds |
+| tableAlt | #EDECE8 | Alternating table row backgrounds |
 
 **Never use raw hex values in component code** — always use Tailwind design token classes.
 
 ### Typography
-- **h1**: Questrial, 32px, weight 400. Never bold (Questrial has no bold weight).
-- **h2**: Questrial, 24px, weight 400.
-- **h3**: DM Sans, 18px, weight 600.
-- **h4**: DM Sans, 13px, weight 600, letter-spacing 0.06em, ALL CAPS.
-- **body**: DM Sans, 15px, weight 400, line-height 1.65.
-- **caption**: DM Sans, 13px, weight 400, color text-secondary.
+- **h1**: Syne, 32px, weight 700, letter-spacing -0.03em. Page titles are UPPERCASE.
+- **h2**: Syne, 24px, weight 700, letter-spacing -0.02em.
+- **h3**: IBM Plex Sans, 18px, weight 600, letter-spacing -0.01em.
+- **h4**: IBM Plex Sans, 13px, weight 600, letter-spacing 0.08em, ALL CAPS.
+- **body**: IBM Plex Sans, 15px, weight 400, line-height 1.65.
+- **caption**: IBM Plex Sans, 13px, weight 400, color text-secondary.
 - **Numeric data** (prices, dates, IDs, counts): IBM Plex Mono, 14px. Always.
 
+### Icons
+- Sidebar nav: `weight="bold" size={15}` (dense stamp glyphs)
+- Empty states: `weight="bold" size={32}`
+- Action buttons: `weight="bold"`, keep size
+- Status indicators: `weight="fill"`
+- Never use `weight="light"` or `weight="regular"`.
+
+### Visual Principles
+- **E-ink flat**: Zero shadows anywhere. Elements are distinguished by borders and surface color only.
+- **Grain overlay**: CSS feTurbulence noise at 2.5% opacity via `body::after` (hidden in print).
+- **Button press**: `active:scale-[0.98]` feedback on all buttons.
+
 ### Component Rules
-- Buttons: min 44px height. Primary buttons have no border-radius (sharp corners).
+- Buttons: min 44px height. Primary buttons have no border-radius (sharp corners). `tracking-[-0.01em]`.
 - Inputs: 44px height, 1.5px solid border, 6px border-radius.
 - Focus ring: 2px offset, info color.
 - Labels always above inputs, external. No floating labels.
+- Dashboard cards use FolderCard shells (manila folder tab shape) with custom accent hex colors.
 
 ## Forbidden Practices
 

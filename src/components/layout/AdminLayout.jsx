@@ -36,7 +36,7 @@ export function AdminLayout({ children }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile topbar */}
         <header className="flex items-center justify-between px-4 py-3 bg-surface border-b border-border md:hidden">
-          <span className="font-heading text-[20px] text-text-primary">Lodge-ical</span>
+          <span className="font-heading text-[20px] text-text-primary tracking-[-0.02em] font-bold">Lodge-ical</span>
           <button
             onClick={() => setMobileOpen(true)}
             className="p-2 rounded-[6px] text-text-secondary hover:bg-border transition-colors"

@@ -173,7 +173,7 @@ export default function Import() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary">Import</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">Import</h1>
         <Button variant="secondary" size="md" onClick={downloadTemplate}>
           <DownloadSimple size={16} /> Download Template
         </Button>
@@ -216,7 +216,7 @@ export default function Import() {
 
         {file ? (
           <div className="flex flex-col items-center gap-3">
-            <FileText size={48} className="text-info" weight="light" />
+            <FileText size={32} className="text-info" weight="bold" />
             <p className="font-body font-semibold text-[16px] text-text-primary">{file.name}</p>
             <p className="font-mono text-[13px] text-text-muted">
               {(file.size / 1024).toFixed(1)} KB
@@ -231,7 +231,7 @@ export default function Import() {
           </div>
         ) : (
           <>
-            <UploadSimple size={48} className="text-text-muted" weight="light" />
+            <UploadSimple size={32} className="text-text-muted" weight="bold" />
             <div className="text-center">
               <p className="font-body font-semibold text-[16px] text-text-primary">
                 Drop your CSV file here

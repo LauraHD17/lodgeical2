@@ -42,7 +42,7 @@ export function Select({
 
         <RadixSelect.Portal>
           <RadixSelect.Content
-            className="bg-surface-raised border border-border rounded-[6px] shadow-lg z-[9999] overflow-hidden"
+            className="bg-surface-raised border border-border rounded-[6px] z-[9999] overflow-hidden"
             position="popper"
             sideOffset={4}
           >

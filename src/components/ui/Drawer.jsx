@@ -41,7 +41,7 @@ export function Drawer({ open, onClose, title, width = 480, children }) {
       {/* Panel */}
       <div
         className={cn(
-          'flex flex-col bg-surface-raised border-l border-border shadow-xl',
+          'flex flex-col bg-surface-raised border-l border-border',
           'h-full overflow-hidden',
         )}
         style={{ width: `min(${width}px, 100vw)` }}
@@ -51,7 +51,7 @@ export function Drawer({ open, onClose, title, width = 480, children }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="font-heading text-[20px] text-text-primary">{title}</h2>
+          <h2 className="font-heading text-[20px] text-text-primary tracking-[-0.02em]">{title}</h2>
           <button
             onClick={onClose}
             className="text-text-muted hover:text-text-primary transition-colors"

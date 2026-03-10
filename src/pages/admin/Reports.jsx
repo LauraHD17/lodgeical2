@@ -302,7 +302,7 @@ function RevenueTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
-    <div className="bg-surface-raised border border-border rounded-[6px] p-3 shadow-md">
+    <div className="bg-surface-raised border border-border rounded-[6px] p-3">
       <p className="font-body text-[13px] font-semibold text-text-primary mb-1">{item.payload?.yearMonth ?? label}</p>
       <p className="font-mono text-[13px] text-text-secondary">{fmt$(item.value * 100)}</p>
     </div>
@@ -314,7 +314,7 @@ function RangeTooltip({ active, payload, label }) {
   const item = payload[0]
   const isOccupancy = item.dataKey === 'occupancy'
   return (
-    <div className="bg-surface-raised border border-border rounded-[6px] p-3 shadow-md">
+    <div className="bg-surface-raised border border-border rounded-[6px] p-3">
       <p className="font-body text-[13px] font-semibold text-text-primary mb-1">{label}</p>
       <p className="font-mono text-[13px] text-text-secondary">
         {isOccupancy ? `${item.value}%` : `$${item.value}`}
@@ -469,7 +469,7 @@ export default function Reports() {
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-heading text-[32px] text-text-primary">Reports & Financials</h1>
+      <h1 className="font-heading text-[32px] text-text-primary uppercase">Reports & Financials</h1>
 
       {/* ── Financial KPI cards ──────────────────────────────────────────── */}
       <div className="flex flex-col gap-4">
@@ -546,8 +546,8 @@ export default function Reports() {
             <div style={{ minWidth: 480 }}>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={earningsChartData} margin={{ top: 0, right: 0, bottom: 0, left: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#D4D4D4" />
-                  <XAxis dataKey="month" tick={{ fontFamily: 'DM Sans', fontSize: 12, fill: '#555555' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#D1D0CB" />
+                  <XAxis dataKey="month" tick={{ fontFamily: 'IBM Plex Sans', fontSize: 12, fill: '#555555' }} />
                   <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 11, fill: '#888888' }} tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} width={48} />
                   <Tooltip content={<RevenueTooltip />} />
                   <Bar dataKey="revenue" radius={[3, 3, 0, 0]} maxBarSize={48}>
@@ -599,8 +599,8 @@ export default function Reports() {
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={revenueByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
-                  <XAxis dataKey="month" tick={{ fontFamily: 'DM Sans', fontSize: 12, fill: '#6b7280' }} />
-                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#6b7280' }} tickFormatter={v => `$${v}`} />
+                  <XAxis dataKey="month" tick={{ fontFamily: 'IBM Plex Sans', fontSize: 12, fill: '#555555' }} />
+                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#555555' }} tickFormatter={v => `$${v}`} />
                   <Tooltip content={<RangeTooltip />} />
                   <Bar dataKey="revenue" fill="#1D4ED8" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -620,8 +620,8 @@ export default function Reports() {
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={occupancyByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
-                  <XAxis dataKey="month" tick={{ fontFamily: 'DM Sans', fontSize: 12, fill: '#6b7280' }} />
-                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#6b7280' }} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                  <XAxis dataKey="month" tick={{ fontFamily: 'IBM Plex Sans', fontSize: 12, fill: '#555555' }} />
+                  <YAxis tick={{ fontFamily: 'IBM Plex Mono', fontSize: 12, fill: '#555555' }} tickFormatter={v => `${v}%`} domain={[0, 100]} />
                   <Tooltip content={<RangeTooltip />} />
                   <Bar dataKey="occupancy" fill="#15803D" radius={[4, 4, 0, 0]} />
                 </BarChart>

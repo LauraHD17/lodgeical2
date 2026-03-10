@@ -376,7 +376,7 @@ export default function GuestCheckIn() {
 
         <StepBar step={step} />
 
-        <div className="bg-surface-raised rounded-[16px] border border-border shadow-sm p-6">
+        <div className="bg-surface-raised rounded-[16px] border border-border p-6">
           {step === 1 && <StepLookup prefillConfirmation={prefill} onFound={handleFound} />}
           {step === 2 && <StepReview data={lookupData} onNext={() => setStep(3)} />}
           {step === 3 && <StepPolicies data={lookupData} onNext={() => setStep(4)} />}

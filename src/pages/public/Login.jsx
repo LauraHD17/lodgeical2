@@ -250,7 +250,7 @@ export default function Login() {
           to="/demo"
           className="flex items-center justify-center gap-3 w-full min-h-[48px] px-4 bg-surface border-[1.5px] border-border rounded-none font-body hover:bg-border transition-colors duration-100"
         >
-          <House size={20} weight="light" className="text-text-secondary shrink-0" />
+          <House size={18} weight="bold" className="text-text-secondary shrink-0" />
           <div className="text-left">
             <div className="text-[14px] font-semibold text-text-primary leading-tight">Try Lodge-ical</div>
             <div className="text-[11px] text-text-muted leading-tight">No account needed — nothing is saved</div>

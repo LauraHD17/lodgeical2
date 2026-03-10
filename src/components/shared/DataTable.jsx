@@ -50,7 +50,7 @@ export function DataTable({
               <th
                 key={col.key}
                 className={cn(
-                  'px-4 py-3 text-left font-body text-[13px] uppercase tracking-wider text-white font-semibold select-none whitespace-nowrap',
+                  'px-4 py-3 text-left font-body text-[13px] uppercase tracking-[0.08em] text-white font-semibold select-none whitespace-nowrap',
                   col.numeric && 'text-right',
                   col.sortable && 'cursor-pointer hover:opacity-80',
                   sortKey === col.key && 'underline text-info'

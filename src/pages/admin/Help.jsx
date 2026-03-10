@@ -331,7 +331,7 @@ export default function Help() {
     <div className="flex flex-col gap-6 max-w-3xl">
       {/* Header */}
       <div>
-        <h1 className="font-heading text-[32px] text-text-primary">Help & FAQ</h1>
+        <h1 className="font-heading text-[32px] text-text-primary uppercase">Help & FAQ</h1>
         <p className="font-body text-[15px] text-text-secondary mt-1">
           Follow the setup guide to get started, or check the FAQ for common questions.
         </p>

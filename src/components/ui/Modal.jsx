@@ -36,7 +36,7 @@ export function Modal({ open, onClose, title, children, className }) {
               >
                 {title && (
                   <Dialog.Title asChild>
-                    <h2 className="font-heading text-[24px] text-text-primary mb-6">
+                    <h2 className="font-heading text-[24px] text-text-primary mb-6 tracking-[-0.02em]">
                       {title}
                     </h2>
                   </Dialog.Title>
