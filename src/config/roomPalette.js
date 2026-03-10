@@ -32,9 +32,12 @@ export const ROOM_PALETTE = [
   { name: 'Vibrant Coral',     bg: '#FE5F55', text: '#FFFFFF', border: '#D84E44' },
 ]
 
-/** Look up a palette entry by name. Falls back to first entry. */
+/** Look up a palette entry by name. Tries exact match first, then partial (legacy 'Sage' → 'Sage Green'). Falls back to first entry. */
 export function getPaletteColor(name) {
-  return ROOM_PALETTE.find(c => c.name === name) ?? ROOM_PALETTE[0]
+  if (!name) return ROOM_PALETTE[0]
+  return ROOM_PALETTE.find(c => c.name === name)
+    ?? ROOM_PALETTE.find(c => c.name.toLowerCase().startsWith(name.toLowerCase()))
+    ?? ROOM_PALETTE[0]
 }
 
 /** Get palette entry by index (for auto-assignment fallback). */
