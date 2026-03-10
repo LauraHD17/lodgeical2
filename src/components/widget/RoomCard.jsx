@@ -16,7 +16,7 @@ export function RoomCard({ room, nights, onSelect }) {
             <h3 className="font-body font-semibold text-[18px] text-text-primary">{room.name}</h3>
             {room.base_rate_cents > 0 && (
               <p className="font-mono text-[14px] text-text-secondary">
-                From ${(room.base_rate_cents / 100).toFixed(2)}/night
+                From {formatCents(room.base_rate_cents)}/night
               </p>
             )}
             <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -33,10 +33,10 @@ export function RoomCard({ room, nights, onSelect }) {
               <p className="font-body text-[13px] text-text-secondary mt-2 line-clamp-2">{room.description}</p>
             )}
             {room.amenities?.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-2" role="list" aria-label="Room amenities">
                 {room.amenities.slice(0, 4).map(a => (
-                  <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 bg-surface border border-border rounded-full text-[11px] font-body text-text-secondary">
-                    <Tag size={10} /> {a}
+                  <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 bg-surface border border-border rounded-full text-[11px] font-body text-text-secondary" role="listitem">
+                    <Tag size={10} aria-hidden="true" /> {a}
                   </span>
                 ))}
               </div>

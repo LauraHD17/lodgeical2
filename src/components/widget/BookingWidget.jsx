@@ -1,7 +1,7 @@
 // src/components/widget/BookingWidget.jsx
 // 4-step public booking flow + inquiry mode. No auth required.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ import { RoomStep } from './RoomStep'
 import { GuestStep } from './GuestStep'
 import { ReviewStep } from './ReviewStep'
 import { InquiryStep } from './InquiryStep'
+import { useWidgetState, clearWidgetState } from './useWidgetState'
 
 const STEPS = ['Dates', 'Room', 'Your Info', 'Review & Pay']
 
@@ -32,16 +33,25 @@ function isSeasonalClosure(checkIn, checkOut, property) {
 
 export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   const navigate = useNavigate()
-  const [step, setStep] = useState(0)
-  const [dates, setDates] = useState({ checkIn: null, checkOut: null })
-  const [selectedRoom, setSelectedRoom] = useState(null)
-  const [guestInfo, setGuestInfo] = useState(null)
+  const [restored, persist] = useWidgetState(property.id)
+
+  const [step, setStep] = useState(restored?.step ?? 0)
+  const [dates, setDates] = useState(restored?.dates ?? { checkIn: null, checkOut: null })
+  const [selectedRoom, setSelectedRoom] = useState(restored?.selectedRoom ?? null)
+  const [guestInfo, setGuestInfo] = useState(restored?.guestInfo ?? null)
   const [isBooking, setIsBooking] = useState(false)
   const [bookingError, setBookingError] = useState(null)
 
   // Inquiry mode
   const [inquiryMode, setInquiryMode] = useState(false)
   const [closureMessage, setClosureMessage] = useState(null)
+
+  // Persist widget state on changes (not payment step to avoid stale payment intents)
+  useEffect(() => {
+    if (step < 3) {
+      persist({ step, dates, selectedRoom, guestInfo })
+    }
+  }, [step, dates, selectedRoom, guestInfo, persist])
 
   function handleDateNext(d) {
     setDates(d)
@@ -104,6 +114,7 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
         setBookingError(json.error || 'Booking failed. Please try again.')
         return
       }
+      clearWidgetState(property.id)
       navigate(`/booking-confirmation?confirmation=${json.confirmation_number}`)
     } catch (err) {
       setBookingError(err.message || 'Network error. Please try again.')
@@ -124,30 +135,34 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
 
       {/* Progress bar — hidden during inquiry mode */}
       {!inquiryMode && (
-        <div className="flex items-center justify-between mb-8 px-2">
+        <nav aria-label="Booking progress" className="flex items-center justify-between mb-8 px-2">
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
-                <div className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold font-body transition-colors',
-                  i < step ? 'bg-success text-white' :
-                  i === step ? 'bg-text-primary text-white' :
-                  'bg-border text-text-muted'
-                )}>
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold font-body transition-colors',
+                    i < step ? 'bg-success text-white' :
+                    i === step ? 'bg-text-primary text-white' :
+                    'bg-border text-text-muted'
+                  )}
+                  role="img"
+                  aria-label={i < step ? `Step ${i + 1}: ${label} — completed` : i === step ? `Step ${i + 1}: ${label} — current` : `Step ${i + 1}: ${label} — upcoming`}
+                >
                   {i < step ? <CheckCircle size={16} weight="bold" /> : i + 1}
                 </div>
                 <span className={cn(
                   'mt-1 text-[11px] font-body whitespace-nowrap',
                   i === step ? 'text-info font-semibold underline' :
                   i < step ? 'text-success' : 'text-text-muted'
-                )}>{label}</span>
+                )} aria-hidden="true">{label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={cn('flex-1 h-[1px] mx-2 mt-[-12px]', i < step ? 'bg-success' : 'bg-border')} />
+                <div className={cn('flex-1 h-[1px] mx-2 mt-[-12px]', i < step ? 'bg-success' : 'bg-border')} aria-hidden="true" />
               )}
             </div>
           ))}
-        </div>
+        </nav>
       )}
 
       {/* Step content */}

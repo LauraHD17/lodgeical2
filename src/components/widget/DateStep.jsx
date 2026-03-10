@@ -138,8 +138,10 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           </div>
           {limitedDates.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 rounded-[3px] bg-warning-bg border border-warning" />
-              <span className="font-body text-[12px] text-text-secondary">Limited</span>
+              <span className="inline-block w-4 h-4 rounded-[3px] bg-warning-bg border border-warning relative">
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-warning leading-none">!</span>
+              </span>
+              <span className="font-body text-[12px] text-text-secondary">Limited availability</span>
             </div>
           )}
           {fullyBookedDates.length > 0 && (
@@ -219,6 +221,18 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           color: var(--color-warning, #B45309) !important;
           border-radius: 4px;
           font-weight: 600;
+          position: relative;
+        }
+        .rdp-day--limited:not(.rdp-day_selected)::after {
+          content: '';
+          position: absolute;
+          bottom: 2px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 4px;
+          height: 4px;
+          border-radius: 50%;
+          background: var(--color-warning, #B45309);
         }
       `}</style>
     </div>

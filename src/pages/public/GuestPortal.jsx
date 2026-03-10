@@ -37,15 +37,20 @@ function GuestPaymentForm({ balanceCents, onSuccess, onError }) {
   async function handlePay() {
     if (!stripe || !elements) return
     setPaying(true)
-    const { error } = await stripe.confirmPayment({
-      elements,
-      redirect: 'if_required',
-    })
-    if (error) {
-      onError(error.message)
+    try {
+      const { error } = await stripe.confirmPayment({
+        elements,
+        redirect: 'if_required',
+      })
+      if (error) {
+        onError(error.message)
+        setPaying(false)
+      } else {
+        onSuccess()
+      }
+    } catch (err) {
+      onError(err?.message ?? 'Payment failed. Please try again.')
       setPaying(false)
-    } else {
-      onSuccess()
     }
   }
 
@@ -362,12 +367,17 @@ function ModificationPaymentForm({ balanceCents, onSuccess, onError }) {
   async function handlePay() {
     if (!stripe || !elements) return
     setPaying(true)
-    const { error } = await stripe.confirmPayment({ elements, redirect: 'if_required' })
-    if (error) {
-      onError(error.message)
+    try {
+      const { error } = await stripe.confirmPayment({ elements, redirect: 'if_required' })
+      if (error) {
+        onError(error.message)
+        setPaying(false)
+      } else {
+        onSuccess()
+      }
+    } catch (err) {
+      onError(err?.message ?? 'Payment failed. Please try again.')
       setPaying(false)
-    } else {
-      onSuccess()
     }
   }
 
@@ -416,9 +426,15 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
   if ((reservation.modification_count ?? 0) >= 1) {
     return (
       <div className="bg-surface-raised border border-border rounded-[8px] p-5 mb-4">
-        <h3 className="font-heading text-[16px] text-text-primary mb-2">Modify Reservation</h3>
-        <p className="font-body text-[14px] text-text-muted">
-          This reservation has already been modified. Only one modification is allowed per booking.
+        <h3 className="font-heading text-[16px] text-text-primary mb-2">
+          <PencilSimple size={16} weight="bold" className="inline mr-2" />
+          Modify Reservation
+        </h3>
+        <p className="font-body text-[14px] text-text-muted mb-2">
+          This reservation has already been modified once.
+        </p>
+        <p className="font-body text-[13px] text-text-muted">
+          Each booking allows one self-service modification. For additional changes, please contact the property directly.
         </p>
       </div>
     )
@@ -555,9 +571,14 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
 
       {step === 'idle' && (
         <div>
-          <p className="font-body text-[14px] text-text-secondary mb-3">
-            You may modify this reservation once. Changes must be equal to or greater than the original booking value.
+          <p className="font-body text-[14px] text-text-secondary mb-2">
+            Need to change your dates, room, or guest count? You can modify this reservation once.
           </p>
+          <ul className="font-body text-[13px] text-text-muted mb-4 list-disc pl-5 space-y-1">
+            <li>If the new total is higher, you&apos;ll pay the difference at checkout.</li>
+            <li>If the new total is lower, a refund will be issued automatically.</li>
+            <li>One self-service modification is allowed per booking.</li>
+          </ul>
           <Button
             variant="secondary"
             size="md"
@@ -616,7 +637,7 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
                     >
                       <span className="font-body text-[14px] text-text-primary font-medium">{room.name}</span>
                       <span className="font-mono text-[13px] text-text-secondary ml-2">
-                        ${((room.base_rate_cents ?? 0) / 100).toFixed(2)}/night
+                        {formatCents(room.base_rate_cents ?? 0)}/night
                       </span>
                       <span className="font-body text-[12px] text-text-muted ml-2">Max {room.max_guests ?? 2} guests</span>
                       {isSelected && <CheckCircle size={14} weight="fill" className="inline ml-2 text-info" />}
@@ -674,15 +695,27 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
                 <p className="font-mono text-[14px] text-text-primary font-semibold">{formatCents(preview.modified.total_cents)}</p>
               </div>
             </div>
-            {preview.balance_due_cents > 0 && (
-              <div className="pt-3 border-t border-border">
-                <div className="flex justify-between items-center">
-                  <span className="font-body text-[14px] text-text-secondary">Balance due</span>
-                  <span className="font-mono text-[16px] text-danger font-semibold">{formatCents(preview.balance_due_cents)}</span>
-                </div>
-                <p className="font-body text-[12px] text-text-muted mt-1">Payment is required to confirm this change.</p>
-              </div>
-            )}
+            <div className="pt-3 border-t border-border">
+              {preview.balance_due_cents > 0 ? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="font-body text-[14px] text-text-secondary">Additional balance due</span>
+                    <span className="font-mono text-[16px] text-danger font-semibold">{formatCents(preview.balance_due_cents)}</span>
+                  </div>
+                  <p className="font-body text-[12px] text-text-muted mt-1">Payment is required to confirm this change.</p>
+                </>
+              ) : preview.refund_cents > 0 ? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="font-body text-[14px] text-text-secondary">Refund</span>
+                    <span className="font-mono text-[16px] text-success font-semibold">{formatCents(preview.refund_cents)}</span>
+                  </div>
+                  <p className="font-body text-[12px] text-text-muted mt-1">A refund will be issued to your original payment method.</p>
+                </>
+              ) : (
+                <p className="font-body text-[13px] text-text-muted">No price difference — your total stays the same.</p>
+              )}
+            </div>
           </div>
           <div className="flex gap-3">
             <Button variant="secondary" size="md" onClick={() => setStep('dates')}>Back</Button>

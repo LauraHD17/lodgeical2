@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { differenceInCalendarDays, format } from 'date-fns'
 import { Button } from '@/components/ui/Button'
-import { fmtMoney as formatCents } from '@/lib/utils'
+import { fmtMoney as formatCents, cn } from '@/lib/utils'
 import { normalizeRoom, normalizeRoomLink } from './widgetSelections'
 import { RoomCard } from './RoomCard'
 import { MultiSelectRoomCard } from './MultiSelectRoomCard'
@@ -105,7 +105,7 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
         </h4>
       )}
 
-      <div className="flex flex-col gap-4 mb-6">
+      <div className={cn('flex flex-col gap-4 mb-6', multiMode && selectedIds.size > 0 && 'pb-20 sm:pb-0')}>
         {rooms.map(room => (
           multiMode ? (
             <MultiSelectRoomCard
@@ -122,8 +122,8 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
       </div>
 
       {multiMode && selectedIds.size > 0 && multiSelection && (
-        <div className="sticky bottom-4 bg-surface-raised border border-info rounded-[8px] p-4">
-          <div className="flex items-center justify-between">
+        <div className="sticky bottom-4 bg-surface-raised border border-info rounded-[8px] p-4 z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <p className="font-body font-semibold text-[15px] text-text-primary">
                 {selectedIds.size} room{selectedIds.size !== 1 ? 's' : ''} selected
@@ -132,7 +132,7 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
                 {formatCents(multiSelection.base_rate_cents)}/night · {formatCents(multiSelection.base_rate_cents * nights)} total
               </p>
             </div>
-            <Button variant="primary" size="md" onClick={() => onNext(multiSelection)}>
+            <Button variant="primary" size="md" onClick={() => onNext(multiSelection)} className="w-full sm:w-auto">
               Continue
             </Button>
           </div>
