@@ -160,10 +160,36 @@ function MetricSkeleton() {
 // Insights panel
 // ---------------------------------------------------------------------------
 
+function InsightItem({ ins }) {
+  const [open, setOpen] = useState(false)
+  const Icon = ins.icon
+  return (
+    <li className="flex items-start gap-3">
+      <Icon size={18} weight="fill" className={cn('mt-0.5 shrink-0', ins.color)} />
+      <div className="flex-1 min-w-0">
+        <p className="font-body text-[14px] text-text-primary leading-relaxed">{ins.text}</p>
+        {ins.math && (
+          <>
+            <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1 font-body text-[12px] text-info mt-1 hover:underline w-fit">
+              {open ? <CaretUp size={11} /> : <CaretDown size={11} />} Show my math
+            </button>
+            {open && (
+              <div className="mt-2 bg-surface border border-border rounded-[6px] p-3 text-[12px] font-body text-text-secondary leading-relaxed">
+                {ins.math}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </li>
+  )
+}
+
 function InsightsPanel({ metrics }) {
   const {
     adr, occupancyPct, thisYearEarnings, lastYearEarnings, bestMonth, roomPerf,
     avgLeadTime, avgStay, weekdayPct, weekendPct, cancellationRate, totalCheckins,
+    thisYearLabel, totalNightsYTD,
   } = metrics
 
   const insights = (() => {
@@ -219,13 +245,36 @@ function InsightsPanel({ metrics }) {
     // Best month
     if (bestMonth.total > 0) informational.push({ icon: Lightbulb, color: 'text-info', text: `${bestMonth.name} was your strongest month this year (${fmtMoney(bestMonth.total)}). Consider pricing that month higher next year.` })
 
+    // Always-on plain-language summary when data exists
+    if (thisYearEarnings > 0 && totalNightsYTD > 0) {
+      informational.push({
+        icon: Lightbulb, color: 'text-info',
+        text: `You've earned ${fmtMoney(thisYearEarnings)} in ${thisYearLabel} across ${totalNightsYTD} nights booked.`,
+        math: `Sum of all payments received in ${thisYearLabel}: ${fmtMoney(thisYearEarnings)} · Nights booked: ${totalNightsYTD}`,
+      })
+    }
+    if (adr > 0) {
+      informational.push({
+        icon: Lightbulb, color: 'text-info',
+        text: `Your average nightly rate is ${fmtMoney(adr)} — that's how much you earn per booked night.`,
+        math: `${fmtMoney(thisYearEarnings)} total revenue ÷ ${totalNightsYTD} nights booked = ${fmtMoney(adr)} per night`,
+      })
+    }
+    if (bestMonth.total > 0) {
+      informational.push({
+        icon: Lightbulb, color: 'text-info',
+        text: `${bestMonth.name} is your top revenue month so far this year at ${fmtMoney(bestMonth.total)}.`,
+        math: `Sum of all payments received in ${bestMonth.name}: ${fmtMoney(bestMonth.total)}`,
+      })
+    }
+
     // Not enough data
     if (actionable.length === 0 && informational.length === 0 && thisYearEarnings === 0) {
       return [{ icon: Lightbulb, color: 'text-text-muted', text: 'Not enough booking data yet. Check back once some reservations have been recorded.' }]
     }
 
-    // Prioritize actionable, then informational, cap at 6
-    return [...actionable, ...informational].slice(0, 6)
+    // Prioritize actionable, then informational, cap at 8
+    return [...actionable, ...informational].slice(0, 8)
   })()
 
   return (
@@ -239,16 +288,8 @@ function InsightsPanel({ metrics }) {
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {insights.map((ins, i) => {
-            const Icon = ins.icon
-            return (
-              <li key={i} className="flex items-start gap-3">
-                <Icon size={18} weight="fill" className={cn('mt-0.5 shrink-0', ins.color)} />
-                <p className="font-body text-[14px] text-text-primary leading-relaxed">{ins.text}</p>
-              </li>
-            )
-          })}
+        <ul className="flex flex-col gap-3">
+          {insights.map((ins, i) => <InsightItem key={i} ins={ins} />)}
         </ul>
       )}
     </div>
@@ -615,10 +656,10 @@ export default function Reports() {
                 </Button>
               </div>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={revenueByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                <BarChart data={revenueByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
                   <XAxis dataKey="month" tick={CHART_AXIS_TICK} />
-                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={v => `$${v}`} />
+                  <YAxis tick={CHART_AXIS_TICK_MONO} tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`} width={48} />
                   <Tooltip content={<RangeTooltip />} />
                   <Bar dataKey="revenue" fill={CHART_COLORS.info} radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -636,10 +677,10 @@ export default function Reports() {
                 </Button>
               </div>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={occupancyByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                <BarChart data={occupancyByMonth} margin={{ top: 0, right: 0, bottom: 0, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
                   <XAxis dataKey="month" tick={CHART_AXIS_TICK} />
-                  <YAxis tick={CHART_AXIS_TICK} tickFormatter={v => `${v}%`} domain={[0, 100]} />
+                  <YAxis tick={CHART_AXIS_TICK_MONO} tickFormatter={v => `${v}%`} domain={[0, 100]} width={48} />
                   <Tooltip content={<RangeTooltip />} />
                   <Bar dataKey="occupancy" fill={CHART_COLORS.success} radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -749,7 +790,7 @@ function StripeReconciliation() {
         className="w-full flex items-center gap-2 px-6 py-4 text-left hover:bg-surface-raised transition-colors"
       >
         <ArrowsClockwise size={18} className="text-text-secondary shrink-0" />
-        <span className="font-heading text-[18px] text-text-primary flex-1">Stripe Reconciliation</span>
+        <span className="font-heading text-[20px] text-text-primary flex-1">Stripe Reconciliation</span>
         {result && !open && (
           isClean
             ? <span className="inline-flex items-center gap-1.5 font-body text-[13px] text-success mr-2">
