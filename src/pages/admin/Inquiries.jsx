@@ -268,7 +268,7 @@ export default function Inquiries() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-heading text-[32px] text-text-primary uppercase">Inquiries</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Inquiries</h1>
         <Button variant="primary" size="md" onClick={openCreate}>
           <Plus size={16} weight="bold" className="mr-1" />
           Add Inquiry
@@ -335,7 +335,7 @@ export default function Inquiries() {
           {/* Guest info */}
           {isCreating ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   label="First name"
                   value={form.guest_first_name}
@@ -358,7 +358,7 @@ export default function Inquiries() {
                 value={form.guest_phone}
                 onChange={e => updateForm('guest_phone', e.target.value)}
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   label="Check-in"
                   type="date"

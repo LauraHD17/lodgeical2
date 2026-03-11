@@ -237,7 +237,7 @@ function ContactDrawer({ contact, onClose, onSaved }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">First name *</span>
           <Input value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" />
@@ -365,7 +365,7 @@ export default function Contacts() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-[32px] text-text-primary uppercase">Admin Contacts</h1>
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Admin Contacts</h1>
           <p className="font-body text-[14px] text-text-secondary mt-1">
             Service providers, emergency contacts, and key vendors.
           </p>

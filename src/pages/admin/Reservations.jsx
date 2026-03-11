@@ -202,7 +202,7 @@ function ReservationDrawer({ reservation, onClose, roomMap }) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
                 Check-in
@@ -315,7 +315,7 @@ export default function Reservations() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="font-heading text-[32px] text-text-primary uppercase">Reservations</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Reservations</h1>
         <div className="flex gap-2">
           <Button variant="secondary" size="md" onClick={() => setBlockOpen(true)}>
             <Wrench size={15} /> Block Dates

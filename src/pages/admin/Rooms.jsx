@@ -240,7 +240,7 @@ function PhotoManager({ room }) {
           <p className="font-body text-[12px] text-text-muted mt-0.5">Up to {MAX_PHOTOS} photos per room</p>
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {photos.map((photo, idx) => (
             <div
               key={photo.id}
@@ -614,7 +614,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
               </p>
               <p className="font-body text-[12px] text-text-muted mt-0.5">Block extra days before and after each reservation for room prep and turnover</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Days Before"
                 type="number"
@@ -893,7 +893,7 @@ function RoomLinksSection({ rooms }) {
               })}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Combined Rate ($/night)"
               type="number"
@@ -988,7 +988,7 @@ export default function Rooms() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-[32px] text-text-primary uppercase">Rooms</h1>
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Rooms</h1>
           {localRooms.length > 1 && (
             <p className="font-body text-[13px] text-text-muted mt-0.5">
               Drag <DotsSixVertical size={12} className="inline" /> to reorder — order reflects in the calendar.

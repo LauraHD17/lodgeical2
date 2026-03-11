@@ -100,7 +100,7 @@ function CalendarReservationDrawer({ reservation, rooms, onClose, onEdit }) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <FieldLabel>Check-in</FieldLabel>
             <p className="font-mono text-[14px] text-text-primary mt-1">
@@ -115,7 +115,7 @@ function CalendarReservationDrawer({ reservation, rooms, onClose, onEdit }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <FieldLabel>Nights</FieldLabel>
             <p className="font-mono text-[14px] text-text-primary mt-1">{nights}</p>
@@ -219,7 +219,7 @@ function BlockDrawer({ block, onClose }) {
               <span className="font-body text-[15px] font-semibold text-text-primary">Property Closed</span>
             </div>
             {block.start && block.end && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <FieldLabel>From</FieldLabel>
                   <p className="font-mono text-[14px] text-text-primary mt-1">{format(parseISO(block.start), 'MMM d, yyyy')}</p>
@@ -481,7 +481,7 @@ export default function Calendar() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary uppercase">{format(currentMonth, 'MMMM yyyy')}</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">{format(currentMonth, 'MMMM yyyy')}</h1>
         <div className="flex items-center gap-2">
           <button onClick={() => setCurrentMonth(m => subMonths(m, 1))} className="flex items-center justify-center w-9 h-9 rounded-[6px] border border-border text-text-secondary hover:bg-border transition-colors" aria-label="Previous month"><CaretLeft size={16} /></button>
           <button onClick={() => setCurrentMonth(new Date())} className="h-9 px-3 rounded-[6px] border border-border font-body text-[14px] text-text-secondary hover:bg-border transition-colors">Today</button>

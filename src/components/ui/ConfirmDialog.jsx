@@ -28,7 +28,7 @@ export function ConfirmDialog({
 
             <Dialog.Content asChild>
               <Motion.div
-                className="fixed left-1/2 top-1/2 z-[9999] -translate-x-1/2 -translate-y-1/2 bg-surface-raised rounded-[12px] max-w-[400px] w-full mx-4 p-8 focus:outline-none"
+                className="fixed left-1/2 top-1/2 z-[9999] -translate-x-1/2 -translate-y-1/2 bg-surface-raised rounded-[12px] max-w-[400px] w-[calc(100%-2rem)] p-4 sm:p-8 focus:outline-none"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}

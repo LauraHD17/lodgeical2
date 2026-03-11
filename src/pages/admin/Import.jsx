@@ -173,7 +173,7 @@ export default function Import() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary uppercase">Import</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Import</h1>
         <Button variant="secondary" size="md" onClick={downloadTemplate}>
           <DownloadSimple size={16} /> Download Template
         </Button>

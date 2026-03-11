@@ -264,7 +264,7 @@ function OverrideModal({ open, onClose, rooms, existing, propertyId }) {
       <div className="flex flex-col gap-4 p-1">
         <Select label="Room" options={rooms.map(r => ({ value: r.id, label: r.name }))} value={form.room_id} onValueChange={v => set('room_id', v)} />
         <Input label="Label (optional)" placeholder="e.g. Peak Season, Holiday Weekend" value={form.label} onChange={e => set('label', e.target.value)} />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input label="Start Date" type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)} />
           <Input label="End Date (inclusive)" type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)} />
         </div>
@@ -544,7 +544,7 @@ export default function Rates() {
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-heading text-[32px] text-text-primary uppercase">Rates</h1>
+      <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Rates</h1>
 
       {/* Base Rates */}
       <div className="flex flex-col gap-4">

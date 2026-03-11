@@ -153,7 +153,7 @@ function SeasonalClosure({ property, onSave }) {
 
       {enabled && (
         <div className="flex flex-col gap-4 pl-7">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Closure start"
               type="date"

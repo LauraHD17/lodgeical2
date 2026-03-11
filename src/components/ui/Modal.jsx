@@ -36,16 +36,16 @@ export function Modal({ open, onClose, title, children, footer, className }) {
               >
                 {title && (
                   <Dialog.Title asChild>
-                    <h2 className="font-heading text-[24px] text-text-primary tracking-[-0.02em] px-8 pt-8 pb-6 shrink-0">
+                    <h2 className="font-heading text-[24px] text-text-primary tracking-[-0.02em] px-4 sm:px-8 pt-4 sm:pt-8 pb-4 sm:pb-6 shrink-0">
                       {title}
                     </h2>
                   </Dialog.Title>
                 )}
-                <div className={cn('flex-1 overflow-y-auto px-8 min-h-0', footer ? 'pb-4' : 'pb-8')}>
+                <div className={cn('flex-1 overflow-y-auto px-4 sm:px-8 min-h-0', footer ? 'pb-4' : 'pb-4 sm:pb-8')}>
                   {children}
                 </div>
                 {footer && (
-                  <div className="shrink-0 px-8 pb-8 pt-4 border-t border-border">
+                  <div className="shrink-0 px-4 sm:px-8 pb-4 sm:pb-8 pt-4 border-t border-border">
                     {footer}
                   </div>
                 )}

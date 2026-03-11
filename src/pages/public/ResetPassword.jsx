@@ -81,7 +81,7 @@ export default function ResetPassword() {
       <div className="w-full max-w-[400px]">
         {/* Logo / wordmark */}
         <div className="mb-8 text-center">
-          <h1 className="font-heading text-[32px] text-text-primary">Lodge-ical</h1>
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary">Lodge-ical</h1>
           <p className="font-body text-[15px] text-text-secondary mt-1">
             Reset your password
           </p>

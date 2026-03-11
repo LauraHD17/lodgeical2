@@ -80,9 +80,9 @@ function EmailLogSection() {
   const selected = logs.find(l => l.id === selectedId) ?? null
 
   return (
-    <div className="flex border border-border rounded-[8px] overflow-hidden" style={{ minHeight: 480 }}>
+    <div className="flex flex-col sm:flex-row border border-border rounded-[8px] overflow-hidden" style={{ minHeight: 480 }}>
       {/* Left panel — message list */}
-      <div className="flex flex-col border-r border-border overflow-y-auto w-[400px] shrink-0">
+      <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-border overflow-y-auto w-full sm:w-[400px] shrink-0 max-h-[240px] sm:max-h-none">
         {logs.map((log, i) => {
           const isActive = log.id === selectedId
           return (
@@ -193,7 +193,7 @@ export default function Messaging() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary uppercase">Messages</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Messages</h1>
       </div>
 
       <Tabs.Root defaultValue="messages">

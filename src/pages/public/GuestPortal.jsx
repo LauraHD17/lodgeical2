@@ -679,7 +679,7 @@ function ModificationSection({ reservation, availableRooms, onModified }) {
         <div>
           <p className="font-body text-[14px] text-text-secondary mb-3">Review your changes:</p>
           <div className="bg-surface border border-border rounded-[6px] p-4 mb-4">
-            <div className="grid grid-cols-2 gap-4 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
               <div>
                 <p className="font-body text-[11px] text-text-muted uppercase mb-1">Original</p>
                 <p className="font-mono text-[13px] text-text-primary">
@@ -786,7 +786,7 @@ function ReservationCard({ reservation, rooms, compact }) {
         <StatusChip status={reservation.status} type="reservation" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mt-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <div>
           <p className="font-body text-[11px] text-text-muted uppercase tracking-[0.06em] mb-1">Check-in</p>
           <p className="font-mono text-[14px] text-text-primary">{formatDate(reservation.check_in)}</p>
@@ -810,7 +810,7 @@ function ReservationCard({ reservation, rooms, compact }) {
         </div>
       )}
 
-      <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-4">
+      <div className="mt-3 pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <p className="font-body text-[11px] text-text-muted uppercase tracking-[0.06em] mb-1">Guest</p>
           <p className="font-body text-[14px] text-text-primary">{guestName || '—'}</p>
@@ -1419,7 +1419,7 @@ function LookupForm({ initialConfirmation, onFound }) {
   return (
     <div className="max-w-sm mx-auto">
       <div className="text-center mb-8">
-        <h1 className="font-heading text-[32px] text-text-primary mb-2 uppercase">Manage Your Reservation</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary mb-2 uppercase">Manage Your Reservation</h1>
         <p className="font-body text-[15px] text-text-secondary">
           Enter your confirmation number and email address to access your reservation.
         </p>

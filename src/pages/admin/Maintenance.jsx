@@ -162,7 +162,7 @@ function LogForm({ log, rooms, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Date completed *</span>
           <Input type="date" value={form.completed_date} onChange={e => set('completed_date', e.target.value)} required />
@@ -187,7 +187,7 @@ function LogForm({ log, rooms, onClose }) {
         />
       </label>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Room (optional)</span>
           <Select value={form.room_id} onValueChange={v => set('room_id', v)}>
@@ -201,7 +201,7 @@ function LogForm({ log, rooms, onClose }) {
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Cost ($)</span>
           <Input
@@ -364,7 +364,7 @@ export default function Maintenance() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-[32px] text-text-primary uppercase">Maintenance Log</h1>
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Maintenance Log</h1>
           <p className="font-body text-[14px] text-text-secondary mt-1">
             Track completed work, repairs, and recurring tasks.
           </p>

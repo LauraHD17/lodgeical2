@@ -822,7 +822,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 print:hidden">
         <div className="flex flex-col gap-1">
-          <h1 className="font-heading text-[32px] text-text-primary uppercase">{greeting()}</h1>
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">{greeting()}</h1>
           <WeatherStrip />
         </div>
 

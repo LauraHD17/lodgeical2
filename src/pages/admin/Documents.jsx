@@ -234,7 +234,7 @@ export default function Documents() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-[32px] text-text-primary uppercase">Documents</h1>
+        <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Documents</h1>
         <Button variant="primary" size="md" onClick={openUploadDialog}>
           <UploadSimple size={16} weight="bold" /> Upload Document
         </Button>

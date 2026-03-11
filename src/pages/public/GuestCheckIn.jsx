@@ -166,7 +166,7 @@ function StepReview({ data, onNext }) {
           )}
         </div>
 
-        <div className="grid grid-cols-2 divide-x divide-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-border">
           <div className="p-4">
             <p className="font-body text-[12px] uppercase tracking-wider font-semibold text-text-muted mb-1">Check-in</p>
             <p className="font-body font-semibold text-[15px] text-text-primary">

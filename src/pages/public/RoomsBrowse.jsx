@@ -66,7 +66,7 @@ export default function RoomsBrowse() {
       {/* Header */}
       <header className="border-b border-border bg-surface">
         <div className="max-w-5xl mx-auto px-6 py-8">
-          <h1 className="font-heading text-[32px] text-text-primary uppercase tracking-tight">
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase tracking-tight">
             {property.name}
           </h1>
           {property.location && (

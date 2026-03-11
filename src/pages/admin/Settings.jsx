@@ -210,7 +210,7 @@ export default function Settings() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-[32px] text-text-primary uppercase">Settings</h1>
+      <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Settings</h1>
 
       <Tabs.Root defaultValue="property">
         <Tabs.List className="flex gap-0 border-b border-border mb-6 overflow-x-auto">
@@ -294,7 +294,7 @@ export default function Settings() {
                 Find your coordinates
               </a>
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 label="Latitude"
                 type="number"
