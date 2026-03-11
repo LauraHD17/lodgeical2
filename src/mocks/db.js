@@ -479,7 +479,28 @@ export const MOCK_ONBOARDING_STATE = {
 // ---------------------------------------------------------------------------
 // Import batches
 // ---------------------------------------------------------------------------
-export const MOCK_IMPORT_BATCHES = []
+export const MOCK_IMPORT_BATCHES = [
+  {
+    id: 'batch-001',
+    property_id: PROPERTY_ID,
+    imported_count: 15,
+    skipped_count: 0,
+    error_count: 0,
+    reservation_ids: [],
+    file_name: 'booking_export_feb.csv',
+    created_at: daysFromNow(-14) + 'T10:30:00Z',
+  },
+  {
+    id: 'batch-002',
+    property_id: PROPERTY_ID,
+    imported_count: 8,
+    skipped_count: 12,
+    error_count: 1,
+    reservation_ids: [],
+    file_name: 'booking_export_mar.csv',
+    created_at: daysFromNow(-3) + 'T14:00:00Z',
+  },
+]
 
 export const MOCK_ADMIN_ACTIVITY = []
 

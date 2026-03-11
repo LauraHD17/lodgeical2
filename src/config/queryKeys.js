@@ -100,6 +100,7 @@ export const queryKeys = {
   importBatches: {
     all: ['importBatches'],
     latest: (propertyId) => ['importBatches', 'latest', propertyId],
+    list: (propertyId) => ['importBatches', 'list', propertyId],
   },
 
   tags: {

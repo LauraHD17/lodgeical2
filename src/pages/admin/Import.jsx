@@ -1,15 +1,17 @@
 // src/pages/admin/Import.jsx
-// Import page — CSV drag-and-drop with live column-mapping preview.
-// On submit, the file is parsed client-side and the rows are sent to the
-// import-csv edge function which handles guest upsert + reservation creation.
+// Import page — CSV drag-and-drop with live column-mapping preview,
+// room-name mapping for mismatches, and import history for transition workflows.
 
-import { useState, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning, ClockCounterClockwise } from '@phosphor-icons/react'
+import { useState, useRef, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning, ClockCounterClockwise, ArrowRight } from '@phosphor-icons/react'
+import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/Button'
+import { Select } from '@/components/ui/Select'
 import { supabase } from '@/lib/supabaseClient'
 import { useToast } from '@/components/ui/useToast'
 import { useProperty } from '@/lib/property/useProperty'
+import { useRooms } from '@/hooks/useRooms'
 import { queryKeys } from '@/config/queryKeys'
 import { cn } from '@/lib/utils'
 import { parseCsvToRows } from '@/lib/csv/parseRfc4180'
@@ -60,31 +62,60 @@ function downloadTemplate() {
 export default function Import() {
   const { addToast } = useToast()
   const { propertyId } = useProperty()
+  const queryClient = useQueryClient()
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)   // { headers, previewRows, allRows }
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState(null)     // { imported, skipped, errors }
-  const [checklistRows, setChecklistRows] = useState(null) // rows for transfer checklist
-  const [showLastImport, setShowLastImport] = useState(false)
+  const [checklistRows, setChecklistRows] = useState(null)
+  const [roomMappings, setRoomMappings] = useState({}) // { csvName: lodgeicalRoomName }
   const fileInputRef = useRef(null)
 
-  // Fetch last import batch for "View last import"
-  const { data: lastBatch } = useQuery({
-    queryKey: queryKeys.importBatches.latest(propertyId),
+  const { data: rooms = [] } = useRooms()
+
+  // Fetch import history
+  const { data: importBatches = [] } = useQuery({
+    queryKey: queryKeys.importBatches.list(propertyId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('import_batches')
         .select()
         .eq('property_id', propertyId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      if (error && error.code !== 'PGRST116') throw error
-      return data ?? null
+        .limit(20)
+      if (error) throw error
+      return data ?? []
     },
     enabled: !!propertyId,
   })
+
+  // Room name matching
+  const { autoMatched, unmatched } = useMemo(() => {
+    if (!preview?.allRows?.length || !rooms.length) return { autoMatched: [], unmatched: [] }
+
+    const roomNameMap = new Map(rooms.map(r => [r.name.toLowerCase().trim(), r.name]))
+    const uniqueCsvNames = [...new Set(preview.allRows.map(r => r.room_name?.trim()).filter(Boolean))]
+
+    const auto = []
+    const un = []
+    for (const csvName of uniqueCsvNames) {
+      if (roomNameMap.has(csvName.toLowerCase().trim())) {
+        auto.push({ csvName, matchedTo: roomNameMap.get(csvName.toLowerCase().trim()) })
+      } else {
+        un.push(csvName)
+      }
+    }
+    return { autoMatched: auto, unmatched: un }
+  }, [preview, rooms])
+
+  const allMapped = unmatched.length === 0 || unmatched.every(name => roomMappings[name])
+  const unmatchedSet = useMemo(() => new Set(unmatched), [unmatched])
+
+  const roomOptions = useMemo(
+    () => rooms.map(r => ({ value: r.name, label: r.name })),
+    [rooms],
+  )
 
   function handleDrop(e) {
     e.preventDefault()
@@ -101,6 +132,7 @@ export default function Import() {
   function loadFile(f) {
     setFile(f)
     setResult(null)
+    setRoomMappings({})
     const reader = new FileReader()
     reader.onload = (evt) => {
       const { headers, rows } = parseCsvToRows(evt.target.result)
@@ -117,11 +149,12 @@ export default function Import() {
     setFile(null)
     setPreview(null)
     setResult(null)
+    setRoomMappings({})
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function handleImport() {
-    if (!preview?.allRows?.length) return
+    if (!preview?.allRows?.length || !allMapped) return
     setImporting(true)
     setResult(null)
     try {
@@ -133,20 +166,32 @@ export default function Import() {
         return
       }
 
+      // Apply room name mappings before sending
+      const roomNameMap = new Map(rooms.map(r => [r.name.toLowerCase().trim(), r.name]))
+      const mappedRows = preview.allRows.map(row => {
+        const csvName = row.room_name?.trim()
+        if (!csvName) return row
+        if (roomMappings[csvName]) return { ...row, room_name: roomMappings[csvName] }
+        const matched = roomNameMap.get(csvName.toLowerCase().trim())
+        if (matched) return { ...row, room_name: matched }
+        return row
+      })
+
       const res = await fetch(`${supabaseUrl}/functions/v1/import-csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ rows: preview.allRows }),
+        body: JSON.stringify({ rows: mappedRows }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Import failed')
       setResult(json)
+
       // Build checklist rows from the import preview data
       if (json.imported > 0 && preview?.allRows) {
-        setChecklistRows(preview.allRows.map((row, i) => ({
+        setChecklistRows(mappedRows.map((row, i) => ({
           id: `import-${i}`,
           confirmation_number: row.confirmation_number,
           guest_name: `${row.guest_first_name ?? ''} ${row.guest_last_name ?? ''}`.trim(),
@@ -158,6 +203,19 @@ export default function Import() {
           notes: row.notes,
         })))
       }
+
+      // Save import batch for history
+      await supabase.from('import_batches').insert({
+        property_id: propertyId,
+        imported_count: json.imported,
+        skipped_count: json.skipped,
+        error_count: json.errors?.length ?? 0,
+        file_name: file?.name ?? 'csv-import',
+        reservation_ids: [],
+      })
+      queryClient.invalidateQueries({ queryKey: queryKeys.importBatches.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all })
+
       addToast({
         message: `Import complete: ${json.imported} created, ${json.skipped} skipped`,
         variant: 'success',
@@ -179,14 +237,23 @@ export default function Import() {
         </Button>
       </div>
 
-      {/* Instructions */}
+      {/* Transition guide */}
       <div className="bg-info-bg border border-info rounded-[8px] p-4 flex items-start gap-3">
         <Info size={18} className="text-info shrink-0 mt-0.5" />
-        <p className="font-body text-[14px] text-info">
-          Upload a CSV file using the template format. Check-in and check-out dates must be
-          <strong className="font-semibold"> YYYY-MM-DD</strong>. Room names must exactly match
-          the names in your Rooms page.
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <p className="font-body font-semibold text-[15px] text-info">
+            Transitioning from another system?
+          </p>
+          <p className="font-body text-[14px] text-info">
+            Lodge-ical safely handles re-imports. Each reservation's confirmation number is
+            unique — duplicates are automatically skipped. Export periodically from your old
+            system, import here, and verify with the transfer checklist.
+          </p>
+          <p className="font-body text-[14px] text-info">
+            Dates must be <strong className="font-semibold">YYYY-MM-DD</strong>. Room names are
+            matched to your Rooms page — we'll help you map any that don't match.
+          </p>
+        </div>
       </div>
 
       {/* Upload area */}
@@ -268,11 +335,20 @@ export default function Import() {
                     key={i}
                     className={i % 2 === 0 ? 'bg-surface-raised' : 'bg-tableAlt'}
                   >
-                    {preview.headers.map((h, j) => (
-                      <td key={j} className="px-3 py-2 font-body text-[13px] text-text-secondary whitespace-nowrap">
-                        {row[h] || <span className="text-text-muted italic">empty</span>}
-                      </td>
-                    ))}
+                    {preview.headers.map((h, j) => {
+                      const isUnmatchedRoom = h === 'room_name' && row[h] && unmatchedSet.has(row[h]?.trim()) && !roomMappings[row[h]?.trim()]
+                      return (
+                        <td
+                          key={j}
+                          className={cn(
+                            'px-3 py-2 font-body text-[13px] whitespace-nowrap',
+                            isUnmatchedRoom ? 'text-danger font-semibold' : 'text-text-secondary',
+                          )}
+                        >
+                          {row[h] || <span className="text-text-muted italic">empty</span>}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -282,10 +358,68 @@ export default function Import() {
             Showing first {preview.previewRows.length} of {preview.allRows.length} row(s)
           </p>
 
+          {/* Room name matching status */}
+          {rooms.length > 0 && (autoMatched.length > 0 || unmatched.length > 0) && (
+            <>
+              {unmatched.length > 0 ? (
+                <div className="bg-warning-bg border border-warning rounded-[8px] p-5 flex flex-col gap-4">
+                  <div className="flex items-start gap-3">
+                    <Warning size={18} className="text-warning shrink-0 mt-0.5" weight="fill" />
+                    <div>
+                      <p className="font-body font-semibold text-[15px] text-text-primary">
+                        {unmatched.length} room name{unmatched.length !== 1 ? 's' : ''} not recognized
+                      </p>
+                      <p className="font-body text-[13px] text-text-secondary mt-0.5">
+                        Select the correct Lodge-ical room for each name from your CSV.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {unmatched.map((csvName) => (
+                      <div key={csvName} className="flex items-center gap-3">
+                        <span className="font-mono text-[14px] text-text-primary min-w-[140px] shrink-0">
+                          &ldquo;{csvName}&rdquo;
+                        </span>
+                        <ArrowRight size={16} weight="bold" className="text-text-muted shrink-0" />
+                        <div className="w-[240px]">
+                          <Select
+                            placeholder="Select a room"
+                            options={roomOptions}
+                            value={roomMappings[csvName] ?? ''}
+                            onValueChange={(val) => setRoomMappings(prev => ({ ...prev, [csvName]: val }))}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {autoMatched.length > 0 && (
+                    <p className="font-body text-[13px] text-success">
+                      {autoMatched.length} name{autoMatched.length !== 1 ? 's' : ''} auto-matched
+                      {autoMatched.length <= 3 && ': '}
+                      {autoMatched.length <= 3 && autoMatched.map(m =>
+                        `"${m.csvName}" → "${m.matchedTo}"`
+                      ).join(', ')}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-success-bg border border-success rounded-[8px] p-4 flex items-center gap-3">
+                  <CheckCircle size={18} className="text-success shrink-0" weight="fill" />
+                  <p className="font-body text-[14px] text-success font-semibold">
+                    All room names matched your Lodge-ical rooms
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
           <Button
             variant="primary"
             size="md"
             loading={importing}
+            disabled={!allMapped}
             onClick={handleImport}
             className="self-start"
           >
@@ -354,28 +488,48 @@ export default function Import() {
         />
       )}
 
-      {/* View last import — shown when no active import result */}
-      {!result && lastBatch && (
-        <div className="border border-border rounded-[8px] p-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <ClockCounterClockwise size={18} className="text-text-muted shrink-0" />
-            <div>
-              <div className="font-body text-[14px] font-semibold text-text-primary">
-                Last import
+      {/* Import History — shown when no active import result */}
+      {!result && importBatches.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="font-heading text-[20px] text-text-primary flex items-center gap-2">
+            <ClockCounterClockwise size={20} weight="fill" className="text-text-secondary" />
+            Import History
+          </h2>
+          <div className="border border-border rounded-[8px] overflow-hidden">
+            {importBatches.map((batch, i) => (
+              <div
+                key={batch.id}
+                className={cn(
+                  'px-4 py-3',
+                  i > 0 && 'border-t border-border',
+                  i % 2 === 0 ? 'bg-surface-raised' : 'bg-surface',
+                )}
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-[13px] text-text-secondary">
+                    {format(parseISO(batch.created_at), 'MMM d, yyyy')}
+                  </span>
+                  {batch.file_name && (
+                    <>
+                      <span className="text-text-muted">·</span>
+                      <span className="font-body text-[14px] font-semibold text-text-primary">
+                        {batch.file_name}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="font-mono text-[13px] mt-1 flex items-center gap-3">
+                  <span className="text-success">{batch.imported_count} imported</span>
+                  {batch.skipped_count > 0 && (
+                    <span className="text-warning">{batch.skipped_count} skipped</span>
+                  )}
+                  {batch.error_count > 0 && (
+                    <span className="text-danger">{batch.error_count} error{batch.error_count !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
               </div>
-              <div className="font-body text-[12px] text-text-secondary">
-                {lastBatch.imported_count} reservations imported
-                {lastBatch.file_name && ` from ${lastBatch.file_name}`}
-              </div>
-            </div>
+            ))}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowLastImport(v => !v)}
-          >
-            {showLastImport ? 'Hide' : 'View checklist'}
-          </Button>
         </div>
       )}
     </div>
