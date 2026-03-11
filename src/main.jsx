@@ -5,7 +5,7 @@ import App from './App.jsx'
 import { isSandboxMode } from './lib/sandbox/useSandbox'
 
 async function startApp() {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.VITE_MSW === 'true') {
     const { worker } = await import('./mocks/browser.js')
     await worker.start({ onUnhandledRequest: 'bypass' })
   } else if (isSandboxMode()) {

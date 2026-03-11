@@ -294,7 +294,7 @@ function initForm(room) {
   if (!room) {
     return {
       name: '', type: 'standard', max_guests: '2',
-      base_rate_cents: '0', description: '',
+      base_rate_dollars: '', description: '',
       allows_pets: false, linkable: false,
       cleaning_fee_dollars: '', pet_fee_dollars: '',
       buffer_days_before: '0', buffer_days_after: '0',
@@ -305,7 +305,7 @@ function initForm(room) {
     name: room.name ?? '',
     type: room.type ?? 'standard',
     max_guests: String(room.max_guests ?? 2),
-    base_rate_cents: String(room.base_rate_cents ?? 0),
+    base_rate_dollars: room.base_rate_cents != null ? (room.base_rate_cents / 100).toFixed(2) : '',
     description: room.description ?? '',
     allows_pets: room.allows_pets ?? false,
     linkable: room.linkable ?? false,
@@ -340,7 +340,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
     const e = {}
     if (!form.name.trim()) e.name = 'Room name required'
     if (!form.max_guests || Number(form.max_guests) < 1) e.max_guests = 'Must be at least 1'
-    if (form.base_rate_cents === '' || Number(form.base_rate_cents) < 0) e.base_rate_cents = 'Invalid rate'
+    if (form.base_rate_dollars === '' || Number(form.base_rate_dollars) < 0) e.base_rate_dollars = 'Invalid rate'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -351,7 +351,7 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
       name: form.name.trim(),
       type: form.type,
       max_guests: Number(form.max_guests),
-      base_rate_cents: Math.round(Number(form.base_rate_cents) * 100),
+      base_rate_cents: Math.round(Number(form.base_rate_dollars || 0) * 100),
       description: form.description.trim(),
       allows_pets: form.allows_pets,
       linkable: form.linkable,
@@ -538,17 +538,17 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
                 type="number"
                 min={0}
                 step={0.01}
-                value={(Number(form.base_rate_cents) / 100).toFixed(2)}
-                onChange={e => set('base_rate_cents', String(Math.round(Number(e.target.value) * 100)))}
+                value={form.base_rate_dollars}
+                onChange={e => set('base_rate_dollars', e.target.value)}
                 className={cn(
                   'h-11 border-[1.5px] border-border rounded-[6px] pl-7 pr-3 font-mono text-[15px] text-text-primary bg-surface-raised w-full',
                   'focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2',
-                  errors.base_rate_cents && 'border-danger'
+                  errors.base_rate_dollars && 'border-danger'
                 )}
               />
             </div>
-            {errors.base_rate_cents && (
-              <span className="mt-1 text-danger text-[13px]">{errors.base_rate_cents}</span>
+            {errors.base_rate_dollars && (
+              <span className="mt-1 text-danger text-[13px]">{errors.base_rate_dollars}</span>
             )}
           </div>
 

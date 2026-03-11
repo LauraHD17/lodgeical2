@@ -386,12 +386,12 @@ export default function Contacts() {
         />
         <Select
           value={filterCategory}
-          onValueChange={setFilterCategory}
+          onValueChange={v => setFilterCategory(v === 'all' ? '' : v)}
           className="w-52"
-          options={[{ value: '', label: 'All categories' }, ...VENDOR_CATEGORIES.map(c => ({ value: c, label: c }))]}
+          options={[{ value: 'all', label: 'All categories' }, ...VENDOR_CATEGORIES.map(c => ({ value: c, label: c }))]}
           placeholder="All categories"
         />
-        {filterCategory && (
+        {filterCategory && filterCategory !== 'all' && (
           <span className="bg-info-bg text-info text-[12px] font-mono px-2 py-0.5 rounded-full">
             1
           </span>

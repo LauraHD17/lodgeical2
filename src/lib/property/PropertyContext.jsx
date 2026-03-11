@@ -10,10 +10,16 @@ import { getRolePermissions } from '../auth/permissions'
 
 export function PropertyProvider({ children }) {
   const { user, isAuthenticated } = useAuth()
+  const [refreshKey, setRefreshKey] = useState(0)
   const [state, setState] = useState({
     propertyId: null, property: null, settings: null,
     role: null, permissions: [], isLoading: false, error: null,
   })
+
+  const refreshProperty = () => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }))
+    setRefreshKey(k => k + 1)
+  }
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -34,7 +40,16 @@ export function PropertyProvider({ children }) {
           .single()
 
         if (accessError || !access) {
-          if (mounted) setState(prev => ({ ...prev, isLoading: false, error: 'No property access found.' }))
+          // No access row. If user has property_name metadata, they are mid-signup.
+          // Login.jsx handles provisioning and does a full page reload afterward.
+          // Stay in loading state so RouteGuard shows loader, not Access Denied.
+          if (mounted) {
+            if (user.user_metadata?.property_name) {
+              setState(prev => ({ ...prev, isLoading: true, error: null }))
+            } else {
+              setState(prev => ({ ...prev, isLoading: false, error: 'No property access found.' }))
+            }
+          }
           return
         }
 
@@ -71,7 +86,9 @@ export function PropertyProvider({ children }) {
 
     loadProperty()
     return () => { mounted = false }
-  }, [isAuthenticated, user])
+  }, [isAuthenticated, user, refreshKey])
 
-  return <PropertyContext.Provider value={state}>{children}</PropertyContext.Provider>
+  const value = { ...state, refreshProperty }
+
+  return <PropertyContext.Provider value={value}>{children}</PropertyContext.Provider>
 }

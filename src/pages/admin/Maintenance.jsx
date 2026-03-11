@@ -2,12 +2,12 @@
 // Maintenance log — chronological record of completed work, with optional reminders.
 // Uses maintenance_logs table (not the old tickets/ticket-system).
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { format, parseISO, addDays } from 'date-fns'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, Bell, Wrench, CheckCircle, X, CaretDown, CaretUp,
+  Plus, Bell, Wrench, CheckCircle, X, CaretDown, CaretUp, MagnifyingGlass,
 } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
@@ -23,9 +23,9 @@ import { cn, dollars } from '@/lib/utils'
 // Constants
 // ---------------------------------------------------------------------------
 
-const LOG_CATEGORIES = [
-  'General', 'Plumbing', 'Electrical', 'HVAC', 'Appliance',
-  'Cleaning', 'Painting', 'Landscaping', 'Pest Control', 'Safety', 'Other',
+const SUGGESTED_CATEGORIES = [
+  'Plumbing', 'Electrical', 'HVAC', 'Appliance', 'Cleaning',
+  'Painting', 'Landscaping', 'Pest Control', 'Safety', 'General',
 ]
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ function ReminderBadge({ date }) {
 
 const EMPTY_FORM = {
   completed_date: format(new Date(), 'yyyy-MM-dd'),
-  category: 'General',
+  category: '',
   description: '',
   performed_by: '',
   cost_display: '',
@@ -108,7 +108,7 @@ const EMPTY_FORM = {
   room_id: '',
 }
 
-function LogForm({ log, rooms, onClose }) {
+function LogForm({ log, rooms, existingCategories, onClose }) {
   const { propertyId } = useProperty()
   const qc = useQueryClient()
   const { addToast } = useToast()
@@ -169,9 +169,22 @@ function LogForm({ log, rooms, onClose }) {
         </label>
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Category</span>
-          <Select value={form.category} onValueChange={v => set('category', v)}>
-            {LOG_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
-          </Select>
+          <input
+            type="text"
+            list="maintenance-categories"
+            value={form.category}
+            onChange={e => set('category', e.target.value)}
+            placeholder={existingCategories.length === 0 ? 'e.g. Plumbing, HVAC, Cleaning' : 'Type or select a category'}
+            className="h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised w-full focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+          />
+          <datalist id="maintenance-categories">
+            {(existingCategories.length > 0 ? existingCategories : SUGGESTED_CATEGORIES).map(c => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          {existingCategories.length === 0 && (
+            <p className="font-body text-[12px] text-text-muted">Type a name to create your first category</p>
+          )}
         </label>
       </div>
 
@@ -190,10 +203,12 @@ function LogForm({ log, rooms, onClose }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Room (optional)</span>
-          <Select value={form.room_id} onValueChange={v => set('room_id', v)}>
-            <Select.Option value="">All / Common area</Select.Option>
-            {rooms.map(r => <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>)}
-          </Select>
+          <Select
+            value={form.room_id || '_none'}
+            onValueChange={v => set('room_id', v === '_none' ? '' : v)}
+            options={[{ value: '_none', label: 'All / Common area' }, ...rooms.map(r => ({ value: r.id, label: r.name }))]}
+            placeholder="All / Common area"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="font-body text-[13px] text-text-muted font-semibold uppercase tracking-[0.06em]">Performed by</span>
@@ -312,6 +327,121 @@ function LogRow({ log, onEdit, onDelete }) {
 }
 
 // ---------------------------------------------------------------------------
+// Category manager — inline rename with bulk update
+// ---------------------------------------------------------------------------
+
+function CategoryManager({ categories, logs, propertyId }) {
+  const qc = useQueryClient()
+  const { addToast } = useToast()
+  const [editingCat, setEditingCat] = useState(null)
+  const [editValue, setEditValue] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [confirmRename, setConfirmRename] = useState(null)
+  const focusRef = useCallback(node => { if (node) node.focus() }, [])
+
+  function startEdit(cat) {
+    setEditingCat(cat)
+    setEditValue(cat)
+  }
+
+  function cancelEdit() {
+    setEditingCat(null)
+    setEditValue('')
+  }
+
+  function handleRenameAttempt() {
+    const newName = editValue.trim()
+    if (!newName || newName === editingCat) { cancelEdit(); return }
+    const affected = logs.filter(l => l.category === editingCat).length
+    setConfirmRename({ oldName: editingCat, newName, count: affected })
+  }
+
+  async function executeRename(oldName, newName) {
+    setRenaming(true)
+    const { error } = await supabase
+      .from('maintenance_logs')
+      .update({ category: newName })
+      .eq('property_id', propertyId)
+      .eq('category', oldName)
+    setRenaming(false)
+    setConfirmRename(null)
+    cancelEdit()
+    if (error) { addToast({ message: 'Rename failed', variant: 'error' }); return }
+    addToast({ message: `Renamed "${oldName}" → "${newName}"`, variant: 'success' })
+    qc.invalidateQueries({ queryKey: ['maintenance-logs', propertyId] })
+  }
+
+  if (categories.length === 0) return null
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5">
+          <Wrench size={14} weight="fill" className="text-text-muted" />
+          <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">Categories</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {categories.map(cat => (
+            <div key={cat} className="flex items-center">
+              {editingCat === cat ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleRenameAttempt()
+                      if (e.key === 'Escape') cancelEdit()
+                    }}
+                    ref={focusRef}
+                    className="h-7 w-28 border border-info rounded-[4px] px-2 font-mono text-[12px] text-text-primary bg-surface-raised focus:outline-none focus:ring-1 focus:ring-info"
+                  />
+                  <button
+                    onClick={handleRenameAttempt}
+                    className="p-1 rounded-[4px] text-success hover:bg-success-bg transition-colors"
+                    title="Save"
+                  >
+                    <CheckCircle size={12} weight="bold" />
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    className="p-1 rounded-[4px] text-text-muted hover:bg-border transition-colors"
+                    title="Cancel"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => startEdit(cat)}
+                  className="group flex items-center gap-1.5 font-mono text-[12px] text-text-primary bg-surface border border-border px-2.5 py-1 rounded-full hover:border-info hover:text-info transition-colors"
+                  title={`Rename "${cat}"`}
+                >
+                  {cat}
+                  <span className="text-[10px] text-text-muted group-hover:text-info transition-colors">&#9998;</span>
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={!!confirmRename}
+        title={`Rename category?`}
+        description={confirmRename ? `This will rename "${confirmRename.oldName}" to "${confirmRename.newName}" across ${confirmRename.count} log ${confirmRename.count === 1 ? 'entry' : 'entries'}.` : ''}
+        onConfirm={() => {
+          if (confirmRename) executeRename(confirmRename.oldName, confirmRename.newName)
+        }}
+        onCancel={() => { setConfirmRename(null); cancelEdit() }}
+        confirmLabel={renaming ? 'Renaming…' : 'Rename All'}
+        variant="primary"
+      />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -324,9 +454,14 @@ export default function Maintenance() {
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingLog, setEditingLog] = useState(null)
-  const [filterRoom, setFilterRoom] = useState('')
-  const [filterCategory, setFilterCategory] = useState('')
+  const [search, setSearch] = useState('')
   const [confirmState, setConfirmState] = useState(null)
+
+  // Unique categories from existing logs (for datalist suggestions)
+  const existingCategories = useMemo(() => {
+    const cats = new Set(logs.map(l => l.category).filter(Boolean))
+    return [...cats].sort()
+  }, [logs])
 
   // Upcoming reminders (within 7 days or overdue)
   const upcomingReminders = useMemo(() => {
@@ -335,12 +470,32 @@ export default function Maintenance() {
   }, [logs])
 
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return logs
+
+    // Parse "+Category" tokens and remaining keyword text
+    const tokens = q.split(/\s+/)
+    const categoryFilters = tokens.filter(t => t.startsWith('+')).map(t => t.slice(1))
+    const keyword = tokens.filter(t => !t.startsWith('+')).join(' ')
+
     return logs.filter(l => {
-      if (filterRoom && l.room_id !== filterRoom) return false
-      if (filterCategory && l.category !== filterCategory) return false
+      if (categoryFilters.length > 0) {
+        const cat = (l.category || '').toLowerCase()
+        if (!categoryFilters.some(cf => cat.includes(cf))) return false
+      }
+      if (keyword) {
+        const haystack = [
+          l.description,
+          l.category,
+          l.performed_by,
+          l.notes,
+          l.rooms?.name,
+        ].filter(Boolean).join(' ').toLowerCase()
+        if (!haystack.includes(keyword)) return false
+      }
       return true
     })
-  }, [logs, filterRoom, filterCategory])
+  }, [logs, search])
 
   function handleDelete(id) {
     setConfirmState({
@@ -394,30 +549,43 @@ export default function Maintenance() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={filterRoom} onValueChange={setFilterRoom} className="w-44">
-          <Select.Option value="">All rooms</Select.Option>
-          {rooms.map(r => <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>)}
-        </Select>
-        <Select value={filterCategory} onValueChange={setFilterCategory} className="w-44">
-          <Select.Option value="">All categories</Select.Option>
-          {LOG_CATEGORIES.map(c => <Select.Option key={c} value={c}>{c}</Select.Option>)}
-        </Select>
-        {(filterRoom || filterCategory) && (
-          <>
-            <span className="bg-info-bg text-info text-[12px] font-mono px-2 py-0.5 rounded-full">
-              {(filterRoom ? 1 : 0) + (filterCategory ? 1 : 0)}
-            </span>
-            <button
-              onClick={() => { setFilterRoom(''); setFilterCategory('') }}
-              className="font-body text-[13px] text-text-muted hover:text-text-primary underline"
-            >
-              Clear filters
-            </button>
-          </>
-        )}
-      </div>
+      {/* Search + Categories */}
+      {logs.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="relative max-w-sm">
+            <MagnifyingGlass size={16} weight="bold" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search logs… (+category to filter)"
+              className="h-11 w-full border-[1.5px] border-border rounded-[6px] pl-9 pr-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-text-muted hover:text-text-primary"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {existingCategories.length > 0 && !search && (
+            <div className="flex flex-wrap gap-1.5">
+              {existingCategories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSearch(`+${cat.toLowerCase()}`)}
+                  className="font-mono text-[12px] text-text-secondary bg-surface border border-border px-2 py-0.5 rounded-full hover:border-info hover:text-info transition-colors"
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+          <CategoryManager categories={existingCategories} logs={logs} propertyId={propertyId} />
+        </div>
+      )}
 
       {/* Log list */}
       {isLoading ? (
@@ -448,7 +616,7 @@ export default function Maintenance() {
 
       {/* Drawer */}
       <Drawer open={drawerOpen} onClose={closeDrawer} title={editingLog ? 'Edit Log' : 'New Log'}>
-        <LogForm log={editingLog} rooms={rooms} onClose={closeDrawer} />
+        <LogForm log={editingLog} rooms={rooms} existingCategories={existingCategories} onClose={closeDrawer} />
       </Drawer>
 
       <ConfirmDialog

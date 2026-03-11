@@ -25,27 +25,148 @@ const forgotSchema = z.object({
 
 const SCHEMAS = { login: loginSchema, signup: signupSchema, forgot: forgotSchema }
 
+/** Score password 0–4 based on length, variety, and patterns. */
+function getPasswordStrength(pw) {
+  if (!pw) return 0
+  let score = 0
+  if (pw.length >= 6) score++
+  if (pw.length >= 10) score++
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++
+  if (/\d/.test(pw)) score++
+  if (/[^a-zA-Z0-9]/.test(pw)) score++
+  return Math.min(score, 4)
+}
+
+const STRENGTH_CONFIG = [
+  { label: '', color: 'bg-border' },
+  { label: 'Weak', color: 'bg-danger' },
+  { label: 'Fair', color: 'bg-warning' },
+  { label: 'Good', color: 'bg-info' },
+  { label: 'Strong', color: 'bg-success' },
+]
+
+function PasswordStrength({ password }) {
+  const strength = getPasswordStrength(password)
+  if (!password) return null
+  const { label, color } = STRENGTH_CONFIG[strength]
+
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <div className="flex gap-1 flex-1">
+        {[1, 2, 3, 4].map(i => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors duration-200 ${i <= strength ? color : 'bg-border'}`}
+          />
+        ))}
+      </div>
+      {label && (
+        <span className={`font-body text-[11px] font-semibold ${
+          strength <= 1 ? 'text-danger' : strength === 2 ? 'text-warning' : strength === 3 ? 'text-info' : 'text-success'
+        }`}>
+          {label}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function LoginForm({ mode, onSuccess, onError, serverError }) {
+  const [passwordValue, setPasswordValue] = useState('')
+
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(SCHEMAS[mode]),
+  })
+
+  async function onSubmit(data) {
+    onError(null)
+    await onSuccess(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <div className="flex flex-col gap-5">
+        {mode === 'signup' && (
+          <Input
+            label="Property name"
+            id="propertyName"
+            type="text"
+            placeholder="e.g. Sunrise Lodge"
+            error={errors.propertyName?.message}
+            {...register('propertyName')}
+          />
+        )}
+
+        <Input
+          label="Email"
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+
+        {mode !== 'forgot' && (
+          <div>
+            <Input
+              label="Password"
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              error={errors.password?.message}
+              {...register('password', {
+                onChange: (e) => setPasswordValue(e.target.value),
+              })}
+            />
+            {mode === 'signup' && (
+              <>
+                <PasswordStrength password={passwordValue} />
+                <p className="font-body text-[11px] text-text-muted mt-1">
+                  6+ characters. Mix uppercase, numbers, and symbols for a stronger password.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {serverError && (
+          <p className="text-danger text-[13px] font-body">{serverError}</p>
+        )}
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isSubmitting}
+          className="w-full mt-2"
+        >
+          {mode === 'login' && 'Sign in'}
+          {mode === 'signup' && 'Create account'}
+          {mode === 'forgot' && 'Send reset link'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mode, setMode] = useState('login')
   const [serverError, setServerError] = useState(null)
   const [forgotSent, setForgotSent] = useState(false)
+  const [signupSent, setSignupSent] = useState(false)
 
   const from = location.state?.from?.pathname ?? '/'
-
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm({
-    resolver: zodResolver(SCHEMAS[mode]),
-  })
 
   function switchMode(newMode) {
     setMode(newMode)
     setServerError(null)
     setForgotSent(false)
-    reset()
+    setSignupSent(false)
   }
 
-  async function onSubmit(data) {
+  async function handleFormSubmit(data) {
     setServerError(null)
 
     if (mode === 'login') {
@@ -64,38 +185,39 @@ export default function Login() {
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
+        options: {
+          data: { property_name: data.propertyName },
+        },
       })
       if (signUpError) {
         setServerError(signUpError.message)
         return
       }
 
-      const session = authData.session
-      if (session) {
-        try {
-          const res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/provision-property`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({ property_name: data.propertyName }),
-            }
-          )
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            setServerError(err.error || 'Failed to create property. Please try again.')
-            return
-          }
-        } catch {
-          setServerError('Failed to create property. Please try again.')
-          return
-        }
+      // Supabase v2 may not return a session immediately after signUp,
+      // even with email confirmation disabled. Wait for the session.
+      let session = authData.session
+      if (!session) {
+        const { data: sessionData } = await supabase.auth.getSession()
+        session = sessionData?.session
       }
 
-      navigate('/onboarding', { replace: true })
+      if (session) {
+        const { error: provisionError } = await supabase.rpc('provision_property', {
+          property_name: data.propertyName,
+        })
+        if (provisionError) {
+          // "User already has a property" is fine — just proceed
+          if (!provisionError.message?.includes('already has a property')) {
+            setServerError(provisionError.message || 'Failed to create property. Please try again.')
+            return
+          }
+        }
+        // Full page reload so PropertyContext initializes fresh with the new property
+        window.location.href = '/'
+      } else {
+        setSignupSent(true)
+      }
     }
 
     if (mode === 'forgot') {
@@ -127,8 +249,22 @@ export default function Login() {
           </p>
         </div>
 
-        <div className="bg-surface-raised border border-border rounded-[8px] p-8">
-          {mode === 'forgot' && forgotSent ? (
+        <div className="bg-surface-raised border border-border rounded-[8px] p-4 sm:p-8">
+          {mode === 'signup' && signupSent ? (
+            <div className="text-center">
+              <p className="font-body text-[15px] text-text-primary font-semibold mb-2">Check your email</p>
+              <p className="font-body text-[14px] text-text-secondary mb-6">
+                We sent a confirmation link to your email. Click it to activate your account and set up your property.
+              </p>
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="font-body text-[14px] text-info hover:underline"
+              >
+                Back to sign in
+              </button>
+            </div>
+          ) : mode === 'forgot' && forgotSent ? (
             <div className="text-center">
               <p className="font-body text-[15px] text-text-primary font-semibold mb-2">Check your email</p>
               <p className="font-body text-[14px] text-text-secondary mb-6">
@@ -143,60 +279,16 @@ export default function Login() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit(onSubmit)} noValidate>
-              <div className="flex flex-col gap-5">
-                {mode === 'signup' && (
-                  <Input
-                    label="Property name"
-                    id="propertyName"
-                    type="text"
-                    placeholder="e.g. Sunrise Lodge"
-                    error={errors.propertyName?.message}
-                    {...register('propertyName')}
-                  />
-                )}
-
-                <Input
-                  label="Email"
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  error={errors.email?.message}
-                  {...register('email')}
-                />
-
-                {mode !== 'forgot' && (
-                  <Input
-                    label="Password"
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    error={errors.password?.message}
-                    {...register('password')}
-                  />
-                )}
-
-                {serverError && (
-                  <p className="text-danger text-[13px] font-body">{serverError}</p>
-                )}
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  loading={isSubmitting}
-                  className="w-full mt-2"
-                >
-                  {mode === 'login' && 'Sign in'}
-                  {mode === 'signup' && 'Create account'}
-                  {mode === 'forgot' && 'Send reset link'}
-                </Button>
-              </div>
-            </form>
+            <LoginForm
+              key={mode}
+              mode={mode}
+              onSuccess={handleFormSubmit}
+              onError={setServerError}
+              serverError={serverError}
+            />
           )}
 
-          {/* Mode toggle links */}
-          {!(mode === 'forgot' && forgotSent) && (
+          {!(mode === 'forgot' && forgotSent) && !(mode === 'signup' && signupSent) && (
             <div className="mt-5 flex flex-col items-center gap-2">
               {mode === 'login' && (
                 <>
