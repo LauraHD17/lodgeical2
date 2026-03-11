@@ -4,7 +4,7 @@
 
 import { useState, useMemo } from 'react'
 import {
-  format, subMonths, startOfMonth, endOfMonth,
+  format, subMonths, addMonths, startOfMonth, endOfMonth,
   parseISO, eachMonthOfInterval, getYear, getDay, differenceInDays,
 } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
@@ -46,7 +46,7 @@ function useFinancialData() {
       if (!propertyId) return null
       const [paymentsRes, reservationsRes, roomsRes, lastYearPayRes, lastYearResRes, cancelledRes] = await Promise.all([
         supabase.from('payments').select('id, amount_cents, status, created_at, type').eq('property_id', propertyId).gte('created_at', chartFrom).lte('created_at', yearEnd).in('status', ['succeeded', 'paid']).eq('type', 'charge'),
-        supabase.from('reservations').select('id, room_ids, check_in, check_out, status, created_at').eq('property_id', propertyId).gte('check_in', yearStart).lte('check_in', yearEnd).neq('status', 'cancelled'),
+        supabase.from('reservations').select('id, room_ids, check_in, check_out, status, created_at, total_due_cents').eq('property_id', propertyId).gte('check_in', yearStart).lte('check_in', yearEnd).neq('status', 'cancelled'),
         supabase.from('rooms').select('id, name').eq('property_id', propertyId).eq('is_active', true),
         supabase.from('payments').select('id, amount_cents, status, created_at, type').eq('property_id', propertyId).gte('created_at', lastYStart).lte('created_at', lastYEnd).in('status', ['succeeded', 'paid']).eq('type', 'charge'),
         supabase.from('reservations').select('id, room_ids, check_in, check_out, status').eq('property_id', propertyId).gte('check_in', lastYStart).lte('check_in', lastYEnd).neq('status', 'cancelled'),
@@ -67,13 +67,16 @@ function useFinancialData() {
 
 function useRangedData(dateFrom, dateTo) {
   const { propertyId } = useProperty()
+  // Fetch reservations starting 60 days before dateFrom so stays that began before
+  // the range window but overlap into it are included in per-month occupancy counts.
+  const resFetchFrom = format(subMonths(new Date(dateFrom), 2), 'yyyy-MM-dd')
   return useQuery({
-    queryKey: queryKeys.reports.ranged(propertyId, dateFrom, dateTo),
+    queryKey: queryKeys.reports.ranged(propertyId, dateFrom, dateTo, resFetchFrom),
     queryFn: async () => {
       if (!propertyId) return { reservations: [], payments: [] }
       const [resResult, payResult] = await Promise.all([
-        supabase.from('reservations').select('id, check_in, check_out, total_due_cents, status').eq('property_id', propertyId).gte('check_in', dateFrom).lte('check_in', dateTo).neq('status', 'cancelled'),
-        supabase.from('payments').select('id, amount_cents, created_at, status').eq('property_id', propertyId).gte('created_at', dateFrom).lte('created_at', dateTo).eq('status', 'paid'),
+        supabase.from('reservations').select('id, check_in, check_out, total_due_cents, status').eq('property_id', propertyId).gte('check_in', resFetchFrom).lte('check_in', dateTo).neq('status', 'cancelled'),
+        supabase.from('payments').select('id, amount_cents, created_at, status').eq('property_id', propertyId).gte('created_at', dateFrom).lte('created_at', dateTo).in('status', ['paid', 'succeeded']),
       ])
       return { reservations: resResult.data ?? [], payments: payResult.data ?? [] }
     },
@@ -396,7 +399,11 @@ export default function Reports() {
       const roomRes     = yearRes.filter(r => (r.room_ids ?? []).includes(room.id))
       const roomNights  = nightsOf(roomRes)
       const occ         = daysElapsed > 0 ? Math.round((roomNights / daysElapsed) * 100) : 0
-      const roomRevenue = roomNights > 0 && adr > 0 ? roomNights * adr : 0
+      // Allocate each reservation's total evenly across its rooms
+      const roomRevenue = roomRes.reduce((sum, r) => {
+        const share = Math.round((r.total_due_cents ?? 0) / Math.max(1, (r.room_ids ?? []).length))
+        return sum + share
+      }, 0)
       return { id: room.id, name: room.name, nights: roomNights, occupancy: Math.min(100, occ), adr: roomNights > 0 ? Math.round(roomRevenue / roomNights) : 0, revenue: roomRevenue }
     }).sort((a, b) => b.revenue - a.revenue)
 
@@ -446,21 +453,26 @@ export default function Reports() {
     })
   }, [rangedData, rangedMonths])
 
-  // Range occupancy by month
+  // Range occupancy by month — counts nights that fall within each month,
+  // not just reservations whose check_in is in that month.
   const occupancyByMonth = useMemo(() => {
     if (!rangedData?.reservations) return []
     return rangedMonths.map(month => {
-      const label       = format(month, 'MMM yyyy')
-      const daysInMonth = endOfMonth(month).getDate()
-      const resos       = rangedData.reservations.filter(r => {
-        if (!r.check_in) return false
-        const ci = parseISO(r.check_in)
-        return ci.getMonth() === month.getMonth() && ci.getFullYear() === month.getFullYear()
-      })
-      const occupiedDays = resos.reduce((sum, r) => {
+      const label        = format(month, 'MMM yyyy')
+      const daysInMonth  = endOfMonth(month).getDate()
+      const monthStart   = startOfMonth(month)
+      const nextMonthStart = startOfMonth(addMonths(month, 1))
+
+      const occupiedDays = rangedData.reservations.reduce((sum, r) => {
         if (!r.check_in || !r.check_out) return sum
-        return sum + Math.max(0, Math.floor((parseISO(r.check_out) - parseISO(r.check_in)) / (1000 * 60 * 60 * 24)))
+        const ci = parseISO(r.check_in)
+        const co = parseISO(r.check_out)
+        if (ci >= nextMonthStart || co <= monthStart) return sum
+        const effStart = ci > monthStart ? ci : monthStart
+        const effEnd   = co < nextMonthStart ? co : nextMonthStart
+        return sum + Math.max(0, Math.round((effEnd - effStart) / (1000 * 60 * 60 * 24)))
       }, 0)
+
       return { month: label, occupancy: daysInMonth > 0 ? Math.min(100, Math.round((occupiedDays / daysInMonth) * 100)) : 0 }
     })
   }, [rangedData, rangedMonths])

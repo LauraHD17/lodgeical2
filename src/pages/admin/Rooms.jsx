@@ -18,6 +18,7 @@ import { queryKeys } from '@/config/queryKeys'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { HelpTip } from '@/components/ui/HelpTip'
 import { useToast } from '@/components/ui/useToast'
 import { ROOM_PALETTE, getPaletteColor } from '@/config/roomPalette'
 import { cn } from '@/lib/utils'
@@ -586,7 +587,10 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
           {/* Linkable toggle */}
           <div className="flex items-center justify-between p-3 border border-border rounded-[6px] bg-surface">
             <div>
-              <p className="font-body font-semibold text-[14px] text-text-primary">Linkable</p>
+              <div className="font-body font-semibold text-[14px] text-text-primary flex items-center gap-1.5">
+                Linkable room
+                <HelpTip text="When enabled, this room can be included in a combined listing with other rooms. For example, two adjacent cabins can be offered together as a single booking for larger groups. You create those combinations in the Room Links section below." />
+              </div>
               <p className="font-body text-[12px] text-text-muted mt-0.5">Allow this room to be linked with other rooms as a combined listing</p>
             </div>
             <div className="flex items-center gap-2">
@@ -604,7 +608,10 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
           {/* Buffer days */}
           <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
             <div>
-              <p className="font-body font-semibold text-[14px] text-text-primary">Buffer Days</p>
+              <p className="font-body font-semibold text-[14px] text-text-primary flex items-center gap-1.5">
+                Buffer Days
+                <HelpTip text="Buffer days automatically block the calendar before and after each reservation so you have time to clean, inspect, and prepare the room. For example, 1 day after means no new guest can check in the same day a guest checks out." />
+              </p>
               <p className="font-body text-[12px] text-text-muted mt-0.5">Block extra days before and after each reservation for room prep and turnover</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -629,8 +636,10 @@ function RoomRow({ room, isNew, onSaved, onCancel, dragHandlers }) {
 
           {/* Fee overrides */}
           <div className="flex flex-col gap-3 p-3 border border-border rounded-[6px] bg-surface">
-            <p className="font-body font-semibold text-[13px] text-text-secondary uppercase tracking-[0.06em]">
-              Fee Overrides <span className="normal-case font-normal text-text-muted">(leave blank to use property default)</span>
+            <p className="font-body font-semibold text-[13px] text-text-secondary uppercase tracking-[0.06em] flex items-center gap-1.5">
+              Fee Overrides
+              <HelpTip text="These fees apply to this specific room only, overriding the property-wide defaults you set in Settings → Tax & Fees. Leave blank to fall back to the property default." />
+              <span className="normal-case font-normal text-text-muted">(leave blank to use property default)</span>
             </p>
             <div className="flex flex-col">
               <label htmlFor="room-cleaning-fee" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
@@ -814,7 +823,10 @@ function RoomLinksSection({ rooms }) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-[22px] text-text-primary">Room Links</h2>
+          <h2 className="font-heading text-[22px] text-text-primary flex items-center gap-2">
+            Room Links
+            <HelpTip text="A Room Link is a combined listing that groups two or more rooms together as a single bookable option — useful when a family or group wants to rent adjacent rooms together. The combined listing gets its own rate and guest capacity. Rooms must be marked as Linkable to appear here." />
+          </h2>
           <p className="font-body text-[13px] text-text-muted mt-0.5">Combine linkable rooms into bookable listings</p>
         </div>
         {!showForm && (

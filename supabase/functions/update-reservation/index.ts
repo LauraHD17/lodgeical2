@@ -9,6 +9,7 @@ import { rateLimit } from '../_shared/rateLimit.ts'
 import { logAdminAction } from '../_shared/audit.ts'
 import { checkConflicts } from '../_shared/conflicts.ts'
 import { sendModificationConfirmation } from '../_shared/email.ts'
+import { calculatePricing } from '../_shared/pricing.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -88,24 +89,17 @@ serve(async (req) => {
     }
   }
 
-  // Recalculate total if dates or rooms changed
+  // Recalculate total if dates or rooms changed — use authoritative calculatePricing()
+  // so rate overrides, tax, and Stripe fee pass-through are all correctly applied.
   let totalDueCents = existing.total_due_cents
   if (datesChanged) {
-    const { data: rooms } = await supabase
-      .from('rooms')
-      .select('base_rate_cents')
-      .in('id', newRoomIds)
-      .eq('property_id', propertyId)
-
-    const nights = Math.ceil(
-      (new Date(newCheckOut).getTime() - new Date(newCheckIn).getTime()) / (1000 * 60 * 60 * 24)
-    )
-    const { data: settings } = await supabase
-      .from('settings').select('tax_rate').eq('property_id', propertyId).single()
-
-    const baseTotal = (rooms ?? []).reduce((sum, r) => sum + r.base_rate_cents * nights, 0)
-    const taxRate = settings?.tax_rate ?? 0
-    totalDueCents = baseTotal + Math.round(baseTotal * (Number(taxRate) / 100))
+    const pricing = await calculatePricing(supabase, {
+      propertyId,
+      roomIds: newRoomIds,
+      checkIn: newCheckIn,
+      checkOut: newCheckOut,
+    })
+    totalDueCents = pricing.totalCents
   }
 
   // Apply updates

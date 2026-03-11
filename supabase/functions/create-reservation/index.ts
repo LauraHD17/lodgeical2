@@ -33,6 +33,14 @@ const inputSchema = z.object({
   origin: z.enum(['direct', 'widget', 'import', 'phone']).default('direct'),
   skip_buffers: z.boolean().default(false),
   policy_acceptances: z.array(z.object({ type: z.string(), accepted: z.boolean() })).optional(),
+  // Fee overrides (admin-created reservations only)
+  cleaning_fee_waived: z.boolean().default(false),
+  cleaning_fee_waive_reason: z.string().optional(),
+  pet_fee_applied: z.boolean().default(false),
+  tax_exempt: z.boolean().default(false),
+  tax_exempt_org: z.string().optional(),
+  misc_fee_cents: z.number().int().min(0).default(0),
+  misc_fee_label: z.string().optional(),
 }).refine(d => d.guest_id || d.guest_email, { message: 'Either guest_id or guest_email is required' })
   .refine(d => new Date(d.check_out) > new Date(d.check_in), { message: 'check_out must be after check_in' })
 
@@ -141,14 +149,18 @@ serve(async (req) => {
     guestRecord = guest
   }
 
-  // 8. Calculate total_due_cents server-side (authoritative, with seasonal overrides)
+  // 8. Calculate total_due_cents server-side (authoritative, with seasonal overrides + fees)
   const [pricing, { data: settings }] = await Promise.all([
-    calculatePricing(supabase, {
-      propertyId,
-      roomIds: input.room_ids,
-      checkIn: input.check_in,
-      checkOut: input.check_out,
-    }),
+    calculatePricing(
+      supabase,
+      { propertyId, roomIds: input.room_ids, checkIn: input.check_in, checkOut: input.check_out },
+      {
+        cleaningFeeWaived: input.cleaning_fee_waived,
+        petFeeApplied:     input.pet_fee_applied,
+        miscFeeCents:      input.misc_fee_cents,
+        taxExempt:         input.tax_exempt,
+      }
+    ),
     supabase
       .from('settings')
       .select('tax_rate, require_payment_at_booking, pass_through_stripe_fee')
@@ -183,6 +195,8 @@ serve(async (req) => {
         notes: input.notes ?? null,
         booker_email: input.booker_email ?? null,
         cc_emails: input.cc_emails,
+        misc_fee_cents: input.misc_fee_cents,
+        misc_fee_label: input.misc_fee_label ?? null,
       })
       .select()
       .single()

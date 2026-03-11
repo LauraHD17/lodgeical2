@@ -34,7 +34,7 @@ const inputSchema = z.object({
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  const rateLimitError = rateLimit(req, INQUIRY_RATE_LIMIT)
+  const rateLimitError = await rateLimit(req, INQUIRY_RATE_LIMIT)
   if (rateLimitError) return rateLimitError
 
   try {

@@ -1,13 +1,18 @@
 // _shared/pricing.ts
 // Authoritative server-side pricing calculation.
-// Used by create-reservation, update-reservation, and get-payment-summary.
+// Used by create-reservation, update-reservation, and preview-pricing.
 //
-// Priority: rate_overrides > base_rate_cents
+// Priority: rate_overrides > base_rate_cents (per room, per night)
 // If multiple overrides cover the same date, the highest rate wins.
 //
+// Fee handling (admin-created reservations):
+//   - Cleaning fee: sum across rooms (room override or property default), waivable
+//   - Pet fee: first allows_pets room (room override or property default), per_night or flat
+//   - Misc fee: arbitrary admin add-on
+//   - Tax-exempt: skip tax entirely
+//
 // Stripe fee pass-through (when enabled in settings):
-//   guest_pays = (base_amount + tax) / (1 - 0.029) + 0.30
-//   (Stripe standard: 2.9% + $0.30 per transaction)
+//   gross = (subtotal + fees + tax + $0.30) / (1 - 0.029)
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -25,9 +30,22 @@ export interface DayRate {
   overrideLabel?: string
 }
 
+/** Optional fee overrides — only used by admin-created reservations. */
+export interface FeeOptions {
+  cleaningFeeWaived?: boolean   // Admin: skip cleaning fee
+  petFeeApplied?: boolean       // Admin: charge pet fee
+  miscFeeCents?: number         // Admin: arbitrary add-on (already in cents)
+  taxExempt?: boolean           // Admin: waive all tax
+}
+
 export interface PricingResult {
   roomRates: RoomRate[]
-  subtotalCents: number
+  subtotalCents: number             // nightly total only
+  cleaningFeeCents: number          // cleaning fee charged (0 if waived)
+  petFeeCents: number               // pet fee charged (0 if not applied)
+  miscFeeCents: number              // misc fee
+  feesSubtotalCents: number         // cleaning + pet + misc
+  taxableSubtotalCents: number      // nightly + fees (tax base)
   taxCents: number
   stripeFeePassthroughCents: number
   totalCents: number
@@ -35,8 +53,8 @@ export interface PricingResult {
 }
 
 /**
- * Calculate the total for a set of rooms over a date range,
- * applying any seasonal rate overrides and optional Stripe fee pass-through.
+ * Calculate the total for a set of rooms over a date range.
+ * Applies seasonal rate overrides, optional fees, tax, and Stripe pass-through.
  */
 export async function calculatePricing(
   supabase: SupabaseClient,
@@ -50,8 +68,16 @@ export async function calculatePricing(
     roomIds: string[]
     checkIn: string  // YYYY-MM-DD
     checkOut: string // YYYY-MM-DD (exclusive — last night is checkOut - 1)
-  }
+  },
+  feeOptions: FeeOptions = {}
 ): Promise<PricingResult> {
+  const {
+    cleaningFeeWaived = false,
+    petFeeApplied = false,
+    miscFeeCents: miscFeeInput = 0,
+    taxExempt = false,
+  } = feeOptions
+
   const checkInDate  = new Date(checkIn)
   const checkOutDate = new Date(checkOut)
   const nights = Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -62,11 +88,11 @@ export async function calculatePricing(
     stayDates.push(d.toISOString().split('T')[0])
   }
 
-  // Fetch rooms + settings in parallel
-  const [{ data: rooms }, { data: settings }, { data: overrides }] = await Promise.all([
+  // Fetch rooms, settings, overrides, and property fees in parallel
+  const [{ data: rooms }, { data: settings }, { data: overrides }, { data: property }] = await Promise.all([
     supabase
       .from('rooms')
-      .select('id, base_rate_cents')
+      .select('id, base_rate_cents, cleaning_fee_cents, pet_fee_cents, allows_pets')
       .in('id', roomIds)
       .eq('property_id', propertyId),
     supabase
@@ -82,11 +108,20 @@ export async function calculatePricing(
       // overlapping the stay: override starts before checkout AND ends after checkin
       .lte('start_date', checkOut)
       .gte('end_date', checkIn),
+    supabase
+      .from('properties')
+      .select('cleaning_fee_cents, pet_fee_cents, pet_fee_type')
+      .eq('id', propertyId)
+      .single(),
   ])
 
-  const taxRate         = Number(settings?.tax_rate ?? 0)
-  const passThroughFees = settings?.pass_through_stripe_fee ?? false
+  const taxRate           = Number(settings?.tax_rate ?? 0)
+  const passThroughFees   = settings?.pass_through_stripe_fee ?? false
+  const propCleaningFee   = property?.cleaning_fee_cents ?? 0
+  const propPetFee        = property?.pet_fee_cents ?? 0
+  const petFeeType        = property?.pet_fee_type ?? 'flat'
 
+  // ── Nightly rate calculation ──────────────────────────────────────────────
   const roomRates: RoomRate[] = []
   let subtotalCents = 0
 
@@ -116,8 +151,33 @@ export async function calculatePricing(
     subtotalCents += subtotal
   }
 
-  const taxCents = Math.round(subtotalCents * (taxRate / 100))
-  const preFeeCents = subtotalCents + taxCents
+  // ── Fee calculation ───────────────────────────────────────────────────────
+
+  // Cleaning fee: sum across all rooms (room-level override, fall back to property default)
+  const rawCleaningFee = (rooms ?? []).reduce((sum, r) => {
+    const roomFee = r.cleaning_fee_cents != null ? r.cleaning_fee_cents : propCleaningFee
+    return sum + roomFee
+  }, 0)
+  const cleaningFeeCents = cleaningFeeWaived ? 0 : rawCleaningFee
+
+  // Pet fee: apply to first room that allows_pets (room-level override, fall back to property default)
+  let petFeeCents = 0
+  if (petFeeApplied) {
+    const petRoom = (rooms ?? []).find(r => r.allows_pets)
+    if (petRoom) {
+      const petRate = petRoom.pet_fee_cents != null ? petRoom.pet_fee_cents : propPetFee
+      petFeeCents = petFeeType === 'per_night' ? petRate * nights : petRate
+    }
+  }
+
+  const miscFeeCents = Math.max(0, miscFeeInput)
+  const feesSubtotalCents = cleaningFeeCents + petFeeCents + miscFeeCents
+
+  // ── Tax + Stripe fee ──────────────────────────────────────────────────────
+
+  const taxableSubtotalCents = subtotalCents + feesSubtotalCents
+  const taxCents = taxExempt ? 0 : Math.round(taxableSubtotalCents * (taxRate / 100))
+  const preFeeCents = taxableSubtotalCents + taxCents
 
   // Stripe fee pass-through: solve for gross so net = preFeeCents
   // gross = (preFeeCents + STRIPE_FIXED_FEE_CENTS) / (1 - STRIPE_PCT_FEE)
@@ -134,6 +194,11 @@ export async function calculatePricing(
   return {
     roomRates,
     subtotalCents,
+    cleaningFeeCents,
+    petFeeCents,
+    miscFeeCents,
+    feesSubtotalCents,
+    taxableSubtotalCents,
     taxCents,
     stripeFeePassthroughCents,
     totalCents,

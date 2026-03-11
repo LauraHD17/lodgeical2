@@ -25,6 +25,7 @@ export function useReservations(filters = {}) {
         `)
         .eq('property_id', propertyId)
         .order('check_in', { ascending: false })
+        .order('id', { ascending: false })
         .limit(PAGE_SIZE)
 
       // Apply filters
@@ -32,13 +33,19 @@ export function useReservations(filters = {}) {
       if (filters.dateFrom) query = query.gte('check_in', filters.dateFrom)
       if (filters.dateTo) query = query.lte('check_in', filters.dateTo)
 
-      // Cursor-based pagination
-      if (pageParam) query = query.lt('check_in', pageParam)
+      // Composite cursor: (check_in < X) OR (check_in = X AND id < Y)
+      // Prevents duplicates/skips when multiple reservations share the same check_in date.
+      if (pageParam) {
+        query = query.or(
+          `check_in.lt.${pageParam.check_in},and(check_in.eq.${pageParam.check_in},id.lt.${pageParam.id})`
+        )
+      }
 
       const { data, error } = await query
       if (error) throw error
 
-      const nextCursor = data?.length === PAGE_SIZE ? data[data.length - 1].check_in : null
+      const last = data?.length === PAGE_SIZE ? data[data.length - 1] : null
+      const nextCursor = last ? { check_in: last.check_in, id: last.id } : null
       return { data: data ?? [], nextCursor }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,

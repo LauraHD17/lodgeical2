@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { HelpTip } from '@/components/ui/HelpTip'
 import { useToast } from '@/components/ui/useToast'
-import { SectionHeader } from './EmailTemplatesTab'
 
 function useExternalFeeds() {
   const { propertyId } = useProperty()
@@ -146,7 +146,10 @@ export function ChannelSyncTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader>External Calendar Sync</SectionHeader>
+      <div className="flex items-center gap-2 pb-2 border-b border-border mb-4">
+        <h3 className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">External Calendar Sync</h3>
+        <HelpTip text="Paste the iCal feed URL from Airbnb, VRBO, or any other platform where you list your rooms. Lodge-ical will regularly check that URL and block off any dates that are already booked elsewhere, keeping your availability accurate." />
+      </div>
       <p className="font-body text-[14px] text-text-secondary -mt-4">
         Paste iCal feed URLs from Airbnb, VRBO, Booking.com, or any other platform. Lodge-ical
         will import them as blocked dates so your availability stays accurate.

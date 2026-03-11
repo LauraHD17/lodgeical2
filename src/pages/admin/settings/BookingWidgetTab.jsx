@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Copy, Check, Code } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { HelpTip } from '@/components/ui/HelpTip'
 import { SectionHeader } from './EmailTemplatesTab'
 
 export function BookingWidgetTab({ property, onSaveClosure }) {
@@ -30,8 +31,9 @@ export function BookingWidgetTab({ property, onSaveClosure }) {
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
-            iframe Snippet
+          <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary flex items-center gap-1.5">
+            Embed Code for Your Website
+            <HelpTip text="This is the HTML code that places your booking widget directly on your own website. Copy it and paste it into any page on your site. If you're not sure how, send it to your web designer." />
           </span>
           <button
             onClick={handleCopy}

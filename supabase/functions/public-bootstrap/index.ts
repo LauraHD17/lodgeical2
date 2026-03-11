@@ -15,7 +15,7 @@ const CORS_HEADERS = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  const rateLimitError = rateLimit(req)
+  const rateLimitError = await rateLimit(req)
   if (rateLimitError) return rateLimitError
 
   const url = new URL(req.url)

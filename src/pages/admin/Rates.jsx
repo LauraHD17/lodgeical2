@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
+import { HelpTip } from '@/components/ui/HelpTip'
 import { useToast } from '@/components/ui/useToast'
 
 // ---------------------------------------------------------------------------
@@ -460,7 +461,10 @@ function OverrideList({ overrides, rooms, propertyId }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarBlank size={18} className="text-text-secondary" />
-          <h2 className="font-heading text-[22px] text-text-primary">Seasonal Overrides</h2>
+          <h2 className="font-heading text-[22px] text-text-primary flex items-center gap-2">
+            Seasonal Overrides
+            <HelpTip text="A Seasonal Override lets you charge a different nightly rate for specific dates — for example, a premium rate over a holiday weekend or a lower rate during slow season. If two overrides cover the same date, the higher rate is used automatically." />
+          </h2>
         </div>
         <Button variant="primary" size="sm" onClick={() => setAddOpen(true)} disabled={rooms.length === 0}>
           <Plus size={14} weight="bold" /> Add Override

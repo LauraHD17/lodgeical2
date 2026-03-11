@@ -121,6 +121,6 @@ export const queryKeys = {
 
   reports: {
     all: ['reports'],
-    ranged: (propertyId, dateFrom, dateTo) => ['reports', 'ranged', propertyId, dateFrom, dateTo],
+    ranged: (propertyId, dateFrom, dateTo, fetchFrom) => ['reports', 'ranged', propertyId, fetchFrom ?? dateFrom, dateTo],
   },
 }

@@ -7,7 +7,7 @@ import { Copy, Check, Link, CalendarPlus } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
-import { SectionHeader } from './EmailTemplatesTab'
+import { HelpTip } from '@/components/ui/HelpTip'
 
 function useRoomsWithTokens() {
   const { propertyId } = useProperty()
@@ -56,7 +56,10 @@ export function ICalFeedsTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      <SectionHeader>iCal Feed URLs</SectionHeader>
+      <div className="flex items-center gap-2 pb-2 border-b border-border mb-4">
+        <h3 className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">iCal Feed URLs</h3>
+        <HelpTip text="iCal is a universal calendar format used by Airbnb, VRBO, Google Calendar, Apple Calendar, and most booking platforms. These URLs let other services read your Lodge-ical availability so your calendars stay in sync automatically." />
+      </div>
       <p className="font-body text-[14px] text-text-secondary -mt-2">
         Subscribe to these URLs in Google Calendar, Apple Calendar, or any platform that
         supports iCal feeds. Each room has a unique, stable URL — anyone with the URL can

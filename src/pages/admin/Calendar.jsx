@@ -257,7 +257,18 @@ export default function Calendar() {
   const [selectedBlock, setSelectedBlock] = useState(null)  // block detail drawer
   const [newResDate, setNewResDate]     = useState(null)    // date clicked to create reservation
 
-  const { data, isLoading } = useReservations()
+  // Fetch only reservations that could be visible in the current calendar view.
+  // dateFrom goes back 2 months so long stays that started before this month are included.
+  // dateTo covers the end of the current month (+1 month to catch check-ins right after month end).
+  const calDateFrom = useMemo(
+    () => format(subMonths(startOfMonth(currentMonth), 2), 'yyyy-MM-dd'),
+    [currentMonth],
+  )
+  const calDateTo = useMemo(
+    () => format(endOfMonth(addMonths(currentMonth, 1)), 'yyyy-MM-dd'),
+    [currentMonth],
+  )
+  const { data, isLoading } = useReservations({ dateFrom: calDateFrom, dateTo: calDateTo })
   const { data: rooms = [] } = useRooms()
   const { propertyId, property } = useProperty()
 

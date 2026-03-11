@@ -164,7 +164,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
             </span>
           </div>
           {/* Per-room breakdown from server pricing */}
-          {pricing.roomRates.length > 1 ? (
+          {(pricing.roomRates?.length ?? 0) > 1 ? (
             pricing.roomRates.map(rr => (
               <div key={rr.roomId} className="flex justify-between">
                 <span className="text-text-secondary">

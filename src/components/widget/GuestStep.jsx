@@ -44,7 +44,7 @@ export function GuestStep({ room, checkIn, checkOut, onNext, onBack }) {
     const parsed = ccEmailSchema.safeParse(ccInput)
     if (!parsed.success) {
       if (!ccInput.trim()) return
-      setCcError(parsed.error.errors[0].message)
+      setCcError(parsed.error.errors?.[0]?.message ?? 'Invalid email')
       return
     }
     const email = parsed.data

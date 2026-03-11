@@ -132,6 +132,23 @@ QueryClientProvider → BrowserRouter → AuthProvider → PropertyProvider
 - All pages in `src/pages/admin/` or `src/pages/public/`.
 - Path alias: `@/` maps to `src/` (configured in Vite).
 
+### Shared UI Components
+
+**`HelpTip`** (`src/components/ui/HelpTip.jsx`) — Inline "?" tooltip for plain-English context on jargon labels. Uses `@radix-ui/react-popover` (already in deps). Opens on hover (120ms delay) and click/focus for keyboard/touch support. Dark `bg-text-primary` panel with arrow.
+
+```jsx
+import { HelpTip } from '@/components/ui/HelpTip'
+
+// Basic usage — inline next to a label:
+<p className="flex items-center gap-1.5">
+  Buffer Days <HelpTip text="Explanation here." />
+</p>
+```
+
+Props: `text` (string, required) — the tooltip copy. `size` (number, default 14) — icon size in px. `className` — extra classes on the trigger button.
+
+**Placement guidelines:** Put `HelpTip` after jargon terms that a non-hospitality innkeeper might not know (buffer days, linkable, iCal, seasonal override, ADR, RevPAR, pass-through fee, etc.). Keep tooltip copy to 2–3 sentences max, plain English.
+
 ### Widget Architecture
 
 The public booking widget (`src/components/widget/`) is a multi-step flow: DateStep → RoomStep → GuestStep → ReviewStep, orchestrated by `BookingWidget.jsx`.

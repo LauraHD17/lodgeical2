@@ -39,13 +39,15 @@ export async function requireAuth(req: Request): Promise<AuthResult | AuthError>
     return { error: 'Invalid or expired token' }
   }
 
-  // Fetch propertyId from DB — always server-side, never from client input
-  const { data: access, error: accessError } = await supabase
+  // Fetch propertyId from DB — always server-side, never from client input.
+  // Use limit(1) instead of single() so users with multiple property rows don't get PGRST116.
+  const { data: accessRows, error: accessError } = await supabase
     .from('user_property_access')
     .select('property_id')
     .eq('user_id', user.id)
-    .single()
+    .limit(1)
 
+  const access = accessRows?.[0]
   if (accessError || !access) {
     return { error: 'No property access found for this user' }
   }

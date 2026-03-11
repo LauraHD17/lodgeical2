@@ -41,7 +41,7 @@ const inputSchema = z.discriminatedUnion('action', [updateContactSchema, attachB
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
-  const rateLimitError = rateLimit(req, UPDATE_RATE_LIMIT)
+  const rateLimitError = await rateLimit(req, UPDATE_RATE_LIMIT)
   if (rateLimitError) return rateLimitError
 
   let body: unknown

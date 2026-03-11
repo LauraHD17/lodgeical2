@@ -13,6 +13,7 @@ import { queryKeys } from '@/config/queryKeys'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { HelpTip } from '@/components/ui/HelpTip'
 import { DataTable } from '@/components/shared/DataTable'
 import { useToast } from '@/components/ui/useToast'
 import { cn } from '@/lib/utils'
@@ -361,7 +362,7 @@ export default function Settings() {
               onChange={(e) => setCheckinout((c) => ({ ...c, check_out_time: e.target.value }))}
             />
             <Input
-              label="Minimum Stay (nights)"
+              label={<span className="flex items-center gap-1.5">Minimum Stay (nights) <HelpTip text="The fewest nights a guest can book in a single reservation. Setting this to 2 or 3 during busy periods reduces frequent turnover for short stays." /></span>}
               type="number"
               min={1}
               value={checkinout.min_stay_nights}
@@ -386,8 +387,9 @@ export default function Settings() {
           <div className="max-w-lg flex flex-col gap-5">
             <SectionHeader>Tax & Cancellation Policy</SectionHeader>
             <div className="flex flex-col">
-              <label htmlFor="settings-tax-rate" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1">
+              <label htmlFor="settings-tax-rate" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 flex items-center gap-1.5">
                 Tax Rate (%)
+                <HelpTip text="Enter the combined occupancy or lodging tax percentage required in your area. This is added to the guest's total at checkout. Check with your local tax authority for the correct rate — it varies by city, county, and state." />
               </label>
               <div className="relative">
                 <input
@@ -485,7 +487,10 @@ export default function Settings() {
                 onChange={(e) => setTaxPolicy((t) => ({ ...t, pass_through_stripe_fee: e.target.checked }))}
                 className="accent-info w-4 h-4"
               />
-              <span className="font-body text-[14px] text-text-primary">Pass processing fee to guests</span>
+              <span className="font-body text-[14px] text-text-primary flex items-center gap-1.5">
+                Pass processing fee to guests
+                <HelpTip text="Stripe charges your property 2.9% + $0.30 per online payment. When this is on, that fee is added to the guest's total so your property receives the full booking amount. When it's off, the fee comes out of your earnings." />
+              </span>
             </label>
             <p className="font-body text-[12px] text-text-muted">When enabled, a 2.9% + $0.30 processing fee is added to the guest&apos;s total so your property receives the full booking amount.</p>
 
