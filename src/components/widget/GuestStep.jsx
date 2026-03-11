@@ -173,7 +173,7 @@ export function GuestStep({ room, checkIn, checkOut, onNext, onBack }) {
               <p className="font-body text-[13px] text-text-muted mb-3">
                 Additional people who should receive check-in information (max 5).
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   id="ccEmailInput"
                   type="email"
@@ -214,7 +214,7 @@ export function GuestStep({ room, checkIn, checkOut, onNext, onBack }) {
           </div>
         )}
 
-        <div className="flex gap-3 mt-6">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
           <Button variant="ghost" size="md" onClick={onBack} type="button" className="text-text-secondary">
             ← Back
           </Button>

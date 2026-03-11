@@ -322,7 +322,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
                   <button
                     type="button"
                     onClick={() => setSelectedPolicy({ title: p.label, content: p.content })}
-                    className="text-info hover:underline font-medium"
+                    className="text-info hover:underline font-medium focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info focus-visible:ring-offset-1 rounded-sm"
                   >
                     {p.label}
                   </button>
@@ -344,7 +344,7 @@ export function ReviewStep({ property, room, dates, guestInfo, settings, onBook,
                 <button
                   type="button"
                   onClick={() => setSelectedPolicy({ title: 'Marketing Policy', content: settings.marketing_policy })}
-                  className="text-info hover:underline"
+                  className="text-info hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info focus-visible:ring-offset-1 rounded-sm"
                 >
                   Learn more
                 </button>

@@ -767,7 +767,7 @@ function RoomRow({ room, roomIndex, days, reservations, tickets, isLast }) {
                   : { backgroundColor: pal.bg + '22', border: `1px solid ${pal.bg}40`, borderLeft: `3px solid ${pal.bg}` }
                 }
               >
-                <span className="font-mono text-[11px] truncate" style={{ color: isPending ? undefined : pal.border ?? pal.bg }} >
+                <span className="font-mono text-[11px] text-text-primary truncate" >
                   {r.guests?.last_name ?? '—'}
                 </span>
               </Link>

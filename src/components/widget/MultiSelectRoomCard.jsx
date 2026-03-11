@@ -1,14 +1,15 @@
 // src/components/widget/MultiSelectRoomCard.jsx
 
 import { Users, CheckSquare, Square } from '@phosphor-icons/react'
-import { fmtMoney as formatCents } from '@/lib/utils'
+import { fmtMoney as formatCents, cn } from '@/lib/utils'
 
 export function MultiSelectRoomCard({ room, nights, selected, onToggle }) {
   return (
     <div
-      className={`border rounded-[8px] overflow-hidden bg-surface transition-colors cursor-pointer ${
+      className={cn(
+        'border rounded-[8px] overflow-hidden bg-surface transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-info focus-visible:outline-none',
         selected ? 'border-info ring-2 ring-info/20' : 'border-border hover:border-info'
-      }`}
+      )}
       onClick={onToggle}
       role="checkbox"
       aria-checked={selected}

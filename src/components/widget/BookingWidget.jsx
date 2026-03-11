@@ -129,11 +129,11 @@ export function BookingWidget({ property, rooms, roomLinks = [], settings }) {
   }
 
   return (
-    <div className={cn(isEmbed ? 'w-full' : 'max-w-2xl mx-auto', isEmbed ? 'p-0' : '')}>
+    <div className={cn(isEmbed ? 'w-full p-0' : 'max-w-3xl mx-auto px-4')}>
       {/* Property name — hidden in embed mode */}
       {!isEmbed && (
         <div className="text-center mb-6">
-          <h1 className="font-heading text-[28px] text-text-primary">{property.name}</h1>
+          <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">{property.name}</h1>
           {property.location && (
             <p className="font-body text-[14px] text-text-muted mt-1">{property.location}</p>
           )}

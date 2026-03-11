@@ -31,12 +31,12 @@ export function DataTable({
 
   function SortIcon({ colKey }) {
     if (sortKey !== colKey) {
-      return <CaretUpDown size={14} className="shrink-0 opacity-60" />
+      return <CaretUpDown size={14} className="shrink-0 opacity-40" />
     }
     if (sortDir === 'asc') {
-      return <CaretUp size={14} className="shrink-0 text-info" />
+      return <CaretUp size={14} weight="bold" className="shrink-0" />
     }
-    return <CaretDown size={14} className="shrink-0 text-info" />
+    return <CaretDown size={14} weight="bold" className="shrink-0" />
   }
 
   const isEmpty = !loading && data.length === 0
@@ -53,7 +53,7 @@ export function DataTable({
                   'px-4 py-3 text-left font-body text-[13px] uppercase tracking-[0.08em] text-white font-semibold select-none whitespace-nowrap',
                   col.numeric && 'text-right',
                   col.sortable && 'cursor-pointer hover:opacity-80',
-                  sortKey === col.key && 'underline text-info'
+                  sortKey === col.key && 'border-b-2 border-white'
                 )}
                 onClick={() => handleSort(col)}
               >
@@ -92,7 +92,7 @@ export function DataTable({
                 tabIndex={onRowClick ? 0 : undefined}
                 aria-label={onRowClick ? `View details` : undefined}
                 className={cn(
-                  'group transition-colors duration-150 hover:bg-info-bg',
+                  'group transition-colors duration-150 hover:bg-tableAlt',
                   rowIndex % 2 === 0 ? 'bg-white' : 'bg-tableAlt',
                   onRowClick && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-info'
                 )}

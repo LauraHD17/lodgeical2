@@ -52,12 +52,15 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
         <Button variant="secondary" size="md" onClick={onBack}>Change dates</Button>
 
         {onInquiry && (
-          <div className="mt-8 border-t border-border pt-6">
-            <p className="font-body text-[13px] text-text-secondary mb-3">
-              Still interested? Send an inquiry and we&apos;ll reach out if availability opens up.
+          <div className="mt-8 border-t border-border pt-6 text-left">
+            <p className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-muted mb-2">
+              Still interested?
+            </p>
+            <p className="font-body text-[15px] text-text-secondary leading-relaxed mb-3">
+              Tell us when you&apos;d like to visit and we&apos;ll reach out if availability opens up.
             </p>
             <Button variant="ghost" size="sm" onClick={onInquiry}>
-              Send an inquiry &rarr;
+              Fill out an inquiry form &rarr;
             </Button>
           </div>
         )}
@@ -79,7 +82,7 @@ export function RoomStep({ rooms, roomLinks = [], checkIn, checkOut, onNext, onB
           <button
             type="button"
             onClick={() => { setMultiMode(!multiMode); setSelectedIds(new Set()) }}
-            className="font-body text-[13px] text-info hover:underline"
+            className="font-body text-[13px] text-info hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info focus-visible:ring-offset-2 rounded-sm"
           >
             {multiMode ? 'Switch to single room' : 'Need multiple rooms?'}
           </button>

@@ -110,8 +110,7 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
         <p className="font-body text-[13px] text-text-muted mb-4">Minimum {minStay} night stay</p>
       )}
 
-      <div className="my-4 overflow-x-auto">
-        <div className="flex justify-center">
+      <div className="my-4 flex justify-center">
         <DayPicker
           mode="range"
           selected={range}
@@ -128,12 +127,11 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           numberOfMonths={isMobile ? 1 : 2}
           className="!font-body"
         />
-        </div>
       </div>
 
       {/* Legend */}
       {hasAnyBookings && (
-        <div className="flex items-center justify-center gap-5 mb-4">
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 mb-4">
           <div className="flex items-center gap-2">
             <span className="inline-block w-4 h-4 rounded-[3px] bg-surface-raised border border-border" />
             <span className="font-body text-[12px] text-text-secondary">Available</span>
@@ -141,14 +139,14 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           {limitedDates.length > 0 && (
             <div className="flex items-center gap-2">
               <span className="inline-block w-4 h-4 rounded-[3px] bg-warning-bg border border-warning relative">
-                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-warning leading-none">!</span>
+                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-warning" />
               </span>
               <span className="font-body text-[12px] text-text-secondary">Limited availability</span>
             </div>
           )}
           {fullyBookedDates.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 rounded-[3px] bg-danger-bg border border-danger" style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(190,18,60,0.15) 3px, rgba(190,18,60,0.15) 5px)' }} />
+              <span className="inline-block w-4 h-4 rounded-[3px] bg-danger-bg border border-danger" style={{ backgroundImage: 'var(--stripe-diagonal)' }} />
               <span className="font-body text-[12px] text-text-secondary">Fully booked</span>
             </div>
           )}
@@ -156,17 +154,16 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
       )}
 
       {range?.from && range?.to && (
-        <div className="flex items-center justify-center gap-4 mb-6 p-3 bg-surface rounded-[6px]">
-          <div className="text-center">
+        <div className="grid grid-cols-3 gap-2 mb-6 p-3 bg-surface rounded-[6px] text-center">
+          <div>
             <p className="font-body text-[11px] text-text-muted uppercase tracking-[0.06em]">Check-in</p>
             <p className="font-mono text-[14px] text-text-primary">{format(range.from, 'MMM d, yyyy')}</p>
           </div>
-          <div className="text-center font-mono text-[14px] text-text-muted">→</div>
-          <div className="text-center">
+          <div>
             <p className="font-body text-[11px] text-text-muted uppercase tracking-[0.06em]">Check-out</p>
             <p className="font-mono text-[14px] text-text-primary">{format(range.to, 'MMM d, yyyy')}</p>
           </div>
-          <div className="text-center">
+          <div>
             <p className="font-body text-[11px] text-text-muted uppercase tracking-[0.06em]">Nights</p>
             <p className="font-mono text-[14px] text-text-primary">{nights}</p>
           </div>
@@ -188,17 +185,26 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
         <button
           type="button"
           onClick={onInquiry}
-          className="mt-6 w-full bg-info-bg border-2 border-info rounded-[10px] p-5 text-center hover:bg-info/10 transition-colors cursor-pointer"
+          className="group mt-8 w-full text-left cursor-pointer"
         >
-          <p className="font-body text-[17px] font-semibold text-info mb-1">
-            Want dates that are unavailable?
-          </p>
-          <p className="font-body text-[14px] text-info/80">
-            Send us an inquiry and we&apos;ll reach out if availability opens up.
-          </p>
-          <span className="inline-block mt-3 font-body text-[14px] font-semibold text-info underline underline-offset-2">
-            Send an inquiry &rarr;
-          </span>
+          <div className="bg-surface border border-border border-l-[3px] border-l-warning rounded-[6px] p-5 group-hover:border-l-info transition-colors">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-body text-[11px] uppercase tracking-[0.08em] font-semibold text-warning mb-1.5">
+                  Inquiry — not a booking
+                </p>
+                <p className="font-heading text-[17px] text-text-primary mb-1">
+                  Can&apos;t find your dates?
+                </p>
+                <p className="font-body text-[14px] text-text-secondary leading-relaxed">
+                  Tell us when you&apos;d like to visit and we&apos;ll reach out if availability opens up.
+                </p>
+                <span className="inline-block mt-3 font-body text-[14px] font-semibold text-text-primary group-hover:text-info transition-colors">
+                  Fill out an inquiry form &rarr;
+                </span>
+              </div>
+            </div>
+          </div>
         </button>
       )}
 
@@ -209,22 +215,16 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           gap: 1.5rem;
         }
         .rdp-day--fully-booked:not(.rdp-day_selected) {
-          background: repeating-linear-gradient(
-            135deg,
-            var(--color-danger-bg, #FFE4E6),
-            var(--color-danger-bg, #FFE4E6) 3px,
-            rgba(190, 18, 60, 0.12) 3px,
-            rgba(190, 18, 60, 0.12) 5px
-          ) !important;
-          color: var(--color-danger, #BE123C) !important;
+          background: var(--stripe-diagonal) !important;
+          color: var(--color-danger) !important;
           opacity: 0.7;
           cursor: not-allowed;
           text-decoration: line-through;
           border-radius: 4px;
         }
         .rdp-day--limited:not(.rdp-day_selected) {
-          background-color: var(--color-warning-bg, #FEF3C7) !important;
-          color: var(--color-warning, #B45309) !important;
+          background-color: var(--color-warning-bg) !important;
+          color: var(--color-warning) !important;
           border-radius: 4px;
           font-weight: 600;
           position: relative;
@@ -238,7 +238,7 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           width: 4px;
           height: 4px;
           border-radius: 50%;
-          background: var(--color-warning, #B45309);
+          background: var(--color-warning);
         }
       `}</style>
     </div>
