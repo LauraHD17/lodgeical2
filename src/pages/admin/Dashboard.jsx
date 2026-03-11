@@ -51,6 +51,16 @@ function wmoToIcon(code) {
   return Cloud
 }
 
+function wmoToGlow(code) {
+  if (code <= 2)                                                         return '0 0 12px rgba(251, 191, 36, 0.6)'   // sunny — warm amber
+  if (code <= 3 || code === 45 || code === 48)                           return 'none'                                // cloudy — neutral
+  if (code >= 51 && code <= 57)                                          return '0 0 10px rgba(148, 163, 184, 0.5)'   // drizzle — cool slate
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82))         return '0 0 10px rgba(148, 163, 184, 0.5)'   // rain — cool slate
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86)         return '0 0 10px rgba(226, 232, 240, 0.65)'  // snow — frosty white
+  if (code >= 95)                                                        return '0 0 10px rgba(167, 139, 250, 0.45)'  // storm — pale violet
+  return 'none'
+}
+
 function useWeather(lat, lon) {
   return useQuery({
     queryKey: queryKeys.weather.current(lat, lon),
@@ -83,8 +93,9 @@ function WeatherStrip() {
   const temp = Math.round(data.current_weather.temperature ?? 0)
   const high = Math.round(data.daily?.temperature_2m_max?.[0] ?? 0)
   const low  = Math.round(data.daily?.temperature_2m_min?.[0] ?? 0)
+  const glow = wmoToGlow(code)
   return (
-    <div className="flex items-center gap-1.5 select-none" aria-hidden="true">
+    <div className="flex items-center gap-1.5 select-none" aria-hidden="true" style={{ textShadow: glow }}>
       {createElement(wmoToIcon(code), { size: 14, weight: 'thin', className: 'text-text-muted shrink-0' })}
       <span className="font-mono text-[13px] text-text-secondary">{temp}°</span>
       <span className="font-mono text-[11px] text-text-muted">H:{high} L:{low}</span>

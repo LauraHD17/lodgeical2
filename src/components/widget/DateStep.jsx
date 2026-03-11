@@ -208,11 +208,62 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
         </button>
       )}
 
-      {/* Inline styles for date modifiers */}
+      {/* Inline styles for DayPicker branding + date modifiers */}
       <style>{`
         .rdp-months {
           flex-wrap: nowrap !important;
           gap: 1.5rem;
+        }
+        /* Month caption — Syne heading font */
+        .rdp-caption_label {
+          font-family: 'Syne', sans-serif !important;
+          font-weight: 700 !important;
+          font-size: 17px !important;
+          letter-spacing: -0.02em !important;
+          color: var(--color-text-primary) !important;
+        }
+        /* Nav buttons — square, matching Button component */
+        .rdp-nav_button {
+          width: 32px !important;
+          height: 32px !important;
+          border-radius: 0 !important;
+          border: 1.5px solid var(--color-border) !important;
+          background: var(--color-surface-raised) !important;
+          color: var(--color-text-primary) !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          transition: opacity 0.15s !important;
+        }
+        .rdp-nav_button:hover {
+          opacity: 0.75 !important;
+        }
+        .rdp-nav_button:active {
+          transform: scale(0.98) !important;
+        }
+        /* Weekday headers — uppercase caption style */
+        .rdp-head_cell {
+          font-family: 'IBM Plex Sans', sans-serif !important;
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.06em !important;
+          color: var(--color-text-muted) !important;
+        }
+        /* Day cells — body font */
+        .rdp-day {
+          font-family: 'IBM Plex Mono', monospace !important;
+          font-size: 13px !important;
+          border-radius: 4px !important;
+        }
+        /* Selected range — info color */
+        .rdp-day_selected:not(.rdp-day--fully-booked) {
+          background-color: var(--color-info) !important;
+          color: white !important;
+        }
+        .rdp-day_range_middle:not(.rdp-day--fully-booked) {
+          background-color: var(--color-info-bg) !important;
+          color: var(--color-info) !important;
         }
         .rdp-day--fully-booked:not(.rdp-day_selected) {
           background: var(--stripe-diagonal) !important;

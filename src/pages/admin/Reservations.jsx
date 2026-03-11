@@ -148,7 +148,7 @@ function ReservationDrawer({ reservation, onClose, roomMap }) {
       {/* Drawer */}
       <div className="fixed right-0 top-0 h-full w-[420px] max-w-full z-[9991] bg-surface-raised flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="font-heading text-[20px] text-text-primary">Reservation Details</h2>
+          <h2 className="font-heading text-[24px] text-text-primary">Reservation Details</h2>
           <button
             onClick={onClose}
             className="text-text-muted hover:text-text-primary transition-colors"

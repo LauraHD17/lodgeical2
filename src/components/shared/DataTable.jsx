@@ -93,7 +93,7 @@ export function DataTable({
                 aria-label={onRowClick ? `View details` : undefined}
                 className={cn(
                   'group transition-colors duration-150 hover:bg-tableAlt',
-                  rowIndex % 2 === 0 ? 'bg-white' : 'bg-tableAlt',
+                  rowIndex % 2 === 0 ? 'bg-surface-raised' : 'bg-tableAlt',
                   onRowClick && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-info'
                 )}
               >

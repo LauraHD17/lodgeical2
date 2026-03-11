@@ -26,7 +26,7 @@ export class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-bg">
+        <div className="min-h-screen flex items-center justify-center bg-background">
           <ErrorState
             title="Something went wrong"
             message="An unexpected error occurred. Please reload the page to continue."

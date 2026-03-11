@@ -266,7 +266,7 @@ export default function Import() {
                 {preview.previewRows.map((row, i) => (
                   <tr
                     key={i}
-                    className={i % 2 === 0 ? 'bg-white' : 'bg-tableAlt'}
+                    className={i % 2 === 0 ? 'bg-surface-raised' : 'bg-tableAlt'}
                   >
                     {preview.headers.map((h, j) => (
                       <td key={j} className="px-3 py-2 font-body text-[13px] text-text-secondary whitespace-nowrap">
@@ -333,7 +333,7 @@ export default function Import() {
                 </thead>
                 <tbody>
                   {result.errors.map((e, i) => (
-                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-tableAlt'}>
+                    <tr key={i} className={i % 2 === 0 ? 'bg-surface-raised' : 'bg-tableAlt'}>
                       <td className="px-3 py-2 font-mono text-[13px] text-text-secondary">{e.row}</td>
                       <td className="px-3 py-2 font-body text-[13px] text-danger">{e.error}</td>
                     </tr>

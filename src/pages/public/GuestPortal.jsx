@@ -1302,7 +1302,7 @@ function PortalTabs({ data, onBack, onRefresh }) {
       </button>
 
       <Tabs.Root defaultValue="upcoming">
-        <Tabs.List className="flex gap-0 border-b border-border mb-6 print:hidden overflow-x-auto w-fit mx-auto">
+        <Tabs.List className="flex gap-0 border-b border-border mb-6 print:hidden overflow-x-auto w-fit max-w-full mx-auto">
           {[
             { value: 'upcoming', label: 'Upcoming', icon: EnvelopeSimple },
             { value: 'history', label: 'History', icon: ClockCounterClockwise },

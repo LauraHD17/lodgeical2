@@ -436,7 +436,7 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
       <div className="flex items-center justify-between mb-6 pt-8">
         <div className="flex items-center gap-3">
           <UserCircle size={32} className="text-text-muted" />
-          <h2 className="font-heading text-[20px] text-text-primary">
+          <h2 className="font-heading text-[24px] text-text-primary">
             {guest.first_name} {guest.last_name}
           </h2>
         </div>

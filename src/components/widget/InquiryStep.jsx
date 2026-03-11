@@ -7,6 +7,7 @@ import { format, differenceInCalendarDays } from 'date-fns'
 import { Info, CheckCircle } from '@phosphor-icons/react'
 import { DayPicker } from 'react-day-picker'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 
 const GUEST_RANGES = ['1-2', '3-4', '5-6', '7+']
@@ -169,60 +170,38 @@ export function InquiryStep({ checkIn, checkOut, propertyId, rooms = [], closure
 
       {/* Guest info */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="inq-first" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 block">
-            First name *
-          </label>
-          <input
-            id="inq-first"
-            type="text"
-            value={firstName}
-            onChange={e => setFirstName(e.target.value)}
-            required
-            className="w-full h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-          />
-        </div>
-        <div>
-          <label htmlFor="inq-last" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 block">
-            Last name *
-          </label>
-          <input
-            id="inq-last"
-            type="text"
-            value={lastName}
-            onChange={e => setLastName(e.target.value)}
-            required
-            className="w-full h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="inq-email" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 block">
-          Email *
-        </label>
-        <input
-          id="inq-email"
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
+        <Input
+          id="inq-first"
+          label="First name *"
+          value={firstName}
+          onChange={e => setFirstName(e.target.value)}
           required
-          className="w-full h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
+        />
+        <Input
+          id="inq-last"
+          label="Last name *"
+          value={lastName}
+          onChange={e => setLastName(e.target.value)}
+          required
         />
       </div>
 
-      <div>
-        <label htmlFor="inq-phone" className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-1 block">
-          Phone (optional)
-        </label>
-        <input
-          id="inq-phone"
-          type="tel"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-          className="w-full h-11 border-[1.5px] border-border rounded-[6px] px-3 font-body text-[15px] text-text-primary bg-surface-raised placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-info focus:ring-offset-2"
-        />
-      </div>
+      <Input
+        id="inq-email"
+        label="Email *"
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        required
+      />
+
+      <Input
+        id="inq-phone"
+        label="Phone (optional)"
+        type="tel"
+        value={phone}
+        onChange={e => setPhone(e.target.value)}
+      />
 
       {/* Guest count */}
       <fieldset>

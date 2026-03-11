@@ -252,7 +252,7 @@ export default function Login() {
         >
           <House size={12} weight="fill" className="text-text-secondary shrink-0" />
           <div className="text-left">
-            <div className="text-[14px] font-semibold text-text-primary leading-tight">Try Lodge-ical</div>
+            <div className="text-[15px] font-semibold text-text-primary leading-tight">Try Lodge-ical</div>
             <div className="text-[11px] text-text-muted leading-tight">No account needed — nothing is saved</div>
           </div>
         </Link>

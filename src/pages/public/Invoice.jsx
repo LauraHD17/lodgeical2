@@ -138,7 +138,7 @@ export default function Invoice() {
         </div>
 
         {/* Invoice meta */}
-        <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-8">
           <div>
             <h2 className="font-body text-[11px] uppercase tracking-[0.06em] font-semibold text-text-muted mb-2">
               Bill To

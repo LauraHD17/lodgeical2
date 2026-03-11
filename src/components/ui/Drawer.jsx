@@ -33,7 +33,7 @@ export function Drawer({ open, onClose, title, width = 480, children }) {
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
       <div
-        className="flex-1 bg-black/30"
+        className="flex-1 bg-text-primary/20"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -51,7 +51,7 @@ export function Drawer({ open, onClose, title, width = 480, children }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="font-heading text-[20px] text-text-primary tracking-[-0.02em]">{title}</h2>
+          <h2 className="font-heading text-[24px] text-text-primary tracking-[-0.02em]">{title}</h2>
           <button
             onClick={onClose}
             className="text-text-muted hover:text-text-primary transition-colors"
