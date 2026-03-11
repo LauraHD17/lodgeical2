@@ -606,4 +606,21 @@ export const handlers = [
     HttpResponse.json({ success: true }),
   ),
 
+  // Stripe reconciliation (mock: all matched clean state)
+  http.post(`${BASE}/functions/v1/stripe-reconcile`, () =>
+    HttpResponse.json({
+      summary: { matched: 10, mismatches: 0, stripeOnly: 0, localOnly: 0,
+                 totalStripeCharges: 1250000, totalLocalPayments: 1250000 },
+      matched: Array.from({ length: 10 }, (_, i) => ({
+        localId: `pay_mock_${i + 1}`,
+        stripeId: `ch_mock_${i + 1}`,
+        amount: 125000,
+        status: 'succeeded',
+      })),
+      mismatches: [],
+      stripeOnly: [],
+      localOnly: [],
+    })
+  ),
+
 ]

@@ -228,21 +228,29 @@ function InsightsPanel({ metrics }) {
     return [...actionable, ...informational].slice(0, 6)
   })()
 
-  if (!insights.length) return null
   return (
     <div className="bg-surface-raised border border-border rounded-[8px] p-6">
       <h2 className="font-heading text-[20px] text-text-primary mb-4">Insights & Recommendations</h2>
-      <ul className="flex flex-col gap-4">
-        {insights.map((ins, i) => {
-          const Icon = ins.icon
-          return (
-            <li key={i} className="flex items-start gap-3">
-              <Icon size={18} weight="fill" className={cn('mt-0.5 shrink-0', ins.color)} />
-              <p className="font-body text-[14px] text-text-primary leading-relaxed">{ins.text}</p>
-            </li>
-          )
-        })}
-      </ul>
+      {insights.length === 0 ? (
+        <div className="flex items-start gap-3">
+          <Lightbulb size={16} weight="fill" className="text-text-muted shrink-0 mt-0.5" />
+          <p className="font-body text-[14px] text-text-muted">
+            Insights will appear here once you have a few months of booking history.
+          </p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {insights.map((ins, i) => {
+            const Icon = ins.icon
+            return (
+              <li key={i} className="flex items-start gap-3">
+                <Icon size={18} weight="fill" className={cn('mt-0.5 shrink-0', ins.color)} />
+                <p className="font-body text-[14px] text-text-primary leading-relaxed">{ins.text}</p>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
@@ -655,6 +663,7 @@ function StripeReconciliation() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const thirtyDaysAgo = format(subMonths(new Date(), 1), 'yyyy-MM-dd')
 
+  const [open, setOpen] = useState(true)
   const [dateFrom, setDateFrom] = useState(thirtyDaysAgo)
   const [dateTo, setDateTo] = useState(today)
   const [loading, setLoading] = useState(false)
@@ -693,9 +702,9 @@ function StripeReconciliation() {
       key: 'type',
       label: 'Type',
       render: (_, row) => {
-        if (row._type === 'mismatch') return <span className="font-body text-[13px] text-warning font-semibold">Amount Mismatch</span>
-        if (row._type === 'stripeOnly') return <span className="font-body text-[13px] text-danger font-semibold">Stripe Only</span>
-        return <span className="font-body text-[13px] text-info font-semibold">Local Only</span>
+        if (row._type === 'mismatch') return <span className="font-body text-[13px] text-warning font-semibold">Amount mismatch</span>
+        if (row._type === 'stripeOnly') return <span className="font-body text-[13px] text-danger font-semibold">Not in Lodge-ical</span>
+        return <span className="font-body text-[13px] text-info font-semibold">Not in Stripe</span>
       },
     },
     {
@@ -723,116 +732,117 @@ function StripeReconciliation() {
     },
   ]
 
+  const isClean = result &&
+    result.summary.mismatches === 0 &&
+    result.summary.stripeOnly === 0 &&
+    result.summary.localOnly === 0
+
+  const issueCount = result
+    ? result.summary.mismatches + result.summary.stripeOnly + result.summary.localOnly
+    : 0
+
   return (
-    <div className="bg-surface border border-border rounded-[8px] p-6 mt-6">
-      <div className="flex items-center gap-2 mb-4">
-        <ArrowsClockwise size={20} className="text-text-secondary" />
-        <h3 className="font-heading text-[18px] text-text-primary">Stripe Reconciliation</h3>
-      </div>
-      <p className="font-body text-[14px] text-text-secondary mb-4">
-        Compare local payment records with Stripe charges to find discrepancies.
-      </p>
+    <div className="bg-surface border border-border rounded-[8px] mt-6 overflow-hidden">
+      {/* Collapsible header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-6 py-4 text-left hover:bg-surface-raised transition-colors"
+      >
+        <ArrowsClockwise size={18} className="text-text-secondary shrink-0" />
+        <span className="font-heading text-[18px] text-text-primary flex-1">Stripe Reconciliation</span>
+        {result && !open && (
+          isClean
+            ? <span className="inline-flex items-center gap-1.5 font-body text-[13px] text-success mr-2">
+                <CheckCircle size={13} weight="fill" /> All {result.summary.matched} matched
+              </span>
+            : <span className="inline-flex items-center gap-1.5 font-body text-[13px] text-warning mr-2">
+                <WarningCircle size={13} weight="fill" /> {issueCount} issue{issueCount !== 1 ? 's' : ''} found
+              </span>
+        )}
+        {open ? <CaretUp size={14} className="text-text-muted shrink-0" /> : <CaretDown size={14} className="text-text-muted shrink-0" />}
+      </button>
 
-      <div className="flex flex-wrap items-end gap-4 mb-4">
-        <div className="min-w-[160px]">
-          <Input
-            label="From"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-        </div>
-        <div className="min-w-[160px]">
-          <Input
-            label="To"
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
-        </div>
-        <Button
-          variant="primary"
-          size="md"
-          loading={loading}
-          onClick={runReconciliation}
-        >
-          <ArrowsClockwise size={14} weight="bold" /> Run Reconciliation
-        </Button>
-      </div>
+      {open && (
+        <div className="px-6 pb-6 border-t border-border">
+          <p className="font-body text-[14px] text-text-secondary mt-4 mb-4">
+            Compare local payment records with Stripe charges to find discrepancies.
+          </p>
 
-      {error && (
-        <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-4">
-          <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
-          <p className="font-body text-[14px] text-danger">{error}</p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex items-center gap-2 py-8 justify-center">
-          <SpinnerGap size={20} className="animate-spin text-info" />
-          <span className="font-body text-[14px] text-text-muted">Fetching Stripe data and comparing...</span>
-        </div>
-      )}
-
-      {result && (
-        <div className="flex flex-col gap-4">
-          {/* Summary cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-success-bg border border-success rounded-[8px] p-4 text-center">
-              <p className="font-mono text-[24px] font-bold text-success">{result.summary.matched}</p>
-              <p className="font-body text-[12px] text-success">Matched</p>
+          <div className="flex flex-wrap items-end gap-4 mb-4">
+            <div className="min-w-[160px]">
+              <Input label="From" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </div>
-            <div className={cn(
-              'border rounded-[8px] p-4 text-center',
-              result.summary.mismatches > 0 ? 'bg-warning-bg border-warning' : 'bg-surface border-border'
-            )}>
-              <p className={cn('font-mono text-[24px] font-bold', result.summary.mismatches > 0 ? 'text-warning' : 'text-text-muted')}>
-                {result.summary.mismatches}
-              </p>
-              <p className="font-body text-[12px] text-text-secondary">Mismatches</p>
+            <div className="min-w-[160px]">
+              <Input label="To" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </div>
-            <div className={cn(
-              'border rounded-[8px] p-4 text-center',
-              result.summary.stripeOnly > 0 ? 'bg-danger-bg border-danger' : 'bg-surface border-border'
-            )}>
-              <p className={cn('font-mono text-[24px] font-bold', result.summary.stripeOnly > 0 ? 'text-danger' : 'text-text-muted')}>
-                {result.summary.stripeOnly}
-              </p>
-              <p className="font-body text-[12px] text-text-secondary">Stripe Only</p>
-            </div>
-            <div className={cn(
-              'border rounded-[8px] p-4 text-center',
-              result.summary.localOnly > 0 ? 'bg-info-bg border-info' : 'bg-surface border-border'
-            )}>
-              <p className={cn('font-mono text-[24px] font-bold', result.summary.localOnly > 0 ? 'text-info' : 'text-text-muted')}>
-                {result.summary.localOnly}
-              </p>
-              <p className="font-body text-[12px] text-text-secondary">Local Only</p>
-            </div>
+            <Button variant="primary" size="md" loading={loading} onClick={runReconciliation}>
+              <ArrowsClockwise size={14} weight="bold" /> Run Reconciliation
+            </Button>
           </div>
 
-          {/* Clean status */}
-          {result.summary.mismatches === 0 && result.summary.stripeOnly === 0 && result.summary.localOnly === 0 && (
-            <div className="flex items-center gap-2 p-4 bg-success-bg border border-success rounded-[8px]">
-              <CheckCircle size={18} weight="fill" className="text-success" />
-              <p className="font-body text-[14px] text-success font-semibold">
-                All {result.summary.matched} transactions match. No discrepancies found.
-              </p>
+          {error && (
+            <div className="flex items-start gap-2 p-3 bg-danger-bg border border-danger rounded-[6px] mb-4">
+              <WarningCircle size={16} weight="fill" className="text-danger shrink-0 mt-0.5" />
+              <p className="font-body text-[14px] text-danger">{error}</p>
             </div>
           )}
 
-          {/* Discrepancy table */}
-          {(result.mismatches?.length > 0 || result.stripeOnly?.length > 0 || result.localOnly?.length > 0) && (
-            <div className="border border-border rounded-[8px] overflow-hidden">
-              <DataTable
-                columns={DISCREPANCY_COLUMNS}
-                data={[
-                  ...(result.mismatches ?? []).map(r => ({ ...r, _type: 'mismatch' })),
-                  ...(result.stripeOnly ?? []).map(r => ({ ...r, _type: 'stripeOnly' })),
-                  ...(result.localOnly ?? []).map(r => ({ ...r, _type: 'localOnly' })),
-                ]}
-                emptyState={<p className="text-text-muted font-body text-[14px] py-4">No discrepancies</p>}
-              />
+          {loading && (
+            <div className="flex items-center gap-2 py-8 justify-center">
+              <SpinnerGap size={20} className="animate-spin text-info" />
+              <span className="font-body text-[14px] text-text-muted">Fetching Stripe data and comparing...</span>
+            </div>
+          )}
+
+          {result && (
+            <div className="flex flex-col gap-4">
+              {/* Compact chip summary row */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-success-bg border border-success/40 rounded-[6px]">
+                  <span className="font-mono text-[13px] font-semibold text-success">{result.summary.matched}</span>
+                  <span className="font-body text-[12px] text-success">matched</span>
+                </span>
+                <span className={cn('inline-flex items-center gap-2 px-3 py-1.5 rounded-[6px] border',
+                  result.summary.mismatches > 0 ? 'bg-warning-bg border-warning/40' : 'bg-surface-raised border-border')}>
+                  <span className={cn('font-mono text-[13px] font-semibold', result.summary.mismatches > 0 ? 'text-warning' : 'text-text-muted')}>{result.summary.mismatches}</span>
+                  <span className={cn('font-body text-[12px]', result.summary.mismatches > 0 ? 'text-warning' : 'text-text-secondary')}>mismatches</span>
+                </span>
+                <span className={cn('inline-flex items-center gap-2 px-3 py-1.5 rounded-[6px] border',
+                  result.summary.stripeOnly > 0 ? 'bg-danger-bg border-danger/40' : 'bg-surface-raised border-border')}>
+                  <span className={cn('font-mono text-[13px] font-semibold', result.summary.stripeOnly > 0 ? 'text-danger' : 'text-text-muted')}>{result.summary.stripeOnly}</span>
+                  <span className={cn('font-body text-[12px]', result.summary.stripeOnly > 0 ? 'text-danger' : 'text-text-secondary')}>not in Lodge-ical</span>
+                </span>
+                <span className={cn('inline-flex items-center gap-2 px-3 py-1.5 rounded-[6px] border',
+                  result.summary.localOnly > 0 ? 'bg-info-bg border-info/40' : 'bg-surface-raised border-border')}>
+                  <span className={cn('font-mono text-[13px] font-semibold', result.summary.localOnly > 0 ? 'text-info' : 'text-text-muted')}>{result.summary.localOnly}</span>
+                  <span className={cn('font-body text-[12px]', result.summary.localOnly > 0 ? 'text-info' : 'text-text-secondary')}>not in Stripe</span>
+                </span>
+              </div>
+
+              {/* All clean banner */}
+              {isClean && (
+                <div className="flex items-center gap-2 p-4 bg-success-bg border border-success rounded-[8px]">
+                  <CheckCircle size={18} weight="fill" className="text-success" />
+                  <p className="font-body text-[14px] text-success font-semibold">
+                    All {result.summary.matched} transactions match. No discrepancies found.
+                  </p>
+                </div>
+              )}
+
+              {/* Discrepancy table */}
+              {(result.mismatches?.length > 0 || result.stripeOnly?.length > 0 || result.localOnly?.length > 0) && (
+                <div className="border border-border rounded-[8px] overflow-hidden">
+                  <DataTable
+                    columns={DISCREPANCY_COLUMNS}
+                    data={[
+                      ...(result.mismatches ?? []).map(r => ({ ...r, _type: 'mismatch' })),
+                      ...(result.stripeOnly ?? []).map(r => ({ ...r, _type: 'stripeOnly' })),
+                      ...(result.localOnly ?? []).map(r => ({ ...r, _type: 'localOnly' })),
+                    ]}
+                    emptyState={<p className="text-text-muted font-body text-[14px] py-4">No discrepancies</p>}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
