@@ -2,8 +2,9 @@
 // Full reservations management page with filters, list view, and side drawer.
 
 import { useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
-import { Plus, X, FunnelSimple, CalendarBlank, Wrench, EnvelopeSimple, FileText } from '@phosphor-icons/react'
+import { Plus, X, FunnelSimple, CalendarBlank, Wrench, EnvelopeSimple, FileText, UploadSimple } from '@phosphor-icons/react'
 
 import { useReservations } from '@/hooks/useReservations'
 import { useRooms } from '@/hooks/useRooms'
@@ -278,6 +279,7 @@ function ReservationDrawer({ reservation, onClose, roomMap }) {
 }
 
 export default function Reservations() {
+  const navigate = useNavigate()
   const [modalOpen, setModalOpen] = useState(false)
   const [blockOpen, setBlockOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState(null)
@@ -317,6 +319,9 @@ export default function Reservations() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="font-heading text-[24px] sm:text-[32px] text-text-primary uppercase">Reservations</h1>
         <div className="flex gap-2">
+          <Button variant="secondary" size="md" onClick={() => navigate("/import")}>
+            <UploadSimple size={15} /> Import CSV
+          </Button>
           <Button variant="secondary" size="md" onClick={() => setBlockOpen(true)}>
             <Wrench size={15} /> Block Dates
           </Button>
