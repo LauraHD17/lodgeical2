@@ -552,14 +552,9 @@ function DailyChecklist({ arriving, departing, rooms, viewDate }) {
 
   return (
     <div className="print-checklist bg-surface border border-border rounded-[8px] p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
-          Daily Checklist — {format(viewDate, 'EEEE, MMM d')}
-        </h3>
-        <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
-          <Printer size={14} weight="bold" /> Print
-        </Button>
-      </div>
+      <h3 className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary mb-4">
+        Daily Checklist — {format(viewDate, 'EEEE, MMM d')}
+      </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Check-ins */}
@@ -839,6 +834,9 @@ export default function Dashboard() {
             ))}
           </div>
 
+          <Button variant="secondary" size="sm" onClick={() => window.print()} className="no-print">
+            <Printer size={14} weight="bold" /> Print Checklist
+          </Button>
           <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
             <Plus size={16} weight="bold" /> New Reservation
           </Button>
@@ -857,13 +855,15 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Printable daily checklist */}
-      <DailyChecklist
-        arriving={arriving}
-        departing={departing}
-        rooms={rooms}
-        viewDate={viewDate}
-      />
+      {/* Printable daily checklist — hidden on screen, visible only when printing */}
+      <div className="hidden print:block">
+        <DailyChecklist
+          arriving={arriving}
+          departing={departing}
+          rooms={rooms}
+          viewDate={viewDate}
+        />
+      </div>
 
       {/* 14-day room calendar */}
       <div className="print:hidden">

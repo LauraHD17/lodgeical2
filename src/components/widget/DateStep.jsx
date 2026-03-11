@@ -110,7 +110,8 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
         <p className="font-body text-[13px] text-text-muted mb-4">Minimum {minStay} night stay</p>
       )}
 
-      <div className="flex justify-center my-4">
+      <div className="my-4 overflow-x-auto">
+        <div className="flex justify-center">
         <DayPicker
           mode="range"
           selected={range}
@@ -127,6 +128,7 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
           numberOfMonths={isMobile ? 1 : 2}
           className="!font-body"
         />
+        </div>
       </div>
 
       {/* Legend */}
@@ -202,6 +204,10 @@ export function DateStep({ settings, propertyId, rooms, initialDates, onNext, on
 
       {/* Inline styles for date modifiers */}
       <style>{`
+        .rdp-months {
+          flex-wrap: nowrap !important;
+          gap: 1.5rem;
+        }
         .rdp-day--fully-booked:not(.rdp-day_selected) {
           background: repeating-linear-gradient(
             135deg,

@@ -97,6 +97,42 @@ export function useUploadDocument() {
   })
 }
 
+export function useUnattachedDocuments() {
+  const { propertyId } = useProperty()
+  return useQuery({
+    queryKey: queryKeys.documents.unattached(propertyId),
+    queryFn: async () => {
+      if (!propertyId) return []
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, filename, file_size, uploaded_at')
+        .eq('property_id', propertyId)
+        .is('guest_id', null)
+        .order('uploaded_at', { ascending: false })
+        .limit(50)
+      if (error) return []
+      return data ?? []
+    },
+    enabled: !!propertyId,
+  })
+}
+
+export function useAttachDocument() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ documentId, guestId }) => {
+      const { error } = await supabase
+        .from('documents')
+        .update({ guest_id: guestId })
+        .eq('id', documentId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all })
+    },
+  })
+}
+
 export function useDeleteDocument() {
   const queryClient = useQueryClient()
 

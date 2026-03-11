@@ -6,6 +6,7 @@ import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import { Plus, X, FunnelSimple, CalendarBlank, Wrench, EnvelopeSimple, FileText } from '@phosphor-icons/react'
 
 import { useReservations } from '@/hooks/useReservations'
+import { useRooms } from '@/hooks/useRooms'
 import { DataTable } from '@/components/shared/DataTable'
 import { StatusChip } from '@/components/shared/StatusChip'
 import { Button } from '@/components/ui/Button'
@@ -24,76 +25,82 @@ const STATUS_OPTIONS = [
   { value: 'no_show', label: 'No Show' },
 ]
 
-const COLUMNS = [
-  {
-    key: 'confirmation_number',
-    label: 'Confirmation #',
-    render: (val) => <span className="font-mono text-[14px]">{val ?? '—'}</span>,
-  },
-  {
-    key: 'guest_name',
-    label: 'Guest Name',
-    render: (_, row) => {
-      const g = row.guests
-      if (!g) return <span className="text-text-muted font-body text-[14px]">—</span>
-      return <span className="font-body text-[14px]">{g.first_name} {g.last_name}</span>
+function getColumns(roomMap) {
+  return [
+    {
+      key: 'confirmation_number',
+      label: 'Confirmation #',
+      render: (val) => <span className="font-mono text-[14px]">{val ?? '—'}</span>,
     },
-  },
-  {
-    key: 'check_in',
-    label: 'Check-in',
-    render: (val) => (
-      <span className="font-mono text-[14px]">
-        {val ? format(parseISO(val), 'MMM d, yyyy') : '—'}
-      </span>
-    ),
-  },
-  {
-    key: 'check_out',
-    label: 'Check-out',
-    render: (val) => (
-      <span className="font-mono text-[14px]">
-        {val ? format(parseISO(val), 'MMM d, yyyy') : '—'}
-      </span>
-    ),
-  },
-  {
-    key: 'nights',
-    label: 'Nights',
-    numeric: true,
-    render: (_, row) => {
-      if (!row.check_in || !row.check_out) return <span className="font-mono text-[14px]">—</span>
-      const n = differenceInCalendarDays(parseISO(row.check_out), parseISO(row.check_in))
-      return <span className="font-mono text-[14px]">{n}</span>
+    {
+      key: 'guest_name',
+      label: 'Guest Name',
+      render: (_, row) => {
+        const g = row.guests
+        if (!g) return <span className="text-text-muted font-body text-[14px]">—</span>
+        return <span className="font-body text-[14px]">{g.first_name} {g.last_name}</span>
+      },
     },
-  },
-  {
-    key: 'room',
-    label: 'Room',
-    render: (_, row) => (
-      <span className="font-body text-[14px] text-text-secondary">
-        {row.room_ids?.length ? `${row.room_ids.length} room(s)` : '—'}
-      </span>
-    ),
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    render: (val) => <StatusChip status={val} />,
-  },
-  {
-    key: 'total_due_cents',
-    label: 'Total',
-    numeric: true,
-    render: (val) => (
-      <span className="font-mono text-[14px]">
-        ${val != null ? (val / 100).toFixed(2) : '0.00'}
-      </span>
-    ),
-  },
-]
+    {
+      key: 'check_in',
+      label: 'Check-in',
+      render: (val) => (
+        <span className="font-mono text-[14px]">
+          {val ? format(parseISO(val), 'MMM d, yyyy') : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'check_out',
+      label: 'Check-out',
+      render: (val) => (
+        <span className="font-mono text-[14px]">
+          {val ? format(parseISO(val), 'MMM d, yyyy') : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'nights',
+      label: 'Nights',
+      numeric: true,
+      render: (_, row) => {
+        if (!row.check_in || !row.check_out) return <span className="font-mono text-[14px]">—</span>
+        const n = differenceInCalendarDays(parseISO(row.check_out), parseISO(row.check_in))
+        return <span className="font-mono text-[14px]">{n}</span>
+      },
+    },
+    {
+      key: 'room',
+      label: 'Room(s)',
+      render: (_, row) => {
+        const ids = row.room_ids ?? []
+        if (!ids.length) return <span className="font-body text-[14px] text-text-muted">—</span>
+        const names = ids.map(id => roomMap[id] ?? 'Unknown')
+        const display = names.length <= 2
+          ? names.join(' · ')
+          : `${names[0]} · ${names[1]} +${names.length - 2}`
+        return <span className="font-body text-[14px] text-text-secondary">{display}</span>
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val) => <StatusChip status={val} />,
+    },
+    {
+      key: 'total_due_cents',
+      label: 'Total',
+      numeric: true,
+      render: (val) => (
+        <span className="font-mono text-[14px]">
+          ${val != null ? (val / 100).toFixed(2) : '0.00'}
+        </span>
+      ),
+    },
+  ]
+}
 
-function ReservationDrawer({ reservation, onClose }) {
+function ReservationDrawer({ reservation, onClose, roomMap }) {
   const [sendingInvoice, setSendingInvoice] = useState(false)
   const { addToast } = useToast()
 
@@ -184,6 +191,17 @@ function ReservationDrawer({ reservation, onClose }) {
             </div>
           )}
 
+          {(reservation.room_ids?.length > 0) && (
+            <div>
+              <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+                Room(s)
+              </span>
+              <p className="font-body text-[15px] text-text-primary mt-1">
+                {reservation.room_ids.map(id => roomMap[id] ?? 'Unknown').join(', ')}
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
@@ -267,10 +285,18 @@ export default function Reservations() {
   const [activeFilters, setActiveFilters] = useState({})
 
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useReservations(activeFilters)
+  const { data: rooms = [] } = useRooms()
 
   const allReservations = useMemo(() => {
     return data?.pages?.flatMap((p) => p.data) ?? []
   }, [data])
+
+  const roomMap = useMemo(
+    () => Object.fromEntries(rooms.map(r => [r.id, r.name])),
+    [rooms],
+  )
+
+  const columns = useMemo(() => getColumns(roomMap), [roomMap])
 
   const applyFilters = useCallback(() => {
     const f = {}
@@ -352,7 +378,7 @@ export default function Reservations() {
       {/* Data Table */}
       <div className="border border-border rounded-[8px] overflow-hidden">
         <DataTable
-          columns={COLUMNS}
+          columns={columns}
           data={allReservations}
           loading={isLoading}
           onRowClick={(row) => setSelectedReservation(row)}
@@ -388,6 +414,7 @@ export default function Reservations() {
         <ReservationDrawer
           reservation={selectedReservation}
           onClose={() => setSelectedReservation(null)}
+          roomMap={roomMap}
         />
       )}
 

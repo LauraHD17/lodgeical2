@@ -4,7 +4,7 @@
 import { useState, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
-import { UploadSimple, DownloadSimple, Trash, File, Info, X, CloudArrowUp } from '@phosphor-icons/react'
+import { UploadSimple, ArrowSquareOut, Copy, Check, Trash, File, X, CloudArrowUp } from '@phosphor-icons/react'
 
 import { supabase } from '@/lib/supabaseClient'
 import { useProperty } from '@/lib/property/useProperty'
@@ -16,6 +16,25 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/useToast'
+
+function CopyLinkButton({ url }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1 text-text-secondary hover:text-text-primary font-body text-[13px]"
+    >
+      {copied ? <Check size={14} weight="bold" className="text-success" /> : <Copy size={14} />}
+      {copied ? 'Copied' : 'Copy link'}
+    </button>
+  )
+}
 
 const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.doc,.docx'
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -186,16 +205,19 @@ export default function Documents() {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {row.file_url && (
-            <a
-              href={row.file_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-info hover:underline font-body text-[13px]"
-            >
-              <DownloadSimple size={14} /> Download
-            </a>
+            <>
+              <a
+                href={row.file_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-info hover:opacity-80 font-body text-[13px]"
+              >
+                <ArrowSquareOut size={14} /> Open
+              </a>
+              <CopyLinkButton url={row.file_url} />
+            </>
           )}
           <button
             onClick={() => handleDelete(row)}

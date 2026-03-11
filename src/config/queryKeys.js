@@ -112,6 +112,7 @@ export const queryKeys = {
     list: (propertyId) => ['documents', 'list', propertyId],
     byGuest: (guestId) => ['documents', 'byGuest', guestId],
     byReservation: (reservationId) => ['documents', 'byReservation', reservationId],
+    unattached: (propertyId) => ['documents', 'unattached', propertyId],
   },
 
   reconciliation: {

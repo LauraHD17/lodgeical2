@@ -12,7 +12,7 @@ export const ROUTES = [
   { path: '/rates',                pageName: 'Rates',               permission: 'manage_rooms',        isPublic: false },
   { path: '/payments',             pageName: 'Payments',            permission: 'manage_payments',     isPublic: false },
   { path: '/messaging',            pageName: 'Messaging',           permission: 'manage_messaging',    isPublic: false },
-  { path: '/documents',            pageName: 'Documents',           permission: 'manage_documents',    isPublic: false, navHidden: true },
+  { path: '/documents',            pageName: 'Documents',           permission: 'manage_documents',    isPublic: false },
   { path: '/maintenance',          pageName: 'Maintenance',         permission: 'manage_maintenance',  isPublic: false },
   { path: '/inquiries',            pageName: 'Inquiries',           permission: 'manage_reservations', isPublic: false },
   { path: '/contacts',             pageName: 'Contacts',            permission: 'manage_contacts',     isPublic: false, navLabel: 'Admin Contacts' },

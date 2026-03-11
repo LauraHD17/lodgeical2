@@ -3,14 +3,14 @@
 // Merge: Step 1 — search for secondary guest. Step 2 — confirm primary wins all data.
 // Merge is executed via supabase edge function 'merge-guests'.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
-import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight, File, UploadSimple, DownloadSimple, Trash } from '@phosphor-icons/react'
+import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight, File, UploadSimple, ArrowSquareOut, Copy, Check, Paperclip } from '@phosphor-icons/react'
 
 import { useGuests, useUpdateGuest } from '@/hooks/useGuests'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/config/queryKeys'
-import { useDocumentsByGuest } from '@/hooks/useDocuments'
+import { useDocumentsByGuest, useUploadDocument, useUnattachedDocuments, useAttachDocument } from '@/hooks/useDocuments'
 import { formatFileSize } from '@/lib/utils'
 import { DataTable } from '@/components/shared/DataTable'
 import { StatusChip } from '@/components/shared/StatusChip'
@@ -241,10 +241,70 @@ function TagEditor({ guest }) {
   )
 }
 
+// ─── Doc Actions ─────────────────────────────────────────────────────────────
+
+function DocActions({ url }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 font-body text-[13px] text-info hover:opacity-80"
+      >
+        <ArrowSquareOut size={14} /> Open
+      </a>
+      <button
+        onClick={handleCopy}
+        className="flex items-center gap-1 font-body text-[13px] text-text-secondary hover:text-text-primary"
+      >
+        {copied ? <Check size={14} weight="bold" className="text-success" /> : <Copy size={14} />}
+        {copied ? 'Copied' : 'Copy link'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Guest Documents ──────────────────────────────────────────────────────────
 
 function GuestDocuments({ guestId }) {
   const { data: docs = [], isLoading: docsLoading } = useDocumentsByGuest(guestId)
+  const { data: unattached = [] } = useUnattachedDocuments()
+  const uploadDocument = useUploadDocument()
+  const attachDocument = useAttachDocument()
+  const fileInputRef = useRef(null)
+  const { addToast } = useToast()
+  const [showAttachPicker, setShowAttachPicker] = useState(false)
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      await uploadDocument.mutateAsync({ file, guestId })
+      addToast({ message: 'Document uploaded', variant: 'success' })
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Upload failed', variant: 'error' })
+    } finally {
+      e.target.value = ''
+    }
+  }
+
+  async function handleAttach(doc) {
+    try {
+      await attachDocument.mutateAsync({ documentId: doc.id, guestId })
+      addToast({ message: `"${doc.filename}" attached`, variant: 'success' })
+      setShowAttachPicker(false)
+    } catch (err) {
+      addToast({ message: err?.message ?? 'Failed to attach', variant: 'error' })
+    }
+  }
 
   return (
     <div>
@@ -252,14 +312,66 @@ function GuestDocuments({ guestId }) {
         <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary">
           Documents
         </h3>
+        <div className="flex items-center gap-3">
+          {unattached.length > 0 && (
+            <button
+              onClick={() => setShowAttachPicker(v => !v)}
+              className="flex items-center gap-1 font-body text-[13px] text-text-secondary hover:text-text-primary"
+            >
+              <Paperclip size={14} />
+              Attach existing
+            </button>
+          )}
+          {docs.length > 0 && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadDocument.isPending}
+              className="flex items-center gap-1 font-body text-[13px] text-info hover:opacity-80 disabled:opacity-50"
+            >
+              <UploadSimple size={14} />
+              {uploadDocument.isPending ? 'Uploading…' : 'Upload'}
+            </button>
+          )}
+        </div>
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
       </div>
+
+      {showAttachPicker && (
+        <div className="mb-3 border border-border rounded-[6px] bg-surface overflow-hidden">
+          <p className="px-3 py-2 font-body text-[12px] text-text-muted border-b border-border">
+            Documents not yet linked to a guest:
+          </p>
+          <div className="max-h-40 overflow-y-auto">
+            {unattached.map(doc => (
+              <button
+                key={doc.id}
+                onClick={() => handleAttach(doc)}
+                disabled={attachDocument.isPending}
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-raised text-left disabled:opacity-50"
+              >
+                <File size={13} className="text-text-muted shrink-0" />
+                <span className="font-body text-[13px] text-text-primary truncate flex-1">{doc.filename}</span>
+                <span className="font-body text-[11px] text-text-muted shrink-0">{formatFileSize(doc.file_size)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {docsLoading ? (
         <div className="animate-pulse bg-border rounded h-16 w-full" />
       ) : docs.length === 0 ? (
-        <p className="font-body text-[13px] text-text-muted">
-          No documents attached. Upload from the Documents page.
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="font-body text-[13px] text-text-muted flex-1">No documents attached.</p>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadDocument.isPending}
+            className="flex items-center gap-1 font-body text-[13px] text-info hover:opacity-80 disabled:opacity-50 shrink-0"
+          >
+            <UploadSimple size={14} />
+            {uploadDocument.isPending ? 'Uploading…' : 'Upload'}
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           {docs.map((doc) => (
@@ -274,16 +386,7 @@ function GuestDocuments({ guestId }) {
                   {formatFileSize(doc.file_size)} · {doc.uploaded_at ? format(parseISO(doc.uploaded_at), 'MMM d, yyyy') : ''}
                 </p>
               </div>
-              {doc.file_url && (
-                <a
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-info hover:text-text-primary shrink-0"
-                >
-                  <DownloadSimple size={14} />
-                </a>
-              )}
+              {doc.file_url && <DocActions url={doc.file_url} />}
             </div>
           ))}
         </div>
@@ -329,136 +432,133 @@ function GuestDrawer({ guest, onClose, onMergeStart }) {
   }
 
   return (
-    <>
-      <div className="fixed inset-0 z-[9990] bg-black opacity-30" role="presentation" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-[440px] max-w-full z-[9991] bg-surface-raised flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <UserCircle size={32} className="text-text-muted" />
-            <h2 className="font-heading text-[20px] text-text-primary">
-              {guest.first_name} {guest.last_name}
-            </h2>
-          </div>
-          <button onClick={onClose} className="text-text-muted hover:text-text-primary">
-            <X size={20} />
-          </button>
+    <Modal open onClose={onClose} className="max-w-[640px]">
+      <div className="flex items-center justify-between mb-6 pt-8">
+        <div className="flex items-center gap-3">
+          <UserCircle size={32} className="text-text-muted" />
+          <h2 className="font-heading text-[20px] text-text-primary">
+            {guest.first_name} {guest.last_name}
+          </h2>
         </div>
+        <button onClick={onClose} className="text-text-muted hover:text-text-primary">
+          <X size={20} />
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-          {/* Contact Info */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary">
-                Contact
-              </h3>
-              <Button variant="ghost" size="sm" onClick={() => setEditMode(!editMode)}>
-                {editMode ? 'Cancel' : 'Edit'}
+      <div className="flex flex-col gap-6">
+        {/* Contact Info */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary">
+              Contact
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setEditMode(!editMode)}>
+              {editMode ? 'Cancel' : 'Edit'}
+            </Button>
+          </div>
+
+          {editMode ? (
+            <div className="flex flex-col gap-3">
+              <Input
+                label="First Name"
+                value={form.first_name}
+                onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
+              />
+              <Input
+                label="Last Name"
+                value={form.last_name}
+                onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
+              />
+              <Input
+                label="Phone"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                loading={updateGuest.isPending}
+                onClick={handleSave}
+              >
+                Save Changes
               </Button>
             </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="font-body text-[14px] text-text-primary">{guest.email}</p>
+              {guest.phone && (
+                <p className="font-body text-[14px] text-text-secondary">{guest.phone}</p>
+              )}
+              <p className="font-body text-[13px] text-text-muted">
+                Since: <span className="font-mono text-[13px]">
+                  {guest.created_at ? format(parseISO(guest.created_at), 'MMM d, yyyy') : '—'}
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
 
-            {editMode ? (
-              <div className="flex flex-col gap-3">
-                <Input
-                  label="First Name"
-                  value={form.first_name}
-                  onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
-                />
-                <Input
-                  label="Last Name"
-                  value={form.last_name}
-                  onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
-                />
-                <Input
-                  label="Phone"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                />
-                <Button
-                  variant="primary"
-                  size="sm"
-                  loading={updateGuest.isPending}
-                  onClick={handleSave}
+        {/* Tags */}
+        <TagEditor guest={guest} />
+
+        {/* Reservation History */}
+        <div>
+          <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary mb-3">
+            Reservation History
+          </h3>
+          {isLoading ? (
+            <div className="animate-pulse bg-border rounded h-24 w-full" />
+          ) : guestReservations.length === 0 ? (
+            <p className="font-body text-[14px] text-text-muted">No reservations found</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {guestReservations.map((r) => (
+                <div
+                  key={r.id}
+                  className="bg-surface border border-border rounded-[6px] p-3 flex flex-col gap-1"
                 >
-                  Save Changes
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="font-body text-[14px] text-text-primary">{guest.email}</p>
-                {guest.phone && (
-                  <p className="font-body text-[14px] text-text-secondary">{guest.phone}</p>
-                )}
-                <p className="font-body text-[13px] text-text-muted">
-                  Since: <span className="font-mono text-[13px]">
-                    {guest.created_at ? format(parseISO(guest.created_at), 'MMM d, yyyy') : '—'}
-                  </span>
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          <TagEditor guest={guest} />
-
-          {/* Reservation History */}
-          <div>
-            <h3 className="font-body text-[13px] uppercase tracking-wider font-semibold text-text-secondary mb-3">
-              Reservation History
-            </h3>
-            {isLoading ? (
-              <div className="animate-pulse bg-border rounded h-24 w-full" />
-            ) : guestReservations.length === 0 ? (
-              <p className="font-body text-[14px] text-text-muted">No reservations found</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {guestReservations.map((r) => (
-                  <div
-                    key={r.id}
-                    className="bg-surface border border-border rounded-[6px] p-3 flex flex-col gap-1"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[13px] text-text-primary">
-                        {r.confirmation_number ?? r.id}
-                      </span>
-                      <StatusChip status={r.status} />
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <span className="font-mono text-[13px] text-text-secondary">
-                        {r.check_in ? format(parseISO(r.check_in), 'MMM d') : '—'}
-                      </span>
-                      <span className="text-text-muted">→</span>
-                      <span className="font-mono text-[13px] text-text-secondary">
-                        {r.check_out ? format(parseISO(r.check_out), 'MMM d, yyyy') : '—'}
-                      </span>
-                    </div>
+                  <div className="flex items-center justify-between">
                     <span className="font-mono text-[13px] text-text-primary">
-                      ${r.total_due_cents != null ? (r.total_due_cents / 100).toFixed(2) : '0.00'}
+                      {r.confirmation_number ?? r.id}
+                    </span>
+                    <StatusChip status={r.status} />
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <span className="font-mono text-[13px] text-text-secondary">
+                      {r.check_in ? format(parseISO(r.check_in), 'MMM d') : '—'}
+                    </span>
+                    <span className="text-text-muted">→</span>
+                    <span className="font-mono text-[13px] text-text-secondary">
+                      {r.check_out ? format(parseISO(r.check_out), 'MMM d, yyyy') : '—'}
                     </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <span className="font-mono text-[13px] text-text-primary">
+                    ${r.total_due_cents != null ? (r.total_due_cents / 100).toFixed(2) : '0.00'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-          {/* Documents */}
-          <GuestDocuments guestId={guest.id} />
+        {/* Documents */}
+        <GuestDocuments guestId={guest.id} />
 
-          {/* Merge */}
-          <div className="pt-2 border-t border-border">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onMergeStart}
-            >
-              <GitMerge size={14} /> Merge with another guest
-            </Button>
-            <p className="mt-1 font-body text-[12px] text-text-muted">
-              Use this to combine duplicate guest profiles.
-            </p>
-          </div>
+        {/* Merge */}
+        <div className="pt-2 border-t border-border">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onMergeStart}
+          >
+            <GitMerge size={14} /> Merge with another guest
+          </Button>
+          <p className="mt-1 font-body text-[12px] text-text-muted">
+            Use this to combine duplicate guest profiles.
+          </p>
         </div>
       </div>
-    </>
+    </Modal>
   )
 }
 
