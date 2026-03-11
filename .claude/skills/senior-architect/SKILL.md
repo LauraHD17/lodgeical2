@@ -1,210 +1,176 @@
 ---
 name: senior-architect
-description: Comprehensive software architecture skill for designing scalable, maintainable systems using ReactJS, NextJS, NodeJS, Express, React Native, Swift, Kotlin, Flutter, Postgres, GraphQL, Go, Python. Includes architecture diagram generation, system design patterns, tech stack decision frameworks, and dependency analysis. Use when designing system architecture, making technical decisions, creating architecture diagrams, evaluating trade-offs, or defining integration patterns.
+description: Lodge-ical system architecture — provider hierarchy, context system, routing, data flow, Edge Function organization, and tech decision rationale. Use when designing system architecture, evaluating trade-offs, planning new features, or understanding how components connect.
 user-invocable: true
+disable-model-invocation: false
 ---
 
-# Senior Architect
+# Lodge-ical Architecture
 
-Complete toolkit for senior architect with modern tools and best practices.
+System architecture and design patterns for Lodge-ical. For full technical docs see `CLAUDE.md`, `src/CLAUDE.md`, and `supabase/CLAUDE.md`.
 
-## Quick Start
+## System Overview
 
-### Main Capabilities
+Lodge-ical is a property management platform for small inns and B&Bs (< 15 rooms). Architecture optimized for simplicity over scale.
 
-This skill provides three core capabilities through automated scripts:
-
-```bash
-# Script 1: Architecture Diagram Generator
-python scripts/architecture_diagram_generator.py [options]
-
-# Script 2: Project Architect
-python scripts/project_architect.py [options]
-
-# Script 3: Dependency Analyzer
-python scripts/dependency_analyzer.py [options]
+```
+┌─────────────────────────────────────────────────┐
+│  React SPA (Vite)                               │
+│  ├─ Admin pages (14 lazy-loaded)                │
+│  ├─ Public pages (widget, guest portal, etc.)   │
+│  └─ TanStack Query (server state cache)         │
+└────────────┬─────────────────┬──────────────────┘
+             │ PostgREST       │ Edge Functions
+             │ (reads)         │ (writes/logic)
+┌────────────▼─────────────────▼──────────────────┐
+│  Supabase                                        │
+│  ├─ PostgreSQL + RLS (data + access control)     │
+│  ├─ Auth (JWT, user sessions)                    │
+│  ├─ Edge Functions (15, Deno/TypeScript)          │
+│  └─ Storage (documents, images)                  │
+└──────────────────────────────────────────────────┘
+             │                 │
+     ┌───────▼───┐     ┌──────▼──────┐
+     │  Stripe   │     │   Resend    │
+     │ Payments  │     │   Email     │
+     └───────────┘     └─────────────┘
 ```
 
-## Core Capabilities
+## Frontend Architecture
 
-### 1. Architecture Diagram Generator
+### Provider Hierarchy (order matters — defined in App.jsx)
 
-Automated tool for architecture diagram generator tasks.
-
-**Features:**
-- Automated scaffolding
-- Best practices built-in
-- Configurable templates
-- Quality checks
-
-**Usage:**
-```bash
-python scripts/architecture_diagram_generator.py  [options]
+```
+QueryClientProvider       ← TanStack Query (staleTime: 2min, retry: 1)
+  BrowserRouter           ← React Router 7
+    AuthProvider           ← Calls supabase.auth.getUser() once
+      PropertyProvider     ← Reads from AuthContext only
+        ToastProvider      ← Toast notifications
+          ErrorBoundary    ← Catches render errors
+            Suspense       ← PageLoader fallback for lazy routes
+              Routes       ← All route definitions
 ```
 
-### 2. Project Architect
+### Context System
 
-Comprehensive analysis and optimization tool.
+| Context | Purpose | Rule |
+|---------|---------|------|
+| AuthContext | User session, role | Calls Supabase once at root. RouteGuard reads from it — never calls Supabase directly. |
+| PropertyContext | Property data, settings, access | Reads from AuthContext only — no direct Supabase calls. |
+| ToastProvider | Notification queue | Available to all components below it. |
 
-**Features:**
-- Deep analysis
-- Performance metrics
-- Recommendations
-- Automated fixes
+### Routing
 
-**Usage:**
-```bash
-python scripts/project_architect.py  [--verbose]
+`src/config/routes.js` is the single source of truth for all 31 routes. From this array:
+- `App.jsx` generates `<Route>` elements, matching `pageName` to `pageMap` lazy imports
+- `Sidebar.jsx` derives nav items (filtering `!isPublic && !navHidden`)
+- `RouteGuard` checks permissions per route
+
+### State Management
+
+- **Server state**: TanStack React Query 5 (all data from Supabase)
+- **UI state**: React useState/useReducer (form state, modals, filters)
+- **No global client state store** — no Redux, no Zustand
+
+## Backend Architecture
+
+### Edge Functions (15 functions in `supabase/functions/`)
+
+| Domain | Functions |
+|--------|-----------|
+| Reservation lifecycle | `create-reservation`, `modify-reservation`, `cancel-reservation`, `confirm-modification`, `update-reservation` |
+| Payments | `create-payment-intent`, `stripe-webhook`, `get-payment-summary` |
+| Calendar | `ical-export`, `ical-import` |
+| Public | `public-bootstrap`, `guest-portal-lookup`, `preview-pricing`, `submit-inquiry` |
+| Admin | `import-csv`, `merge-guests` |
+
+### Shared Utilities (`_shared/`)
+
+| Module | Responsibility |
+|--------|---------------|
+| `auth.ts` | JWT validation, propertyId lookup from `user_property_access` |
+| `pricing.ts` | Nightly rate engine: base rate → overrides → tax → fee pass-through |
+| `paymentSummary.ts` | charges - refunds = net paid, derives paid/partial/unpaid/overpaid |
+| `stripe.ts` | Stripe client singleton |
+| `email.ts` + `emailTemplates.ts` | Resend integration, HTML templates with variable substitution |
+| `rateLimit.ts` | DB-backed sliding window (atomic INSERT...ON CONFLICT) |
+| `ical.ts` | iCalendar parsing and generation |
+
+### RLS as Auth Layer
+
+Two-tier access model (migration 009):
+1. **Admin**: Authenticated user with row in `user_property_access` for target `property_id`
+2. **Public**: Unauthenticated, only for properties where `is_active = true AND is_public = true`
+
+All policies use `EXISTS` subquery — never `USING (auth.uid() = user_id)` directly.
+
+## Data Flow Patterns
+
+### Read Path (admin pages)
+```
+Component → useQuery(queryKeys.entity.list) → supabase.from('table').select()
+  → PostgREST → PostgreSQL (RLS filters by property) → JSON response
 ```
 
-### 3. Dependency Analyzer
-
-Advanced tooling for specialized tasks.
-
-**Features:**
-- Expert-level automation
-- Custom configurations
-- Integration ready
-- Production-grade output
-
-**Usage:**
-```bash
-python scripts/dependency_analyzer.py [arguments] [options]
+### Write Path (business logic)
+```
+Component → useMutation → fetch(Edge Function, Bearer token)
+  → requireAuth() → Zod validation → business logic → PostgreSQL
+  → invalidateQueries(queryKeys.entity.all)
 ```
 
-## Reference Documentation
-
-### Architecture Patterns
-
-Comprehensive guide available in `references/architecture_patterns.md`:
-
-- Detailed patterns and practices
-- Code examples
-- Best practices
-- Anti-patterns to avoid
-- Real-world scenarios
-
-### System Design Workflows
-
-Complete workflow documentation in `references/system_design_workflows.md`:
-
-- Step-by-step processes
-- Optimization strategies
-- Tool integrations
-- Performance tuning
-- Troubleshooting guide
-
-### Tech Decision Guide
-
-Technical reference guide in `references/tech_decision_guide.md`:
-
-- Technology stack details
-- Configuration examples
-- Integration patterns
-- Security considerations
-- Scalability guidelines
-
-## Tech Stack
-
-**Languages:** TypeScript, JavaScript, Python, Go, Swift, Kotlin
-**Frontend:** React, Next.js, React Native, Flutter
-**Backend:** Node.js, Express, GraphQL, REST APIs
-**Database:** PostgreSQL, Prisma, NeonDB, Supabase
-**DevOps:** Docker, Kubernetes, Terraform, GitHub Actions, CircleCI
-**Cloud:** AWS, GCP, Azure
-
-## Development Workflow
-
-### 1. Setup and Configuration
-
-```bash
-# Install dependencies
-npm install
-# or
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
+### Widget Payment Flow
+```
+DateStep → RoomStep → GuestStep → ReviewStep
+  → preview-pricing (public, no auth)
+  → create-payment-intent (guest header)
+  → Stripe Elements confirmPayment
+  → stripe-webhook → payment status update
 ```
 
-### 2. Run Quality Checks
+## Single Sources of Truth
 
-```bash
-# Use the analyzer script
-python scripts/project_architect.py .
+| Concern | File | Rule |
+|---------|------|------|
+| Routes | `src/config/routes.js` | All 31 routes. Never hardcode paths elsewhere. Validated by `npm run routes:check`. |
+| Query keys | `src/config/queryKeys.js` | Factory pattern. Never define keys inline in hooks. |
+| Permissions | `src/lib/auth/permissions.js` | 12 constants, 3 role mappings (owner/manager/staff). |
+| Design tokens | `tailwind.config.js` | Locked palette. Never use raw hex in components. |
 
-# Review recommendations
-# Apply fixes
-```
+## Tech Decisions
 
-### 3. Implement Best Practices
+| Choice | Over | Rationale |
+|--------|------|-----------|
+| React Router SPA | Next.js | No SSR needed — admin tool, not SEO-critical. Simpler deployment (static files). |
+| Supabase | Firebase | PostgreSQL + RLS + Edge Functions in one platform. SQL > NoSQL for relational property data. |
+| Vite | webpack | Faster dev server, simpler config, native ESM. |
+| JSDoc | TypeScript | Less friction for small team. Supabase Edge Functions use TS; frontend uses JSDoc. |
+| TanStack Query | Redux/Zustand | Server state cache with built-in refetching, invalidation. No need for client state store. |
+| Radix UI | MUI/Chakra | Headless primitives, no style opinions. Works with Tailwind design tokens. |
+| PostgREST reads | Edge Functions for reads | Reads go through PostgREST (auto-generated REST from schema + RLS). Writes go through Edge Functions for business logic. |
 
-Follow the patterns and practices documented in:
-- `references/architecture_patterns.md`
-- `references/system_design_workflows.md`
-- `references/tech_decision_guide.md`
+## Product Philosophy
 
-## Best Practices Summary
-
-### Code Quality
-- Follow established patterns
-- Write comprehensive tests
-- Document decisions
-- Review regularly
-
-### Performance
-- Measure before optimizing
-- Use appropriate caching
-- Optimize critical paths
-- Monitor in production
-
-### Security
-- Validate all inputs
-- Use parameterized queries
-- Implement proper authentication
-- Keep dependencies updated
-
-### Maintainability
-- Write clear code
-- Use consistent naming
-- Add helpful comments
-- Keep it simple
+- Target: small inns/B&Bs, < 15 rooms. Innkeeper personally knows every guest.
+- Software handles business data (reservations, payments, finances, guest records).
+- Do NOT add operational tracking (check-in/check-out status) — the innkeeper knows who has arrived.
+- Features should reduce admin burden, not add tracking rituals.
+- When evaluating a feature: "would a 1-person B&B operator actually use this?"
 
 ## Common Commands
 
 ```bash
-# Development
-npm run dev
-npm run build
-npm run test
-npm run lint
+# Frontend
+npm run dev            # Dev server with MSW mocks
+npm run build          # Production build
+npm run lint           # ESLint (zero-warning policy)
+npm run test           # Vitest unit tests
+npm run test:e2e       # Playwright E2E
+npm run routes:check   # Verify routes.js is source of truth
 
-# Analysis
-python scripts/project_architect.py .
-python scripts/dependency_analyzer.py --analyze
-
-# Deployment
-docker build -t app:latest .
-docker-compose up -d
-kubectl apply -f k8s/
+# Backend
+supabase start         # Local Supabase stack
+supabase db reset      # Re-run migrations + seed
+supabase functions serve  # Edge Functions with hot reload
+supabase migration new name  # New migration
 ```
-
-## Troubleshooting
-
-### Common Issues
-
-Check the comprehensive troubleshooting section in `references/tech_decision_guide.md`.
-
-### Getting Help
-
-- Review reference documentation
-- Check script output messages
-- Consult tech stack documentation
-- Review error logs
-
-## Resources
-
-- Pattern Reference: `references/architecture_patterns.md`
-- Workflow Guide: `references/system_design_workflows.md`
-- Technical Guide: `references/tech_decision_guide.md`
-- Tool Scripts: `scripts/` directory
