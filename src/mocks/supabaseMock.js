@@ -149,9 +149,36 @@ const auth = {
 }
 
 // ---------------------------------------------------------------------------
+// Mock functions — in-memory dispatch for Edge Function calls
+// ---------------------------------------------------------------------------
+const functions = {
+  invoke: async (name, { body } = {}) => {
+    if (name === 'import-csv') {
+      const rows = body?.rows ?? []
+      if (!rows.length) return { data: { success: true, imported: 0, skipped: 0, errors: [] }, error: null }
+      const roomNames = new Set(MOCK_ROOMS.map(r => r.name.toLowerCase().trim()))
+      const errors = []
+      let imported = 0, skipped = 0
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        const roomName = (row.room_name ?? '').toLowerCase().trim()
+        if (!roomName || !roomNames.has(roomName)) {
+          errors.push({ row: i + 2, error: `Room "${row.room_name}" not found in this property` })
+        } else {
+          imported++
+        }
+      }
+      return { data: { success: true, imported, skipped, errors }, error: null }
+    }
+    return { data: null, error: { message: `No mock for function: ${name}` } }
+  },
+}
+
+// ---------------------------------------------------------------------------
 // Exported mock client — same shape as the real supabase export
 // ---------------------------------------------------------------------------
 export const supabase = {
   auth,
   from: (table) => new MockQueryBuilder(table),
+  functions,
 }

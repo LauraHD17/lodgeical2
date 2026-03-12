@@ -158,14 +158,6 @@ export default function Import() {
     setImporting(true)
     setResult(null)
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        addToast({ message: 'Your session has expired. Please log in again.', variant: 'error' })
-        setImporting(false)
-        return
-      }
-
       // Apply room name mappings before sending
       const roomNameMap = new Map(rooms.map(r => [r.name.toLowerCase().trim(), r.name]))
       const mappedRows = preview.allRows.map(row => {
@@ -177,16 +169,10 @@ export default function Import() {
         return row
       })
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/import-csv`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ rows: mappedRows }),
+      const { data: json, error: fnError } = await supabase.functions.invoke('import-csv', {
+        body: { rows: mappedRows },
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Import failed')
+      if (fnError) throw new Error(fnError.message ?? 'Import failed')
       setResult(json)
 
       // Build checklist rows from the import preview data
