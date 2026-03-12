@@ -204,16 +204,17 @@ export default function Import() {
         })))
       }
 
-      // Save import batch for history
-      await supabase.from('import_batches').insert({
+      // Save import batch for history (non-blocking)
+      supabase.from('import_batches').insert({
         property_id: propertyId,
         imported_count: json.imported,
         skipped_count: json.skipped,
         error_count: json.errors?.length ?? 0,
         file_name: file?.name ?? 'csv-import',
         reservation_ids: [],
-      })
-      queryClient.invalidateQueries({ queryKey: queryKeys.importBatches.all })
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.importBatches.all })
+      }).catch(() => {})
       queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all })
 
       addToast({

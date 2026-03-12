@@ -246,25 +246,29 @@ export const handlers = [
   ),
 
   http.post(`${BASE}/functions/v1/import-csv`, async ({ request }) => {
-    const body = await request.json().catch(() => ({}))
-    const rows = body?.rows ?? []
-    const count = rows.length
-    if (count === 0) return HttpResponse.json({ success: true, imported: 0, skipped: 0, errors: [] })
-    // Simulate room-name resolution against MOCK_ROOMS
-    const roomNames = new Set(MOCK_ROOMS.map(r => r.name.toLowerCase().trim()))
-    const errors = []
-    let imported = 0
-    let skipped = 0
-    for (let i = 0; i < count; i++) {
-      const row = rows[i]
-      const name = (row.room_name ?? '').toLowerCase().trim()
-      if (!name || !roomNames.has(name)) {
-        errors.push({ row: i + 2, error: `Room "${row.room_name}" not found in this property` })
-      } else {
-        imported++
+    try {
+      const body = await request.json()
+      const rows = body?.rows ?? []
+      const count = rows.length
+      if (count === 0) return HttpResponse.json({ success: true, imported: 0, skipped: 0, errors: [] })
+      // Simulate room-name resolution against MOCK_ROOMS
+      const roomNames = new Set(MOCK_ROOMS.map(r => r.name.toLowerCase().trim()))
+      const errors = []
+      let imported = 0
+      let skipped = 0
+      for (let i = 0; i < count; i++) {
+        const row = rows[i]
+        const name = (row.room_name ?? '').toLowerCase().trim()
+        if (!name || !roomNames.has(name)) {
+          errors.push({ row: i + 2, error: `Room "${row.room_name}" not found in this property` })
+        } else {
+          imported++
+        }
       }
+      return HttpResponse.json({ success: true, imported, skipped, errors })
+    } catch {
+      return HttpResponse.json({ success: true, imported: 0, skipped: 0, errors: [] })
     }
-    return HttpResponse.json({ success: true, imported, skipped, errors })
   }),
 
   // Send invoice
