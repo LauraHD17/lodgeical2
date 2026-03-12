@@ -4,7 +4,8 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
-import { Plus, X, FunnelSimple, CalendarBlank, Wrench, EnvelopeSimple, FileText, UploadSimple } from '@phosphor-icons/react'
+import { Plus, X, FunnelSimple, CalendarBlank, Wrench, EnvelopeSimple, FileText, UploadSimple, Prohibit } from '@phosphor-icons/react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { useReservations } from '@/hooks/useReservations'
 import { useRooms } from '@/hooks/useRooms'
@@ -17,6 +18,9 @@ import { ReservationModal } from '@/components/reservations/ReservationModal'
 import { BlockModal } from '@/components/reservations/BlockModal'
 import { useToast } from '@/components/ui/useToast'
 import { supabase } from '@/lib/supabaseClient'
+import { queryKeys } from '@/config/queryKeys'
+import { cn } from '@/lib/utils'
+import { TEMPLATE_LABELS } from '@/lib/messaging/templateLabels'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -99,6 +103,126 @@ function getColumns(roomMap) {
       ),
     },
   ]
+}
+
+function ScheduledMessages({ reservationId }) {
+  const { addToast } = useToast()
+  const queryClient = useQueryClient()
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+  const [cancellingId, setCancellingId] = useState(null) // id of msg waiting confirmation
+
+  const { data: messages = [], isLoading } = useQuery({
+    queryKey: queryKeys.scheduledMessages.byReservation(reservationId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('scheduled_messages')
+        .select('*')
+        .eq('reservation_id', reservationId)
+        .order('scheduled_for', { ascending: true })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!reservationId,
+  })
+
+  async function handleCancel(msgId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${supabaseUrl}/functions/v1/cancel-scheduled-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ scheduled_message_id: msgId }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to cancel')
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.scheduledMessages.byReservation(reservationId) })
+      addToast({ message: 'Scheduled message cancelled', variant: 'success' })
+    } catch (err) {
+      addToast({ message: err.message || 'Could not cancel message', variant: 'danger' })
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
+  return (
+    <div>
+      <span className="font-body text-[13px] uppercase tracking-[0.06em] font-semibold text-text-secondary">
+        Scheduled Messages
+      </span>
+
+      {isLoading && (
+        <p className="font-body text-[13px] text-text-muted mt-2">Loading...</p>
+      )}
+
+      {!isLoading && messages.length === 0 && (
+        <p className="font-body text-[13px] text-text-muted mt-2">No scheduled messages for this reservation.</p>
+      )}
+
+      {!isLoading && messages.length > 0 && (
+        <div className="flex flex-col gap-1.5 mt-2">
+          {messages.map(msg => {
+            const isPending = msg.status === 'pending'
+            const isCancelling = cancellingId === msg.id
+            const label = TEMPLATE_LABELS[msg.template_type] ?? msg.template_type
+            return (
+              <div
+                key={msg.id}
+                className={cn(
+                  'flex items-center justify-between gap-2 px-3 py-2 rounded-[6px] border border-border',
+                  isPending ? 'bg-surface-raised' : 'bg-surface opacity-60',
+                )}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className={cn('font-body text-[13px] font-medium truncate', isPending ? 'text-text-primary' : 'text-text-secondary')}>
+                    {label}
+                  </p>
+                  <p className="font-mono text-[11px] text-text-muted">
+                    {format(parseISO(msg.scheduled_for), 'MMM d, yyyy · h:mm a')}
+                    {msg.status !== 'pending' && (
+                      <span className="ml-2 capitalize">{msg.status}</span>
+                    )}
+                  </p>
+                </div>
+
+                {isPending && (
+                  isCancelling ? (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-body text-[11px] text-text-secondary">Cancel?</span>
+                      <button
+                        onClick={() => handleCancel(msg.id)}
+                        className="font-body text-[11px] text-danger hover:underline"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setCancellingId(null)}
+                        className="font-body text-[11px] text-text-muted hover:underline"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setCancellingId(msg.id)}
+                      className="text-text-muted hover:text-danger transition-colors shrink-0 p-1"
+                      title="Cancel scheduled message"
+                    >
+                      <Prohibit size={14} weight="bold" />
+                    </button>
+                  )
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ReservationDrawer({ reservation, onClose, roomMap }) {
@@ -253,6 +377,8 @@ function ReservationDrawer({ reservation, onClose, roomMap }) {
               <p className="font-body text-[14px] text-text-secondary mt-1">{reservation.notes}</p>
             </div>
           )}
+
+          <ScheduledMessages reservationId={reservation.id} />
         </div>
 
         {/* Sticky footer */}

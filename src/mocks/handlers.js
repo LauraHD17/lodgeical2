@@ -12,6 +12,7 @@ import {
   MOCK_ONBOARDING_STATE, MOCK_IMPORT_BATCHES, MOCK_ADMIN_ACTIVITY,
   MOCK_INQUIRIES,
   MOCK_DOCUMENTS,
+  MOCK_SCHEDULED_MESSAGES,
 } from './db.js'
 
 // rate_overrides — empty by default in mock
@@ -643,6 +644,48 @@ export const handlers = [
       stripeOnly: [],
       localOnly: [],
     })
+  ),
+
+  // -------------------------------------------------------------------------
+  // scheduled_messages
+  // -------------------------------------------------------------------------
+
+  http.get(`${BASE}/rest/v1/scheduled_messages`, ({ request }) => {
+    const url = new URL(request.url)
+    const resIdFilter = url.searchParams.get('reservation_id')
+    const resId = resIdFilter?.replace('eq.', '')
+    const filtered = resId
+      ? MOCK_SCHEDULED_MESSAGES.filter(m => m.reservation_id === resId)
+      : MOCK_SCHEDULED_MESSAGES
+    const sorted = [...filtered].sort((a, b) => new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime())
+    return pgRespond(request, sorted)
+  }),
+
+  http.patch(`${BASE}/rest/v1/scheduled_messages`, async ({ request }) => {
+    const body = await request.json()
+    const url = new URL(request.url)
+    const idFilter = url.searchParams.get('id')
+    const id = idFilter?.replace('eq.', '')
+    const msg = MOCK_SCHEDULED_MESSAGES.find(m => m.id === id) ?? MOCK_SCHEDULED_MESSAGES[0]
+    return pgRespond(request, { ...msg, ...body })
+  }),
+
+  // cancel-scheduled-message edge function
+  http.post(`${BASE}/functions/v1/cancel-scheduled-message`, async ({ request }) => {
+    const body = await request.json().catch(() => ({}))
+    const msg = MOCK_SCHEDULED_MESSAGES.find(m => m.id === body.scheduled_message_id)
+    if (!msg || msg.status !== 'pending') {
+      return HttpResponse.json({ error: 'Message not found or already processed' }, { status: 404 })
+    }
+    msg.status = 'cancelled'
+    msg.cancelled_by = 'innkeeper'
+    msg.cancelled_at = new Date().toISOString()
+    return HttpResponse.json({ success: true })
+  }),
+
+  // send-custom-message edge function
+  http.post(`${BASE}/functions/v1/send-custom-message`, async () =>
+    HttpResponse.json({ success: true }),
   ),
 
 ]

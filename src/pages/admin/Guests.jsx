@@ -3,7 +3,8 @@
 // Merge: Step 1 — search for secondary guest. Step 2 — confirm primary wins all data.
 // Merge is executed via supabase edge function 'merge-guests'.
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
+import { useDebounce } from '@/hooks/useDebounce'
 import { format, parseISO } from 'date-fns'
 import { MagnifyingGlass, X, UserCircle, GitMerge, ArrowRight, File, UploadSimple, ArrowSquareOut, Copy, Check, Paperclip } from '@phosphor-icons/react'
 
@@ -25,16 +26,11 @@ import { supabase } from '@/lib/supabaseClient'
 function MergeModal({ primaryGuest, onClose, onMerged }) {
   const [step, setStep] = useState(1)
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [secondaryGuest, setSecondaryGuest] = useState(null)
   const [merging, setMerging] = useState(false)
   const { addToast } = useToast()
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(t)
-  }, [search])
-
+  const debouncedSearch = useDebounce(search)
   const { data: searchResults = [] } = useGuests(debouncedSearch)
   const filteredResults = searchResults.filter(g => g.id !== primaryGuest.id)
 
@@ -600,15 +596,10 @@ const COLUMNS = [
 
 export default function Guests() {
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedGuest, setSelectedGuest] = useState(null)
   const [mergeOpen, setMergeOpen] = useState(false)
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(timer)
-  }, [search])
-
+  const debouncedSearch = useDebounce(search)
   const { data: guests = [], isLoading, refetch } = useGuests(debouncedSearch)
 
   function handleMerged() {

@@ -213,6 +213,22 @@ The import page (`src/pages/admin/Import.jsx`) handles bulk reservation import f
 - `/financials` → `/reports` (legacy redirect)
 - `*` → `/login` (fallback for unknown routes)
 
+### Automated Messaging (Phase 1 — built)
+- `scheduled_messages` table: per-reservation queue of timed outbound emails
+- Rule config lives on `email_templates` columns: `rule_enabled`, `trigger_event`, `offset_days`, `send_time`
+- `_shared/scheduleMessages.ts`: `scheduleMessagesForReservation()` + `cancelScheduledMessages()`
+- `process-scheduled-messages` Edge Function: hourly processor (pg_cron or GitHub Actions)
+- `cancel-scheduled-message` Edge Function: innkeeper cancels individual pending message
+- `send-custom-message` Edge Function: one-off compose email from Messaging center
+- New template types: `pre_arrival_info`, `post_stay_follow_up`, `booking_thank_you_delay`
+
+### Gmail Two-Way Sync (Phase 2 — future)
+- Goal: guest replies visible as a conversation thread in the reservation drawer
+- Requires: Gmail OAuth, Pub/Sub push notifications, thread ID tracking, `message_threads` table
+- Consider **Nylas** instead of raw Gmail API — handles OAuth verification, multi-provider (Gmail + Outlook), avoids Google's "unverified app" warning screen for non-technical innkeepers
+- Phase 1 ships Reply-To header on all outgoing emails so replies land in innkeeper's inbox immediately
+- More to discuss before implementation
+
 ## Design System (Mandatory)
 
 ### Color Tokens — Use ONLY These

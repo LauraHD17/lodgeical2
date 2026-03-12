@@ -47,7 +47,12 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   )
 
-  // Guest portal lookup — returns mock reservation
+  // Other edge functions — empty success (registered first, lower priority)
+  await page.route('**/functions/v1/**', route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+  )
+
+  // Guest portal lookup — registered last so it takes priority (LIFO)
   await page.route('**/functions/v1/guest-portal-lookup', route =>
     route.fulfill({
       status: 200,
@@ -55,12 +60,6 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify(MOCK_RESERVATION),
     })
   )
-
-  // Other edge functions — empty success
-  await page.route('**/functions/v1/**', route => {
-    if (route.request().url().includes('guest-portal-lookup')) return
-    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
-  })
 })
 
 test.describe('Guest portal', () => {
@@ -86,7 +85,7 @@ test.describe('Guest portal', () => {
     await inputs.nth(1).fill('jane@example.com')
 
     // Submit the form
-    await page.locator('button[type="submit"], button:has-text("Look Up")').first().click()
+    await page.locator('button[type="submit"], button:has-text("Look Up"), button:has-text("Find Reservation")').first().click()
 
     // Should show reservation confirmation number somewhere on the page
     await expect(page.locator('text=TEST123')).toBeVisible({ timeout: 10_000 })

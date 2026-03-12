@@ -1,0 +1,20 @@
+name: Process Scheduled Messages
+
+on:
+  schedule:
+    # Runs every hour at :05 past the hour
+    - cron: '5 * * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  process:
+    name: Process message queue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger process-scheduled-messages Edge Function
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/process-scheduled-messages" \
+            -H "X-Scheduler-Secret: ${{ secrets.SCHEDULER_SECRET }}" \
+            -H "Content-Type: application/json" \
+          | grep -qE "^2" || (echo "Edge Function returned non-2xx" && exit 1)

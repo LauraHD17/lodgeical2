@@ -9,6 +9,7 @@ import { rateLimit } from '../_shared/rateLimit.ts'
 import { logAdminAction } from '../_shared/audit.ts'
 import { checkConflicts } from '../_shared/conflicts.ts'
 import { sendModificationConfirmation } from '../_shared/email.ts'
+import { scheduleMessagesForReservation } from '../_shared/scheduleMessages.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
 
 const CORS_HEADERS = {
@@ -56,7 +57,7 @@ serve(async (req) => {
   // Fetch existing reservation (verify ownership) — select only the fields needed for update logic
   const { data: existing, error: fetchError } = await supabase
     .from('reservations')
-    .select('id, room_ids, check_in, check_out, total_due_cents, guest_id, confirmation_number')
+    .select('id, room_ids, check_in, check_out, total_due_cents, guest_id, confirmation_number, created_at')
     .eq('id', input.reservation_id)
     .eq('property_id', propertyId)
     .single()
@@ -126,6 +127,17 @@ serve(async (req) => {
   // Audit log (fire-and-forget)
   logAdminAction(supabase, propertyId, user.id, 'update', 'reservation', input.reservation_id)
     .catch(e => console.error('[update-reservation] audit error:', e))
+
+  // Reschedule timed messages if dates changed (fire-and-forget)
+  if (datesChanged) {
+    scheduleMessagesForReservation(supabase, {
+      id: input.reservation_id,
+      property_id: propertyId,
+      created_at: existing.created_at as string,
+      check_in: newCheckIn,
+      check_out: newCheckOut,
+    }, { replaceExisting: true }).catch(e => console.error('[update-reservation] schedule error:', e))
+  }
 
   // Guest notification (fire-and-forget)
   if (input.send_notification) {

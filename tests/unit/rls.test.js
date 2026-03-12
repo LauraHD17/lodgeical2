@@ -123,7 +123,7 @@ describe('Schema: migration files exist', () => {
     const { join } = await import('path')
     const migrationsDir = join(process.cwd(), 'supabase/migrations')
     const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
-    expect(files).toHaveLength(45)
+    expect(files).toHaveLength(58)
 
     const expectedFiles = [
       '001_properties.sql',
@@ -138,14 +138,10 @@ describe('Schema: migration files exist', () => {
       '010_room_ical_tokens.sql',
       '011_room_external_feeds.sql',
       '012_contacts.sql',
-      '012_rate_limits.sql',
       '013_maintenance_tickets.sql',
       '014_maintenance_logs.sql',
-      '014_properties_weather.sql',
       '015_reservation_blocks.sql',
-      '015_settings_cleaning_fee.sql',
       '016_room_photos.sql',
-      '016_settings_stripe_fee_passthrough.sql',
       '017_settings_house_rules.sql',
       '018_rate_overrides.sql',
       '019_email_templates.sql',
@@ -171,6 +167,23 @@ describe('Schema: migration files exist', () => {
       '039_policies.sql',
       '040_daily_digest.sql',
       '041_reconciliation.sql',
+      '042_fix_room_links_public_rls.sql',
+      '043_rate_limits.sql',
+      '044_properties_weather.sql',
+      '045_settings_cleaning_fee.sql',
+      '046_settings_stripe_fee_passthrough.sql',
+      '047_provision_property_function.sql',
+      '048_fix_upa_rls_recursion.sql',
+      '049_cancellation_tiers.sql',
+      '050_refund_processing_fee.sql',
+      '051_cancellation_fee.sql',
+      '052_move_cleaning_fee_to_settings.sql',
+      '053_move_pet_fee_to_settings.sql',
+      '054_pet_policy.sql',
+      '055_import_batch_rollback.sql',
+      '056_automated_messaging.sql',
+      '057_property_timezone.sql',
+      '058_email_logs_bounce_tracking.sql',
     ]
     for (const expected of expectedFiles) {
       expect(files).toContain(expected)

@@ -596,3 +596,34 @@ export const MOCK_INQUIRIES = [
   },
 ]
 
+export const MOCK_SCHEDULED_MESSAGES = [
+  {
+    id: 'sched-001', property_id: PROPERTY_ID, reservation_id: 'res-003',
+    template_type: 'pre_arrival_info',
+    scheduled_for: daysFromNow(4) + 'T15:00:00Z',
+    status: 'pending', cancelled_by: null, cancelled_at: null, sent_at: null,
+    created_at: daysFromNow(-1) + 'T09:00:00Z',
+  },
+  {
+    id: 'sched-002', property_id: PROPERTY_ID, reservation_id: 'res-003',
+    template_type: 'check_in_reminder',
+    scheduled_for: daysFromNow(6) + 'T10:00:00Z',
+    status: 'pending', cancelled_by: null, cancelled_at: null, sent_at: null,
+    created_at: daysFromNow(-1) + 'T09:00:00Z',
+  },
+  {
+    id: 'sched-003', property_id: PROPERTY_ID, reservation_id: 'res-003',
+    template_type: 'post_stay_follow_up',
+    scheduled_for: daysFromNow(12) + 'T11:00:00Z',
+    status: 'pending', cancelled_by: null, cancelled_at: null, sent_at: null,
+    created_at: daysFromNow(-1) + 'T09:00:00Z',
+  },
+  {
+    id: 'sched-004', property_id: PROPERTY_ID, reservation_id: 'res-001',
+    template_type: 'check_in_reminder',
+    scheduled_for: daysFromNow(-2) + 'T10:00:00Z',
+    status: 'sent', cancelled_by: null, cancelled_at: null, sent_at: daysFromNow(-2) + 'T10:01:00Z',
+    created_at: daysFromNow(-5) + 'T09:00:00Z',
+  },
+]
+

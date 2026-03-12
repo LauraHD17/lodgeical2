@@ -14,6 +14,9 @@ export type TemplateType =
   | 'invoice'
   | 'daily_digest'
   | 'custom'
+  | 'pre_arrival_info'
+  | 'post_stay_follow_up'
+  | 'booking_thank_you_delay'
 
 export interface TemplateVars {
   guest_first_name?: string
@@ -223,6 +226,45 @@ function defaultTemplate(type: TemplateType, v: TemplateVars): { subject: string
           <p style="color:#888;font-size:12px;margin-top:32px;border-top:1px solid #D1D0CB;padding-top:12px">
             Sent by Lodge-ical. Manage this in Settings &rarr; Property &rarr; Notifications.
           </p>
+        `),
+      }
+
+    case 'pre_arrival_info':
+      return {
+        subject: `Before you arrive — ${v.property_name}`,
+        html: wrap(`Getting ready for your visit, ${v.guest_first_name}!`, `
+          <p>Your stay at <strong>${v.property_name}</strong> is coming up soon. Here's everything you need to know before you arrive.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr><td style="padding:8px 0;color:#555">Confirmation</td><td><strong>${v.confirmation_number}</strong></td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-in</td><td>${v.check_in_date} at ${v.check_in_time ?? 'see property details'}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Room(s)</td><td>${v.room_names}</td></tr>
+          </table>
+          <p style="color:#555">If you have any questions before you arrive, don't hesitate to reach out.</p>
+        `),
+      }
+
+    case 'post_stay_follow_up':
+      return {
+        subject: `Thank you for staying at ${v.property_name}`,
+        html: wrap(`It was wonderful to have you, ${v.guest_first_name}!`, `
+          <p>Thank you for choosing <strong>${v.property_name}</strong>. We hope you had a wonderful stay.</p>
+          <p>If you have a moment, we'd love to hear about your experience — your feedback means a lot to us and helps us continue to improve.</p>
+          <p style="color:#555;font-size:14px">We look forward to welcoming you back.</p>
+        `),
+      }
+
+    case 'booking_thank_you_delay':
+      return {
+        subject: `We're looking forward to your visit — ${v.property_name}`,
+        html: wrap(`Thanks again, ${v.guest_first_name}!`, `
+          <p>Just a quick note to say we're so glad you'll be joining us at <strong>${v.property_name}</strong>.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0">
+            <tr><td style="padding:8px 0;color:#555">Confirmation</td><td><strong>${v.confirmation_number}</strong></td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-in</td><td>${v.check_in_date}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Check-out</td><td>${v.check_out_date}</td></tr>
+            <tr><td style="padding:8px 0;color:#555">Room(s)</td><td>${v.room_names}</td></tr>
+          </table>
+          <p style="color:#555">Feel free to reach out if you have any questions before your arrival. We can't wait to welcome you!</p>
         `),
       }
   }

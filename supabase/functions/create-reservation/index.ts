@@ -8,6 +8,7 @@ import { requireAuth } from '../_shared/auth.ts'
 import { rateLimit } from '../_shared/rateLimit.ts'
 import { logAdminAction } from '../_shared/audit.ts'
 import { sendBookingConfirmation } from '../_shared/email.ts'
+import { scheduleMessagesForReservation } from '../_shared/scheduleMessages.ts'
 import { calculatePricing } from '../_shared/pricing.ts'
 import { checkConflicts } from '../_shared/conflicts.ts'
 
@@ -233,6 +234,15 @@ serve(async (req) => {
   const resForEmail = { ...reservation, property_id: propertyId, room_ids: input.room_ids }
   sendBookingConfirmation(guestRecord, resForEmail, supabase)
     .catch(e => console.error('[create-reservation] email error:', e))
+
+  // 12. Schedule automated timed messages (fire-and-forget)
+  scheduleMessagesForReservation(supabase, {
+    id: reservation.id as string,
+    property_id: propertyId,
+    created_at: reservation.created_at as string,
+    check_in: input.check_in,
+    check_out: input.check_out,
+  }).catch(e => console.error('[create-reservation] schedule error:', e))
 
   // 10b. If a booker email is set and different from guest, send them a copy
   if (input.booker_email && input.booker_email.toLowerCase() !== guestRecord.email.toLowerCase()) {

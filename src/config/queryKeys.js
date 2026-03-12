@@ -125,4 +125,14 @@ export const queryKeys = {
     all: ['reports'],
     ranged: (propertyId, dateFrom, dateTo, fetchFrom) => ['reports', 'ranged', propertyId, fetchFrom ?? dateFrom, dateTo],
   },
+
+  scheduledMessages: {
+    all: ['scheduledMessages'],
+    byReservation: (reservationId) => ['scheduledMessages', 'byReservation', reservationId],
+  },
+
+  emailTemplates: {
+    all: ['emailTemplates'],
+    byType: (propertyId, templateType) => ['emailTemplates', 'byType', propertyId, templateType],
+  },
 }

@@ -9,6 +9,7 @@ import { rateLimit } from '../_shared/rateLimit.ts'
 import { logAdminAction } from '../_shared/audit.ts'
 import { getStripe } from '../_shared/stripe.ts'
 import { sendCancellationNotice } from '../_shared/email.ts'
+import { cancelScheduledMessages } from '../_shared/scheduleMessages.ts'
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -233,6 +234,10 @@ serve(async (req) => {
     logAdminAction(supabase, propertyId, userId, 'cancel', 'reservation', parsed.data.reservation_id)
       .catch(e => console.error('[cancel-reservation] audit error:', e))
   }
+
+  // Cancel all pending scheduled messages for this reservation (fire-and-forget)
+  cancelScheduledMessages(supabase, parsed.data.reservation_id)
+    .catch(e => console.error('[cancel-reservation] schedule cancel error:', e))
 
   // Send cancellation email (fire-and-forget — don't block the response)
   sendCancellationNotice(reservation.guests, reservation, refundCents, supabase).catch(e =>
