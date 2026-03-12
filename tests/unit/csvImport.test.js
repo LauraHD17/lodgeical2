@@ -162,6 +162,188 @@ describe('parseCsvToRows — RFC 4180 quoted fields', () => {
 })
 
 // ---------------------------------------------------------------------------
+// columnMapper — autoSuggestMapping
+// ---------------------------------------------------------------------------
+
+import {
+  autoSuggestMapping,
+  isTemplateCsv,
+  applyColumnMapping,
+  IMPORT_FIELDS,
+  SPECIAL,
+} from '../../src/lib/csv/columnMapper.js'
+
+const TEMPLATE_HEADERS = [
+  'confirmation_number', 'check_in', 'check_out', 'num_guests',
+  'guest_first_name', 'guest_last_name', 'guest_email', 'guest_phone',
+  'room_name', 'total_due_cents', 'status', 'notes',
+]
+
+describe('isTemplateCsv', () => {
+  it('returns true when all template headers are present', () => {
+    expect(isTemplateCsv(TEMPLATE_HEADERS)).toBe(true)
+  })
+
+  it('returns true when extra columns are present alongside template headers', () => {
+    expect(isTemplateCsv([...TEMPLATE_HEADERS, 'extra_column'])).toBe(true)
+  })
+
+  it('returns false when any template header is missing', () => {
+    const partial = TEMPLATE_HEADERS.filter(h => h !== 'guest_email')
+    expect(isTemplateCsv(partial)).toBe(false)
+  })
+
+  it('returns false for a foreign CSV with different column names', () => {
+    expect(isTemplateCsv(['GUEST NAME', 'CHECK IN', 'CHECK OUT', 'PROPERTY NICKNAME'])).toBe(false)
+  })
+
+  it('returns false for empty array', () => {
+    expect(isTemplateCsv([])).toBe(false)
+  })
+})
+
+describe('autoSuggestMapping', () => {
+  it('maps exact-match column names correctly', () => {
+    const mapping = autoSuggestMapping(['name', 'email', 'room', 'arrival', 'departure'])
+    expect(mapping.guest_name).toBe('name')
+    expect(mapping.guest_email).toBe('email')
+    expect(mapping.room_name).toBe('room')
+    expect(mapping.check_in).toBe('arrival')
+    expect(mapping.check_out).toBe('departure')
+  })
+
+  it('maps "GUEST NAME" to guest_name case-insensitively', () => {
+    const mapping = autoSuggestMapping(['GUEST NAME', 'CHECK IN', 'CHECK OUT', 'PROPERTY NICKNAME'])
+    expect(mapping.guest_name).toBe('GUEST NAME')
+    expect(mapping.check_in).toBe('CHECK IN')
+    expect(mapping.check_out).toBe('CHECK OUT')
+    expect(mapping.room_name).toBe('PROPERTY NICKNAME')
+  })
+
+  it('maps "Booking ID" to confirmation_number', () => {
+    const mapping = autoSuggestMapping(['Booking ID', 'Check In', 'Check Out', 'Guest', 'Room'])
+    expect(mapping.confirmation_number).toBe('Booking ID')
+  })
+
+  it('defaults unmatched required fields to empty string', () => {
+    const mapping = autoSuggestMapping(['completely_unrecognized_col'])
+    expect(mapping.guest_name).toBe('')
+    expect(mapping.check_in).toBe('')
+  })
+
+  it('defaults unmatched optional fields to their sentinel value', () => {
+    const mapping = autoSuggestMapping([])
+    expect(mapping.confirmation_number).toBe(SPECIAL.AUTOGEN)
+    expect(mapping.guest_email).toBe(SPECIAL.SKIP)
+    expect(mapping.total_due_cents).toBe(SPECIAL.ZERO)
+    expect(mapping.status).toBe(SPECIAL.CONFIRMED)
+  })
+
+  it('does not assign the same CSV column to two fields', () => {
+    const mapping = autoSuggestMapping(['name', 'email', 'room', 'check_in', 'check_out'])
+    const assigned = Object.values(mapping).filter(v => !Object.values(SPECIAL).includes(v) && v !== '')
+    const unique = new Set(assigned)
+    expect(assigned.length).toBe(unique.size)
+  })
+})
+
+describe('applyColumnMapping', () => {
+  const rawRows = [
+    { 'GUEST NAME': 'John Doe', 'CHECK IN': '2026-06-01', 'CHECK OUT': '2026-06-05', 'ROOM': 'Cabin A', 'BOOKING ID': 'BK-001', 'TOTAL': '150.00' },
+    { 'GUEST NAME': 'Jane Smith', 'CHECK IN': '2026-07-10', 'CHECK OUT': '2026-07-14', 'ROOM': 'Cabin B', 'BOOKING ID': '', 'TOTAL': '0' },
+  ]
+
+  const mapping = {
+    guest_name:          'GUEST NAME',
+    check_in:            'CHECK IN',
+    check_out:           'CHECK OUT',
+    room_name:           'ROOM',
+    confirmation_number: 'BOOKING ID',
+    total_due_cents:     'TOTAL',
+    amount_paid:         SPECIAL.ZERO,
+    guest_email:         SPECIAL.SKIP,
+    guest_phone:         SPECIAL.SKIP,
+    num_guests:          '1',
+    status:              SPECIAL.CONFIRMED,
+    notes:               SPECIAL.SKIP,
+  }
+
+  it('splits full name into guest_first_name and guest_last_name', () => {
+    const [row] = applyColumnMapping(rawRows, mapping, 'dollars')
+    expect(row.guest_first_name).toBe('John')
+    expect(row.guest_last_name).toBe('Doe')
+  })
+
+  it('handles single-word name (no last name)', () => {
+    const rows = [{ 'GUEST NAME': 'Madonna', 'CHECK IN': '2026-06-01', 'CHECK OUT': '2026-06-05', 'ROOM': 'A', 'BOOKING ID': '', 'TOTAL': '0' }]
+    const [row] = applyColumnMapping(rows, mapping, 'dollars')
+    expect(row.guest_first_name).toBe('Madonna')
+    expect(row.guest_last_name).toBe('')
+  })
+
+  it('converts dollar amounts to cents when moneyUnit is dollars', () => {
+    const [row] = applyColumnMapping(rawRows, mapping, 'dollars')
+    expect(row.total_due_cents).toBe(15000)
+  })
+
+  it('passes through cents when moneyUnit is cents', () => {
+    const [row] = applyColumnMapping(rawRows, mapping, 'cents')
+    expect(row.total_due_cents).toBe(150)
+  })
+
+  it('maps SPECIAL.CONFIRMED to "confirmed" status', () => {
+    const [row] = applyColumnMapping(rawRows, mapping, 'dollars')
+    expect(row.status).toBe('confirmed')
+  })
+
+  it('maps SPECIAL.SKIP fields to empty string', () => {
+    const [row] = applyColumnMapping(rawRows, mapping, 'dollars')
+    expect(row.guest_email).toBe('')
+    expect(row.notes).toBe('')
+  })
+
+  it('maps SPECIAL.AUTOGEN fields to empty string (edge function generates)', () => {
+    const autoGenMapping = { ...mapping, confirmation_number: SPECIAL.AUTOGEN }
+    const [row] = applyColumnMapping(rawRows, autoGenMapping, 'dollars')
+    expect(row.confirmation_number).toBe('')
+  })
+
+  it('maps empty BOOKING ID to empty string', () => {
+    const [, row] = applyColumnMapping(rawRows, mapping, 'dollars')
+    expect(row.confirmation_number).toBe('')
+  })
+
+  it('strips currency symbols from money fields', () => {
+    const rows = [{ ...rawRows[0], 'TOTAL': '$150.00' }]
+    const [row] = applyColumnMapping(rows, mapping, 'dollars')
+    expect(row.total_due_cents).toBe(15000)
+  })
+
+  it('produces guest_first_name and guest_last_name (not guest_name) in output', () => {
+    const [row] = applyColumnMapping(rawRows, mapping, 'dollars')
+    expect(row.guest_first_name).toBeDefined()
+    expect(row.guest_last_name).toBeDefined()
+    expect(row.guest_name).toBeUndefined()
+  })
+})
+
+describe('IMPORT_FIELDS', () => {
+  it('has guest_name, room_name, check_in, check_out as required', () => {
+    const required = IMPORT_FIELDS.filter(f => f.required).map(f => f.key)
+    expect(required).toContain('guest_name')
+    expect(required).toContain('room_name')
+    expect(required).toContain('check_in')
+    expect(required).toContain('check_out')
+  })
+
+  it('has confirmation_number as optional with AUTOGEN default', () => {
+    const field = IMPORT_FIELDS.find(f => f.key === 'confirmation_number')
+    expect(field.required).toBe(false)
+    expect(field.default).toBe(SPECIAL.AUTOGEN)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // CSV row validation helpers (mirrors edge function logic)
 // ---------------------------------------------------------------------------
 

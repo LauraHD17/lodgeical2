@@ -96,3 +96,15 @@ test.describe('Booking confirmation', () => {
     await expect(page.locator('body')).not.toBeEmpty()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Import page — auth redirect
+// ---------------------------------------------------------------------------
+
+test.describe('Import page', () => {
+  test('redirects unauthenticated users to /login', async ({ page }) => {
+    await page.goto('/import')
+    await page.waitForURL(/\/login/, { timeout: 10_000 })
+    await expect(page.url()).toContain('/login')
+  })
+})
