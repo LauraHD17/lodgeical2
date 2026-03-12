@@ -173,6 +173,42 @@ The public booking widget (`src/components/widget/`) is a multi-step flow: DateS
 - Email distribution: guest gets all emails; booker gets confirmations/receipts; CC'd addresses get check-in/arrival info only.
 - Guest portal lookup matches either guest email or booker email.
 
+### CSV Import Workflow (`/import`)
+
+The import page (`src/pages/admin/Import.jsx`) handles bulk reservation import from third-party CSVs (Uplisting, Guesty, custom exports).
+
+**Column mapping** (`src/lib/csv/columnMapper.js`):
+- `IMPORT_FIELDS` — 12 fields, each with `key`, `label`, `required`, `special`, `default`, and `description` (plain-language copy shown in the mapper UI).
+- `autoSuggestMapping(headers)` — matches CSV headers against `ALIASES` using exact/includes comparison. **Alias ordering matters**: more-specific phrases must come before shorter ones to avoid false matches (e.g., `'property nickname'` before `'unit'` so Uplisting's 'Multi-unit name' doesn't steal the `room_name` slot).
+- `isTemplateCsv(headers)` — detects Lodge-ical's own template headers; skips the mapping step entirely.
+- `applyColumnMapping(rows, mapping, moneyUnit)` — transforms raw CSV rows to Lodge-ical field names. Handles full-name split, money conversion (dollars↔cents), and sentinel defaults.
+- `SPECIAL` sentinels: `__autogen__`, `__skip__`, `__zero__`, `__confirmed__`.
+
+**Key alias bugs to avoid re-introducing:**
+- `room_name`: `'property nickname'` must be first (Uplisting's 'Multi-unit name' otherwise matches `'unit'`)
+- `total_due_cents`: `'total'` and `'revenue'` as standalone aliases match 'Total payout' / 'Net revenue' (wrong). Use `'gross revenue'`, `'gross'` etc.
+- `num_guests`: `'number of nights'` was removed — it matches Uplisting's 'Number of nights' column.
+
+**Duplicate detection** (Edge Function `import-csv`):
+- Primary: `confirmation_number` uniqueness check.
+- Composite: `Set` of `check_in|check_out|roomId` strings — catches re-uploads when conf numbers are auto-generated.
+- Both checks run per-row; skipped rows increment `skipped` counter, not an error.
+
+**Import rollback** (`import_batches` table):
+- Each import creates a row in `import_batches` with `reservation_ids UUID[]`, `imported_count`, `rolled_back_at`.
+- Rollback fast path: delete by `reservation_ids` array.
+- Rollback legacy path: time-window query for reservations with `origin='import'` created within the batch's timestamp window (for older batches without `reservation_ids`).
+- Guest profiles are **not** deleted on rollback.
+- Import History only shows batches where `imported_count > 0` — error-only batches are noise and hidden.
+
+**Room rename shortcut:**
+- In the unmatched-room step, after picking a Lodge-ical room, an inline "Rename room in Lodge-ical" link appears.
+- Clicking expands an input pre-filled with the current room name.
+- Saving calls `supabase.from('rooms').update()` + `queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all })`.
+
+**Revenue warning:**
+- If `total_due_cents` is left at `__zero__` (not mapped), a warning banner appears above the Confirm Mapping button reminding the innkeeper that financial reports will show $0 for these bookings.
+
 ### Route Redirects
 - `/financials` → `/reports` (legacy redirect)
 - `*` → `/login` (fallback for unknown routes)
