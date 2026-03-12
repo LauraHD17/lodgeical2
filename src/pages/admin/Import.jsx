@@ -173,11 +173,7 @@ export default function Import() {
         body: { rows: mappedRows },
       })
       if (fnError) {
-        // eslint-disable-next-line no-console
-        console.error('[import-csv] fnError:', fnError, 'status:', fnError.context?.status, 'name:', fnError.name)
         const body = await fnError.context?.text?.().catch(() => null)
-        // eslint-disable-next-line no-console
-        console.error('[import-csv] response body:', body)
         let parsed = null
         try { parsed = JSON.parse(body) } catch { /* not json */ }
         throw new Error(parsed?.error ?? body ?? fnError.message ?? 'Import failed')
