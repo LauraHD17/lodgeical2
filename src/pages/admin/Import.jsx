@@ -3,8 +3,8 @@
 // room-name mapping for mismatches, and import history for transition workflows.
 
 import { useState, useRef, useMemo } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning, ClockCounterClockwise, ArrowRight } from '@phosphor-icons/react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { UploadSimple, DownloadSimple, Info, FileText, X, CheckCircle, Warning, ClockCounterClockwise, ArrowRight, Trash } from '@phosphor-icons/react'
 import { format, parseISO } from 'date-fns'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
@@ -85,6 +85,7 @@ export default function Import() {
   const [columnMapping, setColumnMapping] = useState(null)   // null = template CSV; object = foreign CSV
   const [moneyUnit, setMoneyUnit] = useState('dollars')       // 'dollars' | 'cents'
   const [mappingConfirmed, setMappingConfirmed] = useState(false)
+  const [rollbackTarget, setRollbackTarget] = useState(null) // batch to confirm-rollback
   const fileInputRef = useRef(null)
 
   const { data: rooms = [] } = useRooms()
@@ -135,6 +136,30 @@ export default function Import() {
   // Required fields must be mapped to a real CSV column (not a sentinel)
   const requiredMapped = !!columnMapping && ['guest_name', 'room_name', 'check_in', 'check_out']
     .every(k => columnMapping[k] && !Object.values(SPECIAL).includes(columnMapping[k]))
+
+  const rollbackMutation = useMutation({
+    mutationFn: async (batch) => {
+      const ids = batch.reservation_ids ?? []
+      if (ids.length > 0) {
+        // Delete payments first (FK constraint), then reservations
+        await supabase.from('payments').delete().in('reservation_id', ids)
+        const { error } = await supabase.from('reservations').delete().in('id', ids)
+        if (error) throw new Error(error.message)
+      }
+      // Stamp the batch as rolled back
+      await supabase.from('import_batches').update({ rolled_back_at: new Date().toISOString() }).eq('id', batch.id)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.importBatches.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all })
+      setRollbackTarget(null)
+      addToast({ message: 'Import rolled back — reservations deleted.', variant: 'success' })
+    },
+    onError: (err) => {
+      addToast({ message: err?.message ?? 'Rollback failed', variant: 'error' })
+    },
+  })
 
   function handleDrop(e) {
     e.preventDefault()
@@ -246,7 +271,7 @@ export default function Import() {
         skipped_count: json.skipped,
         error_count: json.errors?.length ?? 0,
         file_name: file?.name ?? 'csv-import',
-        reservation_ids: [],
+        reservation_ids: json.reservation_ids ?? [],
       }).then(() => {
         queryClient.invalidateQueries({ queryKey: queryKeys.importBatches.all })
       }).catch(() => {})
@@ -643,39 +668,108 @@ export default function Import() {
             Import History
           </h2>
           <div className="border border-border rounded-[8px] overflow-hidden">
-            {importBatches.map((batch, i) => (
-              <div
-                key={batch.id}
-                className={cn(
-                  'px-4 py-3',
-                  i > 0 && 'border-t border-border',
-                  i % 2 === 0 ? 'bg-surface-raised' : 'bg-surface',
-                )}
-              >
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-[13px] text-text-secondary">
-                    {format(parseISO(batch.created_at), 'MMM d, yyyy')}
-                  </span>
-                  {batch.file_name && (
-                    <>
-                      <span className="text-text-muted">·</span>
-                      <span className="font-body text-[14px] font-semibold text-text-primary">
-                        {batch.file_name}
+            {importBatches.map((batch, i) => {
+              const rolledBack = !!batch.rolled_back_at
+              const canRollback = !rolledBack && (batch.reservation_ids?.length ?? 0) > 0
+              return (
+                <div
+                  key={batch.id}
+                  className={cn(
+                    'px-4 py-3 flex items-center justify-between gap-4',
+                    i > 0 && 'border-t border-border',
+                    i % 2 === 0 ? 'bg-surface-raised' : 'bg-surface',
+                    rolledBack && 'opacity-50',
+                  )}
+                >
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-[13px] text-text-secondary">
+                        {format(parseISO(batch.created_at), 'MMM d, yyyy')}
                       </span>
-                    </>
+                      {batch.file_name && (
+                        <>
+                          <span className="text-text-muted">·</span>
+                          <span className="font-body text-[14px] font-semibold text-text-primary">
+                            {batch.file_name}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="font-mono text-[13px] mt-0.5 flex items-center gap-3">
+                      {rolledBack ? (
+                        <span className="text-text-muted italic font-body">
+                          Rolled back {format(parseISO(batch.rolled_back_at), 'MMM d, yyyy')}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-success">{batch.imported_count} imported</span>
+                          {batch.skipped_count > 0 && (
+                            <span className="text-warning">{batch.skipped_count} skipped</span>
+                          )}
+                          {batch.error_count > 0 && (
+                            <span className="text-danger">{batch.error_count} error{batch.error_count !== 1 ? 's' : ''}</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {canRollback && (
+                    <button
+                      onClick={() => setRollbackTarget(batch)}
+                      className="flex items-center gap-1.5 font-body text-[13px] text-danger hover:underline shrink-0"
+                    >
+                      <Trash size={14} weight="bold" />
+                      Roll back
+                    </button>
                   )}
                 </div>
-                <div className="font-mono text-[13px] mt-1 flex items-center gap-3">
-                  <span className="text-success">{batch.imported_count} imported</span>
-                  {batch.skipped_count > 0 && (
-                    <span className="text-warning">{batch.skipped_count} skipped</span>
-                  )}
-                  {batch.error_count > 0 && (
-                    <span className="text-danger">{batch.error_count} error{batch.error_count !== 1 ? 's' : ''}</span>
-                  )}
-                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Rollback confirmation dialog */}
+      {rollbackTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40">
+          <div className="bg-surface-raised border border-border rounded-[8px] p-6 w-full max-w-md flex flex-col gap-4 shadow-none mx-4">
+            <div className="flex items-start gap-3">
+              <Warning size={20} className="text-danger shrink-0 mt-0.5" weight="fill" />
+              <div>
+                <p className="font-body font-semibold text-[16px] text-text-primary">
+                  Roll back this import?
+                </p>
+                <p className="font-body text-[14px] text-text-secondary mt-1">
+                  This will permanently delete{' '}
+                  <span className="font-semibold text-text-primary">
+                    {rollbackTarget.imported_count} reservation{rollbackTarget.imported_count !== 1 ? 's' : ''}
+                  </span>
+                  {rollbackTarget.file_name && (
+                    <> from <span className="font-semibold text-text-primary">{rollbackTarget.file_name}</span></>
+                  )}{'. '}
+                  Guest profiles will not be affected. This cannot be undone.
+                </p>
               </div>
-            ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setRollbackTarget(null)}
+                disabled={rollbackMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                loading={rollbackMutation.isPending}
+                onClick={() => rollbackMutation.mutate(rollbackTarget)}
+              >
+                Delete Reservations
+              </Button>
+            </div>
           </div>
         </div>
       )}

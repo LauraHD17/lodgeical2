@@ -122,6 +122,7 @@ serve(async (req) => {
 
   // 4. Process each row
   let imported = 0
+  const createdIds: string[] = []
   let skipped  = 0
   const errors: RowError[] = []
 
@@ -221,6 +222,7 @@ serve(async (req) => {
       })
     }
 
+    createdIds.push(reservation.id)
     imported++
   }
 
@@ -229,7 +231,7 @@ serve(async (req) => {
     .catch(() => {})
 
   return new Response(
-    JSON.stringify({ success: true, imported, skipped, errors }),
+    JSON.stringify({ success: true, imported, skipped, errors, reservation_ids: createdIds }),
     { headers: CORS_HEADERS },
   )
 
