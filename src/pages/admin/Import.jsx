@@ -172,7 +172,10 @@ export default function Import() {
       const { data: json, error: fnError } = await supabase.functions.invoke('import-csv', {
         body: { rows: mappedRows },
       })
-      if (fnError) throw new Error(fnError.message ?? 'Import failed')
+      if (fnError) {
+        const body = await fnError.context?.json?.().catch(() => null)
+        throw new Error(body?.error ?? fnError.message ?? 'Import failed')
+      }
       setResult(json)
 
       // Build checklist rows from the import preview data
