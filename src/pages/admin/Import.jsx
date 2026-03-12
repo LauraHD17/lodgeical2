@@ -169,8 +169,17 @@ export default function Import() {
         return row
       })
 
+      // Refresh session to ensure access_token is valid before calling edge function
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        addToast({ message: 'Session expired — please log in again.', variant: 'error' })
+        setImporting(false)
+        return
+      }
+
       const { data: json, error: fnError } = await supabase.functions.invoke('import-csv', {
         body: { rows: mappedRows },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (fnError) {
         const body = await fnError.context?.text?.().catch(() => null)
