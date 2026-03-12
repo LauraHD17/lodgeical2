@@ -85,7 +85,9 @@ export default function Import() {
   const [columnMapping, setColumnMapping] = useState(null)   // null = template CSV; object = foreign CSV
   const [moneyUnit, setMoneyUnit] = useState('dollars')       // 'dollars' | 'cents'
   const [mappingConfirmed, setMappingConfirmed] = useState(false)
-  const [rollbackTarget, setRollbackTarget] = useState(null) // batch to confirm-rollback
+  const [rollbackTarget, setRollbackTarget] = useState(null)    // batch to confirm-rollback
+  const [renameTarget, setRenameTarget] = useState(null)        // { csvName, roomId, currentName }
+  const [renameValue, setRenameValue] = useState('')
   const fileInputRef = useRef(null)
 
   const { data: rooms = [] } = useRooms()
@@ -179,6 +181,19 @@ export default function Import() {
       addToast({ message: err?.message ?? 'Rollback failed', variant: 'error' })
     },
   })
+
+  async function handleRenameRoom() {
+    if (!renameTarget || !renameValue.trim()) return
+    const { error } = await supabase
+      .from('rooms')
+      .update({ name: renameValue.trim() })
+      .eq('id', renameTarget.roomId)
+    if (error) { addToast({ message: 'Rename failed', variant: 'error' }); return }
+    setRoomMappings(prev => ({ ...prev, [renameTarget.csvName]: renameValue.trim() }))
+    queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all })
+    setRenameTarget(null)
+    addToast({ message: `Room renamed to "${renameValue.trim()}"`, variant: 'success' })
+  }
 
   function handleDrop(e) {
     e.preventDefault()
@@ -394,79 +409,91 @@ export default function Import() {
       {/* Column Mapper — shown for non-template CSVs before confirming */}
       {columnMapping && !mappingConfirmed && preview && (
         <div className="bg-surface border border-border rounded-[8px] p-5 flex flex-col gap-4">
+          {/* Guided header */}
           <div>
             <h4 className="font-body text-[13px] font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
-              Column Mapping
+              Step 1 of 2 — Match Your Columns
             </h4>
-            <p className="font-body text-[13px] text-text-secondary">
-              Your CSV uses custom column names. Match each field to the right column — we&rsquo;ve pre-filled our best guesses.
+            <p className="font-body text-[15px] font-semibold text-text-primary">
+              Tell us which column in your file corresponds to each Lodge-ical field.
+            </p>
+            <p className="font-body text-[13px] text-text-secondary mt-1">
+              We&rsquo;ve made our best guesses based on your column names — adjust anything that looks wrong.
+              Nothing is imported until you review your data in the next step.
             </p>
           </div>
 
+          {/* 3-column grid: field name | dropdown | what to look for */}
           <div className="flex flex-col">
-            <div className="grid grid-cols-2 gap-3 pb-2 border-b border-border mb-1">
+            <div className="grid grid-cols-[1fr_1.2fr_2fr] gap-4 pb-2 border-b border-border mb-1">
               <span className="font-body text-[12px] uppercase tracking-wider text-text-muted font-semibold">Lodge-ical Field</span>
               <span className="font-body text-[12px] uppercase tracking-wider text-text-muted font-semibold">Your CSV Column</span>
+              <span className="font-body text-[12px] uppercase tracking-wider text-text-muted font-semibold">What to look for</span>
             </div>
             {IMPORT_FIELDS.map(field => (
-              <div key={field.key} className="grid grid-cols-2 gap-3 items-start py-2 border-b border-border last:border-0">
-                <div>
-                  <span className="font-body text-[14px] text-text-primary">
-                    {field.label}{field.required && <span className="text-danger ml-0.5">*</span>}
+              <div key={field.key} className="grid grid-cols-[1fr_1.2fr_2fr] gap-4 items-start py-3 border-b border-border last:border-0">
+                {/* Col 1: label + required/optional badge */}
+                <div className="flex flex-col gap-0.5 pt-1">
+                  <span className="font-body text-[14px] font-semibold text-text-primary leading-tight">
+                    {field.label}
                   </span>
-                  {field.hint && (
-                    <span className="font-body text-[12px] text-text-muted block">{field.hint}</span>
-                  )}
+                  {field.required
+                    ? <span className="font-mono text-[10px] text-danger font-semibold uppercase tracking-wider">required</span>
+                    : <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">optional</span>
+                  }
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <Select
-                      options={buildColumnOptions(field, preview.headers)}
-                      value={columnMapping[field.key] ?? ''}
-                      onValueChange={val => setColumnMapping(prev => ({ ...prev, [field.key]: val }))}
-                    />
-                  </div>
+
+                {/* Col 2: dropdown + money unit toggle */}
+                <div className="flex flex-col gap-1.5">
+                  <Select
+                    options={buildColumnOptions(field, preview.headers)}
+                    value={columnMapping[field.key] ?? ''}
+                    onValueChange={val => setColumnMapping(prev => ({ ...prev, [field.key]: val }))}
+                    className={cn(
+                      field.required
+                        && (!columnMapping[field.key] || Object.values(SPECIAL).includes(columnMapping[field.key]))
+                        && 'ring-1 ring-danger rounded-[6px]'
+                    )}
+                  />
                   {field.special === 'money'
                     && columnMapping[field.key]
                     && !Object.values(SPECIAL).includes(columnMapping[field.key])
                     && (
-                    <div className="flex items-center gap-2 shrink-0 font-body text-[13px] text-text-secondary">
+                    <div className="flex items-center gap-3 font-body text-[13px] text-text-secondary">
                       <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="moneyUnit"
-                          value="dollars"
-                          checked={moneyUnit === 'dollars'}
-                          onChange={() => setMoneyUnit('dollars')}
-                        />
-                        $
+                        <input type="radio" name="moneyUnit" value="dollars" checked={moneyUnit === 'dollars'} onChange={() => setMoneyUnit('dollars')} />
+                        Dollars ($)
                       </label>
                       <label className="flex items-center gap-1 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="moneyUnit"
-                          value="cents"
-                          checked={moneyUnit === 'cents'}
-                          onChange={() => setMoneyUnit('cents')}
-                        />
-                        ¢
+                        <input type="radio" name="moneyUnit" value="cents" checked={moneyUnit === 'cents'} onChange={() => setMoneyUnit('cents')} />
+                        Cents (¢)
                       </label>
                     </div>
                   )}
                 </div>
+
+                {/* Col 3: plain-language description */}
+                <p className="font-body text-[13px] text-text-secondary leading-snug pt-1">
+                  {field.description}
+                </p>
               </div>
             ))}
           </div>
 
-          <Button
-            variant="primary"
-            size="md"
-            disabled={!requiredMapped}
-            onClick={applyAndConfirmMapping}
-            className="self-start"
-          >
-            Confirm Mapping
-          </Button>
+          {/* Footer: reassurance + action */}
+          <div className="flex items-center justify-between pt-1 border-t border-border mt-1">
+            <p className="font-body text-[13px] text-text-muted">
+              You&rsquo;ll see a preview of your data before anything is saved.
+            </p>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!requiredMapped}
+              onClick={applyAndConfirmMapping}
+            >
+              Preview Import →
+            </Button>
+          </div>
         </div>
       )}
 
@@ -568,19 +595,50 @@ export default function Import() {
 
                   <div className="flex flex-col gap-3">
                     {unmatched.map((csvName) => (
-                      <div key={csvName} className="flex items-center gap-3">
-                        <span className="font-mono text-[14px] text-text-primary min-w-[140px] shrink-0">
-                          &ldquo;{csvName}&rdquo;
-                        </span>
-                        <ArrowRight size={16} weight="bold" className="text-text-muted shrink-0" />
-                        <div className="w-[240px]">
-                          <Select
-                            placeholder="Select a room"
-                            options={roomOptions}
-                            value={roomMappings[csvName] ?? ''}
-                            onValueChange={(val) => setRoomMappings(prev => ({ ...prev, [csvName]: val }))}
-                          />
+                      <div key={csvName} className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-[14px] text-text-primary min-w-[140px] shrink-0">
+                            &ldquo;{csvName}&rdquo;
+                          </span>
+                          <ArrowRight size={16} weight="bold" className="text-text-muted shrink-0" />
+                          <div className="w-[240px]">
+                            <Select
+                              placeholder="Select a room"
+                              options={roomOptions}
+                              value={roomMappings[csvName] ?? ''}
+                              onValueChange={(val) => {
+                                setRoomMappings(prev => ({ ...prev, [csvName]: val }))
+                                if (renameTarget?.csvName === csvName) setRenameTarget(null)
+                              }}
+                            />
+                          </div>
                         </div>
+                        {/* Inline room rename — shown after a Lodge-ical room has been selected */}
+                        {roomMappings[csvName] && (
+                          renameTarget?.csvName === csvName ? (
+                            <div className="flex items-center gap-2 ml-[calc(140px+2rem)]">
+                              <input
+                                className="border border-border rounded-[6px] px-2 py-1 font-body text-[13px] text-text-primary bg-surface-raised w-40 focus:outline-none focus:ring-2 focus:ring-info"
+                                value={renameValue}
+                                onChange={e => setRenameValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleRenameRoom(); if (e.key === 'Escape') setRenameTarget(null) }}
+                              />
+                              <button onClick={handleRenameRoom} className="font-body text-[13px] text-success hover:underline">Save</button>
+                              <button onClick={() => setRenameTarget(null)} className="font-body text-[13px] text-text-muted hover:underline">Cancel</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const roomId = rooms.find(r => r.name === roomMappings[csvName])?.id
+                                setRenameTarget({ csvName, roomId, currentName: roomMappings[csvName] })
+                                setRenameValue(roomMappings[csvName])
+                              }}
+                              className="font-body text-[13px] text-info hover:underline ml-[calc(140px+2rem)] self-start"
+                            >
+                              Also rename this room in Lodge-ical
+                            </button>
+                          )
+                        )}
                       </div>
                     ))}
                   </div>

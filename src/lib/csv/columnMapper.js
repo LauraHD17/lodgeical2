@@ -3,21 +3,95 @@
 // Used when an innkeeper uploads a CSV export from their old system.
 
 // ---------------------------------------------------------------------------
-// Field definitions — the Lodge-ical fields we need from an import CSV
+// Field definitions — the Lodge-ical fields we need from an import CSV.
+// Each field has a plain-language `description` shown in the column mapper UI
+// so innkeepers know exactly which column to pick, regardless of what their
+// old system called it.
 // ---------------------------------------------------------------------------
 export const IMPORT_FIELDS = [
-  { key: 'guest_name',          label: 'Guest name',      required: true,  special: 'fullname',  hint: 'Will be split into first and last name'       },
-  { key: 'room_name',           label: 'Room',            required: true                                                                               },
-  { key: 'check_in',            label: 'Check-in date',   required: true,                         hint: 'Must be YYYY-MM-DD'                           },
-  { key: 'check_out',           label: 'Check-out date',  required: true,                         hint: 'Must be YYYY-MM-DD'                           },
-  { key: 'num_guests',          label: '# Guests',        required: false, default: '1'                                                                },
-  { key: 'guest_email',         label: 'Guest email',     required: false, default: '__skip__'                                                         },
-  { key: 'guest_phone',         label: 'Guest phone',     required: false, default: '__skip__'                                                         },
-  { key: 'confirmation_number', label: 'Booking ID',      required: false, default: '__autogen__', hint: 'Auto-generated if not in your CSV'           },
-  { key: 'total_due_cents',     label: 'Total charge',    required: false, default: '__zero__',   special: 'money'                                     },
-  { key: 'amount_paid',         label: 'Amount paid',     required: false, default: '__zero__',   special: 'money', hint: 'Creates a payment record if > 0' },
-  { key: 'status',              label: 'Status',          required: false, default: '__confirmed__'                                                    },
-  { key: 'notes',               label: 'Notes',           required: false, default: '__skip__'                                                         },
+  {
+    key: 'guest_name',
+    label: 'Guest name',
+    required: true,
+    special: 'fullname',
+    description: "The guest's full name. Look for 'Guest name', 'Name', 'Customer', or 'Client'. We'll split it into first and last name automatically — everything before the last space becomes the first name.",
+  },
+  {
+    key: 'room_name',
+    label: 'Room',
+    required: true,
+    description: "Which room or unit the guest booked. In Uplisting this is 'Property nickname'; other systems call it 'Unit', 'Listing', or 'Accommodation'. If the column includes your property name (e.g., 'North Haven Inn - Room 3'), that's fine — you'll match it to your Lodge-ical rooms in the next step.",
+  },
+  {
+    key: 'check_in',
+    label: 'Check-in date',
+    required: true,
+    description: "Arrival date. Must be YYYY-MM-DD (e.g., 2026-06-15). Look for 'Check in', 'Arrival', or 'Start date'. If your dates are in a different format, reformat them in Excel or Google Sheets first.",
+  },
+  {
+    key: 'check_out',
+    label: 'Check-out date',
+    required: true,
+    description: "Departure date in YYYY-MM-DD format — the day the guest leaves, not their last night. Look for 'Check out', 'Departure', or 'End date'.",
+  },
+  {
+    key: 'num_guests',
+    label: '# Guests',
+    required: false,
+    default: '1',
+    description: "Number of people in the party. Often 'Number of guests', 'Adults', or 'Party size'. Defaults to 1 if not mapped.",
+  },
+  {
+    key: 'guest_email',
+    label: 'Guest email',
+    required: false,
+    default: '__skip__',
+    description: "Used to create or find the guest's profile — if the same guest books again, we'll match them by email. A placeholder address is generated if not provided; you can update it from the guest's profile later.",
+  },
+  {
+    key: 'guest_phone',
+    label: 'Guest phone',
+    required: false,
+    default: '__skip__',
+    description: "Contact number. Skip if not in your CSV.",
+  },
+  {
+    key: 'confirmation_number',
+    label: 'Booking ID',
+    required: false,
+    default: '__autogen__',
+    description: "Your existing booking or reservation number — often 'Booking ID', 'Reservation #', or 'Conf #'. Carried into Lodge-ical so you can cross-reference with your old system during transition. Auto-generated if not in your CSV.",
+  },
+  {
+    key: 'total_due_cents',
+    label: 'Total charge',
+    required: false,
+    default: '__zero__',
+    special: 'money',
+    description: "The full amount the guest was charged — what appears on their receipt, including cleaning fees and taxes. In Uplisting, use 'Gross revenue'. Avoid 'Total payout', 'Net revenue', or 'Payout' — those are what you received after platform fees, which is less than what the guest paid.",
+  },
+  {
+    key: 'amount_paid',
+    label: 'Amount paid',
+    required: false,
+    default: '__zero__',
+    special: 'money',
+    description: "How much the guest has already paid. For fully paid bookings this equals the total charge; for unpaid ones it's 0. If your CSV only shows an outstanding balance, subtract that from the total charge. Leave as $0 to record payments manually after import.",
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    required: false,
+    default: '__confirmed__',
+    description: "Booking status. We recognize 'confirmed', 'pending', 'cancelled', and 'no_show'. Defaults to 'confirmed' if not mapped or if values don't match — you can correct individual bookings after import.",
+  },
+  {
+    key: 'notes',
+    label: 'Notes',
+    required: false,
+    default: '__skip__',
+    description: "Free-text notes or special requests attached to the booking. Optional.",
+  },
 ]
 
 // Fields that require a real CSV column (can't be skipped or defaulted)
@@ -27,28 +101,37 @@ export const REQUIRED_FIELDS = IMPORT_FIELDS.filter(f => f.required).map(f => f.
 // Special default sentinel values
 // ---------------------------------------------------------------------------
 export const SPECIAL = {
-  AUTOGEN:    '__autogen__',
-  SKIP:       '__skip__',
-  ZERO:       '__zero__',
-  CONFIRMED:  '__confirmed__',
+  AUTOGEN:   '__autogen__',
+  SKIP:      '__skip__',
+  ZERO:      '__zero__',
+  CONFIRMED: '__confirmed__',
 }
 
 // ---------------------------------------------------------------------------
-// Keyword aliases — used for auto-suggest
+// Keyword aliases — used for auto-suggest mapping.
+//
+// ORDERING MATTERS: the first alias that matches a CSV header wins.
+// More-specific phrases must come before shorter ones to avoid false matches
+// (e.g., 'property nickname' before 'unit' so Uplisting's 'Multi-unit name'
+// doesn't steal the room_name slot).
 // ---------------------------------------------------------------------------
 const ALIASES = {
-  guest_name:          ['guest name', 'name', 'customer', 'full name', 'fullname', 'client', 'guest'],
-  room_name:           ['room', 'unit', 'accommodation', 'multi-unit', 'multi unit', 'property nickname', 'room name', 'unit name', 'suite'],
-  check_in:            ['check in', 'checkin', 'arrival', 'check-in', 'start date', 'from', 'arrive'],
-  check_out:           ['check out', 'checkout', 'departure', 'check-out', 'end date', 'to', 'depart'],
-  num_guests:          ['guests', 'adults', 'number of guests', 'people', 'pax', 'party size', 'occupants', 'number of nights'],
-  guest_email:         ['email', 'e-mail', 'guest email', 'email address', 'mail'],
-  guest_phone:         ['phone', 'telephone', 'mobile', 'cell', 'contact number', 'tel'],
-  confirmation_number: ['confirmation', 'booking', 'reservation id', 'booking id', 'booking number', 'ref', 'reference', 'id', 'booking ref'],
-  total_due_cents:     ['total', 'amount', 'charge', 'price', 'revenue', 'booking total', 'rate', 'total charge', 'amount due'],
-  amount_paid:         ['paid', 'amount paid', 'payment', 'received', 'collected'],
-  status:              ['status', 'booking status', 'reservation status', 'state'],
-  notes:               ['notes', 'comments', 'special requests', 'memo', 'remarks', 'special'],
+  guest_name:          ['guest name', 'full name', 'fullname', 'name', 'customer', 'client', 'guest'],
+  // 'property nickname' first — Uplisting; then specific phrases before 'unit' (which would match 'Multi-unit name')
+  room_name:           ['property nickname', 'property', 'listing', 'room name', 'unit name', 'room', 'suite', 'accommodation', 'unit'],
+  check_in:            ['check in', 'checkin', 'check-in', 'arrival', 'start date', 'arrive', 'from'],
+  check_out:           ['check out', 'checkout', 'check-out', 'departure', 'end date', 'depart', 'to'],
+  // 'number of nights' removed — it would match Uplisting's 'Number of nights' column (wrong field)
+  num_guests:          ['number of guests', 'num guests', 'guests', 'adults', 'people', 'pax', 'party size', 'occupants'],
+  guest_email:         ['guest email', 'email address', 'email', 'e-mail', 'mail'],
+  guest_phone:         ['guest phone', 'phone number', 'phone', 'telephone', 'mobile', 'cell', 'contact number', 'tel'],
+  confirmation_number: ['booking id', 'booking number', 'booking ref', 'reservation id', 'confirmation number', 'confirmation', 'booking', 'ref', 'reference', 'id'],
+  // 'gross revenue' / 'gross' first — that's the right Uplisting column (guest-facing total).
+  // 'total' and 'revenue' removed: too broad — match 'Total payout' and 'Net revenue' by accident.
+  total_due_cents:     ['gross revenue', 'gross', 'total charged', 'total charge', 'booking total', 'accommodation total', 'amount due', 'charge', 'price'],
+  amount_paid:         ['amount paid', 'paid', 'payment received', 'received', 'collected', 'payment'],
+  status:              ['booking status', 'reservation status', 'status', 'state'],
+  notes:               ['special requests', 'notes', 'comments', 'memo', 'remarks', 'special'],
 }
 
 function normalize(str) {
@@ -71,7 +154,6 @@ export function autoSuggestMapping(csvHeaders) {
     const aliases = ALIASES[field.key] ?? []
     let best = null
 
-    // Try each alias against each header
     outer: for (const alias of aliases) {
       for (const h of normalizedHeaders) {
         if (usedHeaders.has(h.original)) continue
@@ -132,11 +214,11 @@ export function applyColumnMapping(rawRows, mapping, moneyUnit = 'dollars') {
 
       // Money fields: optionally convert dollars → cents
       if (field.special === 'money') {
-        let raw_val = ''
+        let rawVal = ''
         if (src && src !== SPECIAL.SKIP && src !== SPECIAL.ZERO && raw[src] !== undefined) {
-          raw_val = raw[src]
+          rawVal = raw[src]
         }
-        const parsed = parseFloat(String(raw_val).replace(/[^0-9.]/g, '')) || 0
+        const parsed = parseFloat(String(rawVal).replace(/[^0-9.]/g, '')) || 0
         const cents = moneyUnit === 'dollars' ? Math.round(parsed * 100) : Math.round(parsed)
 
         if (field.key === 'total_due_cents') row.total_due_cents = cents
