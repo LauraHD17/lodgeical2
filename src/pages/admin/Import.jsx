@@ -16,6 +16,7 @@ import { queryKeys } from '@/config/queryKeys'
 import { cn } from '@/lib/utils'
 import { parseCsvToRows } from '@/lib/csv/parseRfc4180'
 import { TransferChecklist } from '@/components/import/TransferChecklist'
+import { autoSuggestMapping, isTemplateCsv, applyColumnMapping, IMPORT_FIELDS, SPECIAL } from '@/lib/csv/columnMapper'
 
 const CSV_TEMPLATE_HEADERS = [
   'confirmation_number',
@@ -58,6 +59,17 @@ function downloadTemplate() {
   URL.revokeObjectURL(url)
 }
 
+function buildColumnOptions(field, headers) {
+  const cols = headers.map(h => ({ value: h, label: h }))
+  const specials = []
+  if (!field.required) {
+    if (field.default === SPECIAL.AUTOGEN)         specials.push({ value: SPECIAL.AUTOGEN,    label: '(Auto-generate)' })
+    else if (field.default === SPECIAL.ZERO)       specials.push({ value: SPECIAL.ZERO,       label: '(Default to $0)' })
+    else if (field.default === SPECIAL.CONFIRMED)  specials.push({ value: SPECIAL.CONFIRMED,  label: '(Default: confirmed)' })
+    else                                           specials.push({ value: SPECIAL.SKIP,       label: '(None — skip)' })
+  }
+  return [...cols, ...specials]
+}
 
 export default function Import() {
   const { addToast } = useToast()
@@ -65,11 +77,14 @@ export default function Import() {
   const queryClient = useQueryClient()
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState(null)
-  const [preview, setPreview] = useState(null)   // { headers, previewRows, allRows }
+  const [preview, setPreview] = useState(null)   // { headers, previewRows, allRows, rawRows? }
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState(null)     // { imported, skipped, errors }
   const [checklistRows, setChecklistRows] = useState(null)
   const [roomMappings, setRoomMappings] = useState({}) // { csvName: lodgeicalRoomName }
+  const [columnMapping, setColumnMapping] = useState(null)   // null = template CSV; object = foreign CSV
+  const [moneyUnit, setMoneyUnit] = useState('dollars')       // 'dollars' | 'cents'
+  const [mappingConfirmed, setMappingConfirmed] = useState(false)
   const fileInputRef = useRef(null)
 
   const { data: rooms = [] } = useRooms()
@@ -90,7 +105,7 @@ export default function Import() {
     enabled: !!propertyId,
   })
 
-  // Room name matching
+  // Room name matching — runs on allRows (post-mapping for foreign CSVs)
   const { autoMatched, unmatched } = useMemo(() => {
     if (!preview?.allRows?.length || !rooms.length) return { autoMatched: [], unmatched: [] }
 
@@ -117,6 +132,10 @@ export default function Import() {
     [rooms],
   )
 
+  // Required fields must be mapped to a real CSV column (not a sentinel)
+  const requiredMapped = !!columnMapping && ['guest_name', 'room_name', 'check_in', 'check_out']
+    .every(k => columnMapping[k] && !Object.values(SPECIAL).includes(columnMapping[k]))
+
   function handleDrop(e) {
     e.preventDefault()
     setDragActive(false)
@@ -133,14 +152,21 @@ export default function Import() {
     setFile(f)
     setResult(null)
     setRoomMappings({})
+    setColumnMapping(null)
+    setMappingConfirmed(false)
+    setMoneyUnit('dollars')
     const reader = new FileReader()
     reader.onload = (evt) => {
       const { headers, rows } = parseCsvToRows(evt.target.result)
-      setPreview({
-        headers,
-        previewRows: rows.slice(0, 5),
-        allRows: rows,
-      })
+      if (isTemplateCsv(headers)) {
+        setColumnMapping(null)
+        setMappingConfirmed(true)
+        setPreview({ headers, previewRows: rows.slice(0, 5), allRows: rows })
+      } else {
+        setColumnMapping(autoSuggestMapping(headers))
+        setMappingConfirmed(false)
+        setPreview({ headers, previewRows: rows.slice(0, 5), allRows: [], rawRows: rows })
+      }
     }
     reader.readAsText(f)
   }
@@ -150,7 +176,16 @@ export default function Import() {
     setPreview(null)
     setResult(null)
     setRoomMappings({})
+    setColumnMapping(null)
+    setMappingConfirmed(false)
+    setMoneyUnit('dollars')
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function applyAndConfirmMapping() {
+    const mapped = applyColumnMapping(preview.rawRows, columnMapping, moneyUnit)
+    setPreview(p => ({ ...p, allRows: mapped }))
+    setMappingConfirmed(true)
   }
 
   async function handleImport() {
@@ -240,19 +275,19 @@ export default function Import() {
 
       {/* Transition guide */}
       <div className="bg-info-bg border border-info rounded-[8px] p-4 flex items-start gap-3">
-        <Info size={18} className="text-info shrink-0 mt-0.5" />
+        <Info size={18} className="text-info shrink-0 mt-0.5" weight="fill" />
         <div className="flex flex-col gap-1.5">
           <p className="font-body font-semibold text-[15px] text-info">
             Transitioning from another system?
           </p>
           <p className="font-body text-[14px] text-info">
-            Lodge-ical safely handles re-imports. Each reservation's confirmation number is
-            unique — duplicates are automatically skipped. Export periodically from your old
-            system, import here, and verify with the transfer checklist.
+            Upload your existing CSV — any column format works. Lodge-ical will help you
+            map your columns to the right fields. Re-imports are safe: duplicate reservations
+            (same room, same dates) are automatically skipped.
           </p>
           <p className="font-body text-[14px] text-info">
             Dates must be <strong className="font-semibold">YYYY-MM-DD</strong>. Room names are
-            matched to your Rooms page — we'll help you map any that don't match.
+            matched to your Rooms page — we&rsquo;ll help you map any that don&rsquo;t match.
           </p>
         </div>
       </div>
@@ -288,7 +323,7 @@ export default function Import() {
             <p className="font-body font-semibold text-[16px] text-text-primary">{file.name}</p>
             <p className="font-mono text-[13px] text-text-muted">
               {(file.size / 1024).toFixed(1)} KB
-              {preview && ` · ${preview.allRows.length} row${preview.allRows.length !== 1 ? 's' : ''}`}
+              {preview && ` · ${preview.rawRows?.length ?? preview.allRows.length} row${(preview.rawRows?.length ?? preview.allRows.length) !== 1 ? 's' : ''}`}
             </p>
             <button
               onClick={(e) => { e.stopPropagation(); clearFile() }}
@@ -312,10 +347,121 @@ export default function Import() {
         )}
       </div>
 
-      {/* Column mapping preview */}
-      {preview && (
+      {/* Column Mapper — shown for non-template CSVs before confirming */}
+      {columnMapping && !mappingConfirmed && preview && (
+        <div className="bg-surface border border-border rounded-[8px] p-5 flex flex-col gap-4">
+          <div>
+            <h4 className="font-body text-[13px] font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
+              Column Mapping
+            </h4>
+            <p className="font-body text-[13px] text-text-secondary">
+              Your CSV uses custom column names. Match each field to the right column — we&rsquo;ve pre-filled our best guesses.
+            </p>
+          </div>
+
+          <div className="flex flex-col">
+            <div className="grid grid-cols-2 gap-3 pb-2 border-b border-border mb-1">
+              <span className="font-body text-[12px] uppercase tracking-wider text-text-muted font-semibold">Lodge-ical Field</span>
+              <span className="font-body text-[12px] uppercase tracking-wider text-text-muted font-semibold">Your CSV Column</span>
+            </div>
+            {IMPORT_FIELDS.map(field => (
+              <div key={field.key} className="grid grid-cols-2 gap-3 items-start py-2 border-b border-border last:border-0">
+                <div>
+                  <span className="font-body text-[14px] text-text-primary">
+                    {field.label}{field.required && <span className="text-danger ml-0.5">*</span>}
+                  </span>
+                  {field.hint && (
+                    <span className="font-body text-[12px] text-text-muted block">{field.hint}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Select
+                      options={buildColumnOptions(field, preview.headers)}
+                      value={columnMapping[field.key] ?? ''}
+                      onValueChange={val => setColumnMapping(prev => ({ ...prev, [field.key]: val }))}
+                    />
+                  </div>
+                  {field.special === 'money'
+                    && columnMapping[field.key]
+                    && !Object.values(SPECIAL).includes(columnMapping[field.key])
+                    && (
+                    <div className="flex items-center gap-2 shrink-0 font-body text-[13px] text-text-secondary">
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="moneyUnit"
+                          value="dollars"
+                          checked={moneyUnit === 'dollars'}
+                          onChange={() => setMoneyUnit('dollars')}
+                        />
+                        $
+                      </label>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="moneyUnit"
+                          value="cents"
+                          checked={moneyUnit === 'cents'}
+                          onChange={() => setMoneyUnit('cents')}
+                        />
+                        ¢
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            variant="primary"
+            size="md"
+            disabled={!requiredMapped}
+            onClick={applyAndConfirmMapping}
+            className="self-start"
+          >
+            Confirm Mapping
+          </Button>
+        </div>
+      )}
+
+      {/* Preview + room matching — shown after mapping confirmed (or template CSV) */}
+      {preview && (columnMapping === null || mappingConfirmed) && (
         <div className="flex flex-col gap-4">
-          <h2 className="font-heading text-[20px] text-text-primary">Column Mapping Preview</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-[20px] text-text-primary">Preview</h2>
+            {columnMapping && mappingConfirmed && (
+              <button
+                onClick={() => setMappingConfirmed(false)}
+                className="font-body text-[13px] text-info hover:underline"
+              >
+                Edit column mapping
+              </button>
+            )}
+          </div>
+
+          {/* Revenue warning — shown when a foreign CSV has both money columns left at $0 default */}
+          {columnMapping && mappingConfirmed
+            && columnMapping.total_due_cents === SPECIAL.ZERO
+            && (
+            <div className="bg-warning-bg border border-warning rounded-[8px] p-4 flex items-start gap-3">
+              <Warning size={18} className="text-warning shrink-0 mt-0.5" weight="fill" />
+              <p className="font-body text-[14px] text-text-primary">
+                <span className="font-semibold">No charge column mapped.</span>{' '}
+                Financial reports for these reservations will show $0 revenue. Occupancy and calendar
+                will be correct, but ADR and revenue metrics will be understated.{' '}
+                <button
+                  onClick={() => setMappingConfirmed(false)}
+                  className="text-info underline underline-offset-2"
+                >
+                  Edit mapping
+                </button>{' '}
+                to fix this.
+              </p>
+            </div>
+          )}
+
           <div className="overflow-x-auto border border-border rounded-[8px]">
             <table className="w-full border-collapse">
               <thead>
@@ -442,8 +588,8 @@ export default function Import() {
               : 'bg-success-bg border-success'
           )}>
             {result.errors?.length > 0
-              ? <Warning size={18} className="text-warning mt-0.5 shrink-0" />
-              : <CheckCircle size={18} className="text-success mt-0.5 shrink-0" />
+              ? <Warning size={18} className="text-warning mt-0.5 shrink-0" weight="fill" />
+              : <CheckCircle size={18} className="text-success mt-0.5 shrink-0" weight="fill" />
             }
             <div className="flex flex-col gap-1">
               <p className="font-body font-semibold text-[14px] text-text-primary">
@@ -451,7 +597,7 @@ export default function Import() {
               </p>
               <p className="font-body text-[13px] text-text-secondary">
                 {result.imported} reservation{result.imported !== 1 ? 's' : ''} created
-                {' · '}{result.skipped} skipped (already exist)
+                {result.skipped > 0 && ` · ${result.skipped} skipped (already exist)`}
                 {result.errors?.length > 0 && ` · ${result.errors.length} error(s)`}
               </p>
             </div>

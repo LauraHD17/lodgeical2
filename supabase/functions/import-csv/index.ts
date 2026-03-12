@@ -24,19 +24,20 @@ const CORS_HEADERS = {
 }
 
 // ---------------------------------------------------------------------------
-// Row schema — mirrors CSV_TEMPLATE_HEADERS in Import.jsx
+// Row schema — relaxed for column-mapped imports from third-party systems
 // ---------------------------------------------------------------------------
 const csvRowSchema = z.object({
-  confirmation_number: z.string().min(1),
+  confirmation_number: z.string().optional().default(''),   // auto-generated if empty
   check_in:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
   check_out:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
-  num_guests:          z.coerce.number().int().min(1),
+  num_guests:          z.coerce.number().int().min(1).optional().default(1),
   guest_first_name:    z.string().min(1),
-  guest_last_name:     z.string().min(1),
-  guest_email:         z.string().email(),
+  guest_last_name:     z.string().optional().default(''),
+  guest_email:         z.string().optional().default(''),   // placeholder generated if empty
   guest_phone:         z.string().optional().default(''),
   room_name:           z.string().min(1),
-  total_due_cents:     z.coerce.number().int().min(0),
+  total_due_cents:     z.coerce.number().int().min(0).optional().default(0),
+  amount_paid_cents:   z.coerce.number().int().min(0).optional().default(0),
   status:              z.enum(['confirmed', 'pending', 'cancelled', 'no_show']).default('confirmed'),
   notes:               z.string().optional().default(''),
 }).refine(r => new Date(r.check_out) > new Date(r.check_in), {
@@ -97,18 +98,27 @@ serve(async (req) => {
     })
   }
 
-  // 3. Load rooms + existing confirmation numbers in parallel (both independent of row data)
+  // 3. Load rooms + existing reservations in parallel (both independent of row data)
   const [{ data: propertyRooms }, { data: existingReservations }] = await Promise.all([
     supabase.from('rooms').select('id, name').eq('property_id', propertyId),
-    supabase.from('reservations').select('confirmation_number').eq('property_id', propertyId),
+    supabase.from('reservations')
+      .select('confirmation_number, check_in, check_out, room_ids')
+      .eq('property_id', propertyId),
   ])
 
   const roomByName = new Map<string, string>(
     (propertyRooms ?? []).map(r => [r.name.toLowerCase().trim(), r.id])
   )
 
-  // Pre-load into a Set for O(1) duplicate checks — avoids N+1 per-row SELECT
+  // Pre-load into Sets for O(1) duplicate checks — avoids N+1 per-row SELECT
+  // Primary key: confirmation_number (exact match for CSVs that include booking IDs)
   const existingConfNums = new Set((existingReservations ?? []).map(r => r.confirmation_number))
+  // Fallback composite key: check_in|check_out|roomId (catches re-uploads where conf numbers were auto-generated)
+  const existingCompositeKeys = new Set(
+    (existingReservations ?? []).flatMap((r: { check_in: string; check_out: string; room_ids: string[] }) =>
+      (r.room_ids ?? []).map((rid: string) => `${r.check_in}|${r.check_out}|${rid}`)
+    )
+  )
 
   // 4. Process each row
   let imported = 0
@@ -129,8 +139,22 @@ serve(async (req) => {
     }
     const row: CsvRow = parsed.data
 
+    // Auto-generate confirmation_number if not provided
+    let confNum = row.confirmation_number
+    if (!confNum) {
+      const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/I/1
+      const gen = () => Array.from(crypto.getRandomValues(new Uint8Array(6)))
+        .map(b => ALPHABET[b % ALPHABET.length]).join('')
+      confNum = gen()
+      if (existingConfNums.has(confNum)) confNum = gen()
+    }
+
     // Check for duplicate confirmation_number (O(1) — pre-loaded above)
-    if (existingConfNums.has(row.confirmation_number)) { skipped++; continue }
+    if (existingConfNums.has(confNum)) { skipped++; continue }
+    existingConfNums.add(confNum) // prevent intra-batch dupes
+
+    // Placeholder email if not provided (guest upsert requires unique email)
+    const guestEmail = row.guest_email || `import-${confNum.toLowerCase()}@placeholder.lodgeical`
 
     // Resolve room
     const roomId = roomByName.get(row.room_name.toLowerCase().trim())
@@ -139,13 +163,18 @@ serve(async (req) => {
       continue
     }
 
+    // Composite key dedup: check_in|check_out|roomId — catches re-uploads where conf numbers were auto-generated
+    const compositeKey = `${row.check_in}|${row.check_out}|${roomId}`
+    if (existingCompositeKeys.has(compositeKey)) { skipped++; continue }
+    existingCompositeKeys.add(compositeKey) // prevent intra-batch dupes
+
     // Upsert guest
     const { data: guest, error: guestErr } = await supabase
       .from('guests')
       .upsert(
         {
           property_id: propertyId,
-          email:       row.guest_email,
+          email:       guestEmail,
           first_name:  row.guest_first_name,
           last_name:   row.guest_last_name,
           phone:       row.guest_phone || null,
@@ -161,7 +190,7 @@ serve(async (req) => {
     }
 
     // Insert reservation
-    const { error: insertErr } = await supabase.from('reservations').insert({
+    const { data: reservation, error: insertErr } = await supabase.from('reservations').insert({
       property_id:         propertyId,
       guest_id:            guest.id,
       room_ids:            [roomId],
@@ -171,20 +200,33 @@ serve(async (req) => {
       status:              row.status,
       origin:              'import',
       total_due_cents:     row.total_due_cents,
-      confirmation_number: row.confirmation_number,
+      confirmation_number: confNum,
       notes:               row.notes || null,
-    })
+    }).select('id').single()
 
-    if (insertErr) {
-      errors.push({ row: rowNum, error: insertErr.message })
-    } else {
-      imported++
+    if (insertErr || !reservation) {
+      errors.push({ row: rowNum, error: insertErr?.message ?? 'Insert failed' })
+      continue
     }
+
+    // Create payment record if amount_paid > 0
+    if (row.amount_paid_cents > 0) {
+      await supabase.from('payments').insert({
+        property_id:    propertyId,
+        reservation_id: reservation.id,
+        amount_cents:   row.amount_paid_cents,
+        status:         'paid',
+        method:         'import',
+        paid_at:        new Date().toISOString(),
+      })
+    }
+
+    imported++
   }
 
   // Audit log (fire-and-forget)
-  logAdminAction(supabase, propertyId, user.id, 'import', 'reservation', null, { count: imported, fileName: 'csv-import' })
-    .catch(e => console.error('[import-csv] audit error:', e))
+  logAdminAction(supabase, propertyId, user!.id, 'import', 'reservation', undefined, { count: imported, fileName: 'csv-import' })
+    .catch(() => {})
 
   return new Response(
     JSON.stringify({ success: true, imported, skipped, errors }),
