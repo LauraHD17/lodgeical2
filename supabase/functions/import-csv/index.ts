@@ -20,7 +20,7 @@ import { logAdminAction } from '../_shared/audit.ts'
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +53,7 @@ interface RowError {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
+  try {
   // 1. Auth
   const authResult = await requireAuth(req)
   if (authResult.error) {
@@ -189,4 +190,12 @@ serve(async (req) => {
     JSON.stringify({ success: true, imported, skipped, errors }),
     { headers: CORS_HEADERS },
   )
+
+  } catch (err) {
+    console.error('[import-csv]', err)
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : 'Internal error' }),
+      { status: 500, headers: CORS_HEADERS },
+    )
+  }
 })

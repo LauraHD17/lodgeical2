@@ -19,7 +19,7 @@ import { parseIcs, deriveConfirmationNumber } from '../_shared/ical.ts'
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 // Internal "blocked date" guest — created once per property on first sync.

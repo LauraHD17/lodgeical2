@@ -11,7 +11,7 @@ import { calculatePaymentSummary } from '../_shared/paymentSummary.ts'
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 const inputSchema = z.object({
