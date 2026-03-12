@@ -679,15 +679,15 @@ export default function Import() {
         />
       )}
 
-      {/* Import History — shown when no active import result */}
-      {!result && importBatches.length > 0 && (
+      {/* Import History — only batches that created reservations (error-only runs are noise) */}
+      {!result && importBatches.filter(b => b.imported_count > 0).length > 0 && (
         <div className="flex flex-col gap-3">
           <h2 className="font-heading text-[20px] text-text-primary flex items-center gap-2">
             <ClockCounterClockwise size={20} weight="fill" className="text-text-secondary" />
             Import History
           </h2>
           <div className="border border-border rounded-[8px] overflow-hidden">
-            {importBatches.map((batch, i) => {
+            {importBatches.filter(b => b.imported_count > 0).map((batch, i) => {
               const rolledBack = !!batch.rolled_back_at
               const canRollback = !rolledBack && batch.imported_count > 0
               return (
