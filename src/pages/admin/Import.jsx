@@ -141,10 +141,29 @@ export default function Import() {
     mutationFn: async (batch) => {
       const ids = batch.reservation_ids ?? []
       if (ids.length > 0) {
-        // Delete payments first (FK constraint), then reservations
+        // Fast path: we have the exact IDs from when they were created
         await supabase.from('payments').delete().in('reservation_id', ids)
         const { error } = await supabase.from('reservations').delete().in('id', ids)
         if (error) throw new Error(error.message)
+      } else {
+        // Legacy path: batch pre-dates reservation_ids tracking.
+        // Match by origin='import' within a ±5 min window of the batch timestamp.
+        const batchTime = new Date(batch.created_at)
+        const windowStart = new Date(batchTime.getTime() - 5 * 60 * 1000).toISOString()
+        const windowEnd   = new Date(batchTime.getTime() + 5 * 60 * 1000).toISOString()
+        const { data: legacyRows } = await supabase
+          .from('reservations')
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('origin', 'import')
+          .gte('created_at', windowStart)
+          .lte('created_at', windowEnd)
+        const legacyIds = (legacyRows ?? []).map(r => r.id)
+        if (legacyIds.length > 0) {
+          await supabase.from('payments').delete().in('reservation_id', legacyIds)
+          const { error } = await supabase.from('reservations').delete().in('id', legacyIds)
+          if (error) throw new Error(error.message)
+        }
       }
       // Stamp the batch as rolled back
       await supabase.from('import_batches').update({ rolled_back_at: new Date().toISOString() }).eq('id', batch.id)
@@ -670,7 +689,7 @@ export default function Import() {
           <div className="border border-border rounded-[8px] overflow-hidden">
             {importBatches.map((batch, i) => {
               const rolledBack = !!batch.rolled_back_at
-              const canRollback = !rolledBack && (batch.reservation_ids?.length ?? 0) > 0
+              const canRollback = !rolledBack && batch.imported_count > 0
               return (
                 <div
                   key={batch.id}
